@@ -48,12 +48,37 @@ figure standard baseline
 at least know what equations mean  
 try fit standard baseline  
 
+
+
 ## 3.12
-###  
+### firefly inersia task  
+tau as a time constant for velocity curve, so the velocity isnt changed immediately  
+tau has a effect on where stop  
+but for each tau, should have a mean of 0  
+seperate vestibular, visual, and combined task types  
+question, how to do visual only task?  
+if have estimated tau correct, no tau uncertainty, sensory likelyhood funciton changed, so prior weight larger. still tau has a effect on posterier  
+have prior, and exact likelyhood, inference correct, but post is biased by prior?  
+bias, varinace trade off  
+## the model,
+estimate tau from baysian, from change of speed of begining of trial and end of trail, at first several trials.    
+integrate joystick input with tau estimate to trajectory  
+how estimate the 2nd step, using two tau, just use tau in equation, not probablistic  
+in this way, no process noise, deterministic  
+if using probablistic, estimated parameter instead of believed parameter, provide extra noise  
+should be considered when improving  
+waber law, distance squared, still not explained the effect  
+chaos, highly depends on init states and amp  
+## progress
+refactor framework  
+## todo
+ssh  
+ssh vscode  
+git repo organize  
 
-### progress
 
-### todo
+
+
 
 
 

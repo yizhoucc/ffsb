@@ -3,10 +3,12 @@ from numpy import pi
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
-from FireflyEnv.firefly_task import Model
 from DDPGv2Agent.belief_step import BeliefStep
 from FireflyEnv.plotter_gym import Render
+from FireflyEnv.firefly_task import Model
 from DDPGv2Agent.rewards import *
+
+
 
 
 class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OBS_NOISE_STD):
@@ -18,10 +20,9 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
     def __init__(self,arg):
         '''
         state-observation-blief-action-next state
-
+        arg:
+            gains_range, 4 element list
         step:  action -> new state-observation-blief    
-        
-
         reset: init new state
         '''
         super(FireflyEnv, self).__init__()
@@ -33,12 +34,12 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         self.action_space = spaces.Box(-np.ones(2), np.ones(2), dtype=np.float32)
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
 
-        self.model = Model(arg) # environment
-        self.belief = BeliefStep(arg) # agent
-        self.action_dim = self.model.action_dim
-        self.state_dim = self.model.state_dim
-        #self.reset(gains_range, std_range, goal_radius_range)
+        # specific defines
+
+        self.action_dim = 2
+        self.state_dim = 29
         self.rendering = Render()
+        self.gains_range=arg.gains_range
 
 
 
@@ -71,7 +72,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         
         return self.state, reward, done, info
 
-    def reset(self):
+    def reset(self,pro_gains=None,noise_range=None, goal_radius_range=None, pro_noise_ln_vars=None, goal_radius=None, gains_range=None,obs_gains=None,obs_noise_ln_vars=None):
         '''
         # retrun obs
         two ling of reset here:
@@ -81,13 +82,18 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
 
         then, reset belief:
 
-
         finally, return state
         '''
+        print('resetting env')
 
 
-        x, pro_gains, pro_noise_ln_vars, goal_radius = self.model.reset(gains_range, noise_range, goal_radius_range)
-        # detail of model reset
+
+        '''
+        init world state
+        output; x, pro_gains, pro_noise_ln_vars, goal_radius
+        input; gains_range, noise_range, goal_radius_range
+        orignal call, model.reset
+        '''
         self.pro_gains = torch.zeros(2)
         self.pro_noise_ln_vars = torch.zeros(2)
         if pro_gains is None: # is none, so assign value?
@@ -108,7 +114,6 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
             self.goal_radius = torch.zeros(1).uniform_(goal_radius_range[0], self.max_goal_radius)
         else:
             self.goal_radius = goal_radius
-
         self.time = torch.zeros(1)
         min_r = self.goal_radius.item()
         r = torch.zeros(1).uniform_(min_r, self.box)  # GOAL_RADIUS, self.box is world size
@@ -130,26 +135,17 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-        b, state, obs_gains, obs_noise_ln_vars = self.belief.reset(x, torch.zeros(1) , pro_gains, pro_noise_ln_vars, goal_radius, gains_range, noise_range)
-        # detail of belief reset
-                self.pro_gains = pro_gains
+        '''
+        init belief state
+        output: b, state, obs_gains, obs_noise_ln_vars
+        input: (x, torch.zeros(1) , pro_gains, pro_noise_ln_vars, goal_radius, gains_range, noise_range)
+        orignal call, belief.reset
+        '''
+        self.pro_gains = pro_gains
         self.pro_noise_ln_vars = pro_noise_ln_vars
         self.goal_radius = goal_radius
-
         self.obs_gains = torch.zeros(2)
         self.obs_noise_ln_vars = torch.zeros(2)
-
         if obs_gains is None:
             self.obs_gains[0] = torch.zeros(1).uniform_(gains_range[0], gains_range[1])  # [obs_gain_vel]
             self.obs_gains[1] = torch.zeros(1).uniform_(gains_range[2], gains_range[3])  # [obs_gain_ang]
@@ -181,6 +177,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
 
 
 
+
     def __del__(self):
         if self.enable_render is True:
             self.maze_view.quit_game()
@@ -201,3 +198,13 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         pos = x.view(-1)[:2]
         r = torch.norm(pos).item()
         return pos, r
+
+
+# if __name__ == "__main__":
+
+#     from stable_baselines.common.env_checker import check_env
+#     env=gym.make('FF-v0')
+#     # env = CustomEnv(arg1, ...)
+#     # It will check your custom environment and output additional warnings if needed
+#     check_env(env)
+#     pass

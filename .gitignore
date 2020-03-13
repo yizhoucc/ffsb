@@ -2,3 +2,4 @@
 *.xml
 *.json
 data/
+.vscode/settings.json

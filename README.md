@@ -2,11 +2,12 @@
 minhae0516/[new-firefly-forward_v2](https://github.com/minhae0516/new-firefly-forward_v2)  
 hill-a/[stable-baseline](https://github.com/hill-a/stable-baselines)  
 
-
-
-
-
-
+### dependency
+tensorflow==1.14.0  
+tensorflow-estimator==1.14.0  
+pytorch==1.4.0   
+cuda10.1
+note: the tensorflow used is a very outdated version,it will give lots of warnings for deprecated namings.    
 
 
 

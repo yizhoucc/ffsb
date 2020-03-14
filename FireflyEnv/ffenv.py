@@ -131,7 +131,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
 
         # orignal return names
         #return next_x, reached_target, next_b, reward, info, next_state, next_ox
-        print(self.belief.shape,'this is belief shape in step')
+        # print(self.belief.shape,'this is belief shape in step')
         return self.belief, reward, reached_target, info
 
     def reset(self):

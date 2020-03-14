@@ -1,3 +1,19 @@
+# based on these works:
+minhae0516/[new-firefly-forward_v2](https://github.com/minhae0516/new-firefly-forward_v2)  
+hill-a/[stable-baseline](https://github.com/hill-a/stable-baselines)  
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Forward Control for Firefly Project
 
 These codes are for the forward control of the firefly project. 

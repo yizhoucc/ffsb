@@ -49,7 +49,6 @@ at least know what equations mean
 try fit standard baseline  
 
 
-
 ## 3.12
 ### firefly inersia task  
 tau as a time constant for velocity curve, so the velocity isnt changed immediately  
@@ -78,14 +77,277 @@ git repo organize
 
 
 
-
-
-
-
-
 ## 3.13
+###  
+
+### progress
+refactor details and link to framework    
+### todo
+check if var correct  
+test learning  
+visualize using gym  
+
+
+
+# wk 2
+
+## 3.16
+
 ###  
 
 ### progress
 
 ### todo
+
+## 3.17
+
+###  
+
+### progress
+
+### todo
+
+## 3.18
+
+###  
+
+### progress
+
+### todo
+
+## 3.19
+
+###  
+
+### progress
+
+### todo
+
+## 3.20
+
+###  
+
+### progress
+
+### todo
+
+
+# wk 3
+
+## 3.23
+
+###  
+
+### progress
+
+### todo
+
+## 3.24
+
+###  
+
+### progress
+
+### todo
+
+## 3.25
+
+###  
+
+### progress
+
+### todo
+
+## 3.26
+
+###  
+
+### progress
+
+### todo
+
+## 3.27
+
+###  
+
+### progress
+
+### todo
+
+
+
+# wk 4
+
+## 3.30
+
+###  
+
+### progress
+
+### todo
+
+## 3.31
+
+###  
+
+### progress
+
+### todo
+
+## 4.01
+
+###  
+
+### progress
+
+### todo
+
+## 4.02
+
+###  
+
+### progress
+
+### todo
+
+## 4.03
+
+###  
+
+### progress
+
+### todo
+
+
+
+# wk 5
+
+## 4.06
+
+###  
+
+### progress
+
+### todo
+
+## 4.07
+
+###  
+
+### progress
+
+### todo
+
+## 4.08
+
+###  
+
+### progress
+
+### todo
+
+## 4.09
+
+###  
+
+### progress
+
+### todo
+
+## 4.10
+
+###  
+
+### progress
+
+### todo
+
+
+
+# wk 6
+
+## 4.13
+
+###  
+
+### progress
+
+### todo
+
+## 4.14
+
+###  
+
+### progress
+
+### todo
+
+## 1.15
+
+###  
+
+### progress
+
+### todo
+
+## 4.16
+
+###  
+
+### progress
+
+### todo
+
+## 4.17
+
+###  
+
+### progress
+
+### todo
+
+
+
+# wk 7
+
+## 4.20
+
+###  
+
+### progress
+
+### todo
+
+## 4.21
+
+###  
+
+### progress
+
+### todo
+
+## 4.22
+
+###  
+
+### progress
+
+### todo
+
+## 4.23
+
+###  
+
+### progress
+
+### todo
+
+## 4.24
+
+###  
+
+### progress
+
+### todo
+
+

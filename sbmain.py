@@ -1,6 +1,7 @@
 import gym
 from stable_baselines.ddpg.policies import MlpPolicy
 from stable_baselines import A2C
+from stable_baselines.common.policies import MlpPolicy
 from stable_baselines import DDPG
 from FireflyEnv import ffenv
 from Config import Config
@@ -28,9 +29,17 @@ arg=Config()
 
 
 env=ffenv.FireflyEnv(arg)
-model = DDPG(MlpPolicy, env, verbose=1,batch_size=64)
-model.learn(total_timesteps=50000)
+model = A2C(MlpPolicy, env, verbose=1)
+model.learn(total_timesteps=5000)
 
-# obs = env.reset()
+model.save("a2c_ff")
+obs = env.reset()
+del model # remove to demonstrate saving and loading
+model = A2C.load("a2c_ff")
+
+while True:
+    action, _states = model.predict(obs)
+    obs, rewards, dones, info = env.step(action)
+    env.render()
 
 # env.close()

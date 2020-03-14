@@ -33,7 +33,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         # They must be gym.spaces objects
         # box and discrete are most common
         self.action_space = spaces.Box(-np.ones(2), np.ones(2), dtype=np.float32)
-        self.observation_space = spaces.Box(low, high, dtype=np.float32)
+        self.observation_space = spaces.Box(low=-1, high=1,shape=(1,29), dtype=np.float32)
 
         # specific defines
         
@@ -62,6 +62,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         self.GOAL_RADIUS_STEP_SIZE = arg.GOAL_RADIUS_STEP_SIZE
         self.gains_range = arg.gains_range
         self.noise_range = arg.noise_range
+        self.REWARD=arg.REWARD
         # reset
         self.reset()
 
@@ -88,8 +89,9 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         '''
         # x t+1 and done
         # fftask forward. 
-        # next_x, reached_target = self.model(x, action.view(-1))  # track true next_x of monkey
-        next_x = dynamics(x, action, self.dt, self.box, self.pro_gains, self.pro_noise_ln_vars)
+        # next_x, reached_target = self.model(x, action.view(-1))  
+        # true next state, xy position, reach target or not(have not decide if stop or not).
+        next_x = self.dynamics(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_ln_vars)
         pos = next_x.view(-1)[:2]
         reached_target = (torch.norm(pos) <= self.goal_radius) # pos is relative dist?
 
@@ -99,36 +101,38 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         # belief step observations
         # next_ox = self.belief.observations(next_x)  # observation
         on = torch.sqrt(torch.exp(self.obs_noise_ln_vars)) * torch.randn(2) # on is observation noise
-        vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
-
-        ovel = self.obs_gains[0] * vel + on[0] # observe velocity
-        oang_vel = self.obs_gains[1] * ang_vel + on[1]
-        ox = torch.stack((ovel, oang_vel)) # observed x
+        vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
+        ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
+        oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity
+        next_ox = torch.stack((ovel, oang_vel)) # observed x t+1
 
 
 
         # b t+1
         # belef step foward, kalman filter
         # next_b, info = self.belief(b, next_ox, action, self.model.box)  # belief next state, info['stop']=terminal # reward only depends on belief
-        next_b, info = self.belief(b, next_ox, action, self.model.box)  # belief next state, info['stop']=terminal # reward only depends on belief
-
+        next_b, info = self.belief_forward(self.b, next_ox, action, self.box)  
+        # belief next state, info['stop']=terminal # reward only depends on belief
+        # in place update here. check
 
 
         # reshape b
         # next_state = self.belief.Breshape(next_b, t, theta)  # state used in policy is different from belief
-        next_state = Breshape(next_b, t, theta)  # state used in policy is different from belief
+        self.belief = self.Breshape(next_b, self.time, self.theta)  # state used in policy is different from belief
 
 
 
         # reward
         # reward = return_reward(episode, info, reached_target, next_b, self.model.goal_radius, REWARD, finetuning)
-        reward = return_reward(episode, info, reached_target, next_b, self.model.goal_radius, REWARD, finetuning)
+        episode=1
+        finetuning=0
+        reward = return_reward(episode, info, reached_target, next_b, self.goal_radius, self.REWARD, finetuning)
 
 
         # orignal return names
         #return next_x, reached_target, next_b, reward, info, next_state, next_ox
-        
-        return next_state, reward, reached_target, info
+        print(self.belief.shape,'this is belief shape in step')
+        return self.belief, reward, reached_target, info
 
     def reset(self):
         '''
@@ -173,7 +177,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         ang = range_angle(ang)
         vel = torch.zeros(1)
         ang_vel = torch.zeros(1)
-        x = torch.cat([px, py, ang, vel, ang_vel])
+        self.x = torch.cat([px, py, ang, vel, ang_vel]) # this is state
 
 
         
@@ -195,11 +199,11 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         self.obs_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) # [obs_ang_noise]
         self.theta = (self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars, self.goal_radius)
         self.P = torch.eye(5) * 1e-8 # change 4 to size function
-        self.b = x, self.P  # belief=x because is not move yet
-        self.state = self.Breshape(self.b, self.time, self.theta)
+        self.b = self.x, self.P  # belief=x because is not move yet
+        self.belief = self.Breshape(self.b, self.time, self.theta)
         # return self.b, self.state, self.obs_gains, self.obs_noise_ln_vars
-        print(self.state.shape) #1,29
-        return self.state
+        print(self.belief.shape) #1,29
+        return self.belief # this is belief
 
 
 
@@ -223,7 +227,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         r = torch.norm(pos).item()
         return pos, r
 
-    def dynamics(x, a, dt, box, pro_gains, pro_noise_ln_vars):
+    def dynamics(self,x, a, dt, box, pro_gains, pro_noise_ln_vars):
         '''
         used in fireflytask forward, return next state x
         '''
@@ -265,7 +269,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
 
         # Extended Kalman Filter
         pre_bx_, P = b
-        bx_ = dynamics(pre_bx_, a.view(-1), self.dt, box, self.pro_gains, self.pro_noise_ln_vars)
+        bx_ = self.dynamics(pre_bx_, a, self.dt, box, self.pro_gains, self.pro_noise_ln_vars)
         bx_ = bx_.t() # make a column vector
         A = self.A(bx_) # after dynamics
         P_ = A.mm(P).mm(A.t())+Q # P_ = APA^T+Q
@@ -299,22 +303,59 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
     def Breshape(self, b, time, theta): # reshape belief for policy
         pro_gains, pro_noise_ln_vars, obs_gains, obs_noise_ln_vars, goal_radius = theta # unpack the theta
         x, P = b # unpack the belief
-        px, py, ang, vel, ang_vel = torch.split(x.view(-1), 1) # unpack states
+        px, py, ang, vel, ang_vel = torch.split(x.view(-1), 1) # unpack state x
         r = torch.norm(torch.cat([px, py])).view(-1) # what is r? relative distance to firefly
         rel_ang = ang - torch.atan2(-py, -px).view(-1) # relative angel
         rel_ang = range_angle(rel_ang) # resize relative angel into -pi pi range.
-        vecL = vectorLowerCholesky(P) # take the lower triangle
+        vecL = vectorLowerCholesky(P) # take the lower triangle of P
         state = torch.cat([r, rel_ang, vel, ang_vel, time, vecL, pro_gains.view(-1), pro_noise_ln_vars.view(-1), obs_gains.view(-1), obs_noise_ln_vars.view(-1), torch.ones(1)*goal_radius]) # original
         #state = torch.cat([r, rel_ang, vel, ang_vel]) #, time, vecL]) #simple
 
         return state.view(1, -1)
+    def A(self, x_): # F in wiki
+        '''
+        used in kalman filter
+        '''
+        # retrun A matrix, A*Pt-1*AT+Q to predict Pt
+        dt = self.dt
+        px, py, ang, vel, ang_vel = torch.split(x_.view(-1),1)
+
+        A_ = torch.zeros(5, 5)
+        A_[:3, :3] = torch.eye(3)
+        A_[0, 2] = - vel * torch.sin(ang) * dt
+        A_[1, 2] = vel * torch.cos(ang) * dt
+        return A_
 
 
+    def observations(self, x): 
+        '''
+        takes in state x and output to observation of x
+        '''
+        # observation of velocity and angle have gain and noise, but no noise of position
+        on = torch.sqrt(torch.exp(self.obs_noise_ln_vars)) * torch.randn(2) # on is observation noise
+        vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
 
+        ovel = self.obs_gains[0] * vel + on[0] # observe velocity
+        oang_vel = self.obs_gains[1] * ang_vel + on[1]
+        ox = torch.stack((ovel, oang_vel)) # observed x
+        return ox
+    def _isTerminal(self, x, a, log=True):
+        terminal_vel = self.terminal_vel
+        terminal = is_terminal_action(a, terminal_vel)
+        return terminal.item() == 1
 
+def is_terminal_action(a, terminal_vel):
+    """
+    terminal is true if the action( which determines velocity) is lower that terminal_vel,
+    which means the monkey stops.
+    This approach only cares the action, does not depend on the position.
+    """
+    stop = (torch.norm(torch.tensor(a, dtype=torch.float64)) <= terminal_vel)
 
-
-
+    if stop:
+        return torch.ByteTensor([True])
+    else:
+        return torch.ByteTensor([False])
 
 
 

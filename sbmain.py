@@ -27,12 +27,9 @@ arg=Config()
 
 
 
-
-
-
 env=ffenv.FireflyEnv(arg)
-model = DDPG(MlpPolicy, env, verbose=1)
-model.learn(total_timesteps=500)
+model = DDPG(MlpPolicy, env, verbose=1,batch_size=64)
+model.learn(total_timesteps=50000)
 
 # obs = env.reset()
 

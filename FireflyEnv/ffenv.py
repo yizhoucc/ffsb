@@ -66,8 +66,6 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         # reset
         self.reset()
 
-
-
     def step(self, action):
         '''
         # input:
@@ -84,7 +82,6 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         self.states, self.belief, action, self.noises
         1. states update by action
         2. belief update by action and states with noise, by kalman filter
-
         
         '''
         # x t+1 and done
@@ -93,9 +90,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         # true next state, xy position, reach target or not(have not decide if stop or not).
         next_x = self.dynamics(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_ln_vars)
         pos = next_x.view(-1)[:2]
-        reached_target = (torch.norm(pos) <= self.goal_radius) # pos is relative dist?
-
-
+        reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
 
         # o t+1
         # belief step observations
@@ -106,8 +101,6 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity
         next_ox = torch.stack((ovel, oang_vel)) # observed x t+1
 
-
-
         # b t+1
         # belef step foward, kalman filter
         # next_b, info = self.belief(b, next_ox, action, self.model.box)  # belief next state, info['stop']=terminal # reward only depends on belief
@@ -115,24 +108,23 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         # belief next state, info['stop']=terminal # reward only depends on belief
         # in place update here. check
 
-
         # reshape b
         # next_state = self.belief.Breshape(next_b, t, theta)  # state used in policy is different from belief
         self.belief = self.Breshape(next_b, self.time, self.theta)  # state used in policy is different from belief
 
-
-
         # reward
         # reward = return_reward(episode, info, reached_target, next_b, self.model.goal_radius, REWARD, finetuning)
-        episode=1
-        finetuning=0
+        episode=1 # sb has its own countings. will discard this later
+        finetuning=0 # not doing finetuning
         reward = return_reward(episode, info, reached_target, next_b, self.goal_radius, self.REWARD, finetuning)
-
 
         # orignal return names
         #return next_x, reached_target, next_b, reward, info, next_state, next_ox
         # print(self.belief.shape,'this is belief shape in step')
-        return self.belief, reward, reached_target, info
+        self.time=self.time+1
+        stop=reached_target and info['stop'] or self.time>9
+        
+        return self.belief, reward, stop, info
 
     def reset(self):
         '''
@@ -146,9 +138,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
 
         finally, return state
         '''
-        print('resetting env')
-
-
+        # print('resetting env')
 
         '''
         init world state
@@ -164,7 +154,6 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         self.pro_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) #[proc_vel_noise]
         self.pro_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) #[proc_ang_noise]
         self.max_goal_radius = min(self.max_goal_radius + self.GOAL_RADIUS_STEP, self.goal_radius_range[1])
-        #self.goal_radius = torch.zeros(1).uniform_(self.min_goal_radius, goal_radius_range[1])
         self.goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.max_goal_radius)
         self.time = torch.zeros(1)
         min_r = self.goal_radius.item()
@@ -177,7 +166,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         ang = range_angle(ang)
         vel = torch.zeros(1)
         ang_vel = torch.zeros(1)
-        self.x = torch.cat([px, py, ang, vel, ang_vel]) # this is state
+        self.x = torch.cat([px, py, ang, vel, ang_vel]) # this is state x0
 
 
         
@@ -199,22 +188,17 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         self.obs_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) # [obs_ang_noise]
         self.theta = (self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars, self.goal_radius)
         self.P = torch.eye(5) * 1e-8 # change 4 to size function
-        self.b = self.x, self.P  # belief=x because is not move yet
+        self.b = self.x, self.P  # belief=x because is not move yet, and no noise on x, y, angle
         self.belief = self.Breshape(self.b, self.time, self.theta)
         # return self.b, self.state, self.obs_gains, self.obs_noise_ln_vars
-        print(self.belief.shape) #1,29
-        return self.belief # this is belief
-
-
-
-
-
+        # print(self.belief.shape) #1,29
+        return self.belief # this is belief b0
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def Brender(self, b, x, WORLD_SIZE, GOAL_RADIUS):
+    def Brender(self, b, x, WORLD_SIZE=1.0, GOAL_RADIUS=0.2):
         bx, P = b
         goal = torch.zeros(2)
         self.rendering.render(goal, bx.view(1,-1), P, x.view(1,-1), WORLD_SIZE, GOAL_RADIUS)
@@ -223,13 +207,17 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         self.rendering.render(mode)
 
     def get_position(self, x):
+        '''
+        return (x,y) and r as distance
+        '''
         pos = x.view(-1)[:2]
         r = torch.norm(pos).item()
         return pos, r
 
     def dynamics(self,x, a, dt, box, pro_gains, pro_noise_ln_vars):
         '''
-        used in fireflytask forward, return next state x
+        oringal in fireflytask forward, return next state x.
+        questions, progain and pronoise is applied even when calculating the new x. is it corret?
         '''
         # dynamics, return new position updated in format of x tuple 
         px, py, ang, vel, ang_vel = torch.split(x.view(-1), 1)
@@ -238,7 +226,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         a_w = a[1]  # action for angular velocity
 
         w = torch.sqrt(torch.exp(pro_noise_ln_vars)) * torch.randn(2) # std * randn #random process noise for [vel, ang_vel]
-        # is this std?
+
         vel = 0.0 * vel + pro_gains[0] * a_v + w[0] # discard prev velocity and new v=gain*new v+noise
         ang_vel = 0.0 * ang_vel + pro_gains[1] * a_w + w[1]
         ang = ang + ang_vel * dt
@@ -255,39 +243,38 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
     def belief_forward(self,  b, ox, a, box):
         I = torch.eye(5)
 
-        # Q matrix, pro_noise 
+        # Q matrix, process noise for tranform xt to xt+1. only applied to v and w
         Q = torch.zeros(5, 5)
         Q[-2:, -2:] = torch.diag(torch.exp(self.pro_noise_ln_vars)) # variance of vel, ang_vel
-        # why no sqrt here? because 2 noise will * each other?
         
-        # R matrix, observe noise
+        # R matrix, observe noise for observation
         R = torch.diag(torch.exp(self.obs_noise_ln_vars))
 
-        # H matrix
+        # H matrix, transform x into observe space. only applied to v and w.
         H = torch.zeros(2, 5)
         H[:, -2:] = torch.diag(self.obs_gains)
 
         # Extended Kalman Filter
         pre_bx_, P = b
-        bx_ = self.dynamics(pre_bx_, a, self.dt, box, self.pro_gains, self.pro_noise_ln_vars)
+        bx_ = self.dynamics(pre_bx_, a, self.dt, box, self.pro_gains, self.pro_noise_ln_vars) # estimate xt+1 from xt and at
         bx_ = bx_.t() # make a column vector
-        A = self.A(bx_) # after dynamics
-        P_ = A.mm(P).mm(A.t())+Q # P_ = APA^T+Q
-        if not is_pos_def(P_):
+        A = self.A(bx_) # calculate the A matrix, to apply on covariance matrix 
+        P_ = A.mm(P).mm(A.t())+Q # estimate Pt+1 = APA^T+Q, 
+        if not is_pos_def(P_): # should be positive definate. if not, show debug
             print("P_:", P_)
             print("P:", P)
             print("A:", A)
             APA = A.mm(P).mm(A.t())
             print("APA:", APA)
             print("APA +:", is_pos_def(APA))
-        error = ox - self.observations(bx_)
-        S = H.mm(P_).mm(H.t()) + R # S = HPH^T+R
-        K = P_.mm(H.t()).mm(torch.inverse(S)) # K = PHS^-1
-        bx = bx_ + K.matmul(error)
+        error = ox - self.observations(bx_) # error as z-hx, the xt+1 is estimated
+        S = H.mm(P_).mm(H.t()) + R # S = HPH^T+R. the covarance of observation of xt->xt+1 transition 
+        K = P_.mm(H.t()).mm(torch.inverse(S)) # K = PHS^-1, kalman gain. has a H in front but canceled out
+        bx = bx_ + K.matmul(error) # update xt+1 from the estimated xt+1 using new observation zt
         I_KH = I - K.mm(H)
-        P = I_KH.mm(P_)
+        P = I_KH.mm(P_)# update covarance of xt+1 from the estimated xt+1 using new observation zt noise R
 
-        if not is_pos_def(P):
+        if not is_pos_def(P): 
             print("here")
             print("P:", P)
             P = (P + P.t()) / 2 + 1e-6 * I  # make symmetric to avoid computational overflows
@@ -295,12 +282,14 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         bx = bx.t() #return to a row vector
         b = bx.view(-1), P  # belief
 
-
         # terminal check
         terminal = self._isTerminal(bx, a) # check the monkey stops or not
-        return b, {'stop': terminal}
+        return b, {'stop': terminal} # the dict is info. will be changed in next version to put stop and reach target together.
 
-    def Breshape(self, b, time, theta): # reshape belief for policy
+    def Breshape(self, b, time, theta): 
+        '''
+        reshape belief for policy
+        '''
         pro_gains, pro_noise_ln_vars, obs_gains, obs_noise_ln_vars, goal_radius = theta # unpack the theta
         x, P = b # unpack the belief
         px, py, ang, vel, ang_vel = torch.split(x.view(-1), 1) # unpack state x
@@ -312,9 +301,10 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         #state = torch.cat([r, rel_ang, vel, ang_vel]) #, time, vecL]) #simple
 
         return state.view(1, -1)
+    
     def A(self, x_): # F in wiki
         '''
-        used in kalman filter
+        used in kalman filter as transformation matrix for xt to xt+1
         '''
         # retrun A matrix, A*Pt-1*AT+Q to predict Pt
         dt = self.dt
@@ -325,7 +315,6 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         A_[0, 2] = - vel * torch.sin(ang) * dt
         A_[1, 2] = vel * torch.cos(ang) * dt
         return A_
-
 
     def observations(self, x): 
         '''
@@ -339,6 +328,7 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         oang_vel = self.obs_gains[1] * ang_vel + on[1]
         ox = torch.stack((ovel, oang_vel)) # observed x
         return ox
+    
     def _isTerminal(self, x, a, log=True):
         terminal_vel = self.terminal_vel
         terminal = is_terminal_action(a, terminal_vel)
@@ -357,25 +347,3 @@ def is_terminal_action(a, terminal_vel):
     else:
         return torch.ByteTensor([False])
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# if __name__ == "__main__":
-
-#     from stable_baselines.common.env_checker import check_env
-#     env=gym.make('FF-v0')
-#     # env = CustomEnv(arg1, ...)
-#     # It will check your custom environment and output additional warnings if needed
-#     check_env(env)
-#     pass

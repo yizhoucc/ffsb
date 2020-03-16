@@ -93,11 +93,28 @@ visualize using gym
 
 ## 3.16
 
-###  
-
+### reading about algorithm 
+### soft a2c
+max reward, max entropy  
+this make the action from a spike to a board peak  
+so encourage other choices to explore the surface  
+state value V, loss: predict V -expect Q -logpi (entropy term)
+soft Q, loss: predict Q -reward -y*next V
+policy pi, loss: KL divergence (expQ, pi)  
+### why using target networks, eg target V/Q
+Q and V interdependent  
+so they are dependent on itself, training become unstable  
+target network as a lag or incomplete version of main network  
+here in our example, using a tau=0.001 to update targets  
+so target is a exp decay lagged version  
 ### progress
-
+now has tensorboard  
+trained an agent  
+finished checking all involved codes  
 ### todo
+understand other algorithms and try  
+from results, do some intepretations based on algorithm charactoristics  
+depends on random, some agents are not learning.  
 
 ## 3.17
 

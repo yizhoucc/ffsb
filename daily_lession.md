@@ -118,8 +118,28 @@ depends on random, some agents are not learning.
 
 ## 3.17
 
-###  
-
+###  meetings notes
+explained framework  
+state and image/external diff  
+state has theta v w, and image is only x y  
+irc needs:  
+policy(observation, old belief, task parameter)  
+neuron network has the policy and backprob to likelhood  
+belief step  
+### zhengwei foraging task
+red/blue stop happen location  
+star as estimation, from max likelihood    
+dash line for error  
+solid line, gradient descent  
+belief posterier of box 1/2, green line for 1/2, triangle for press  
+why the belief isnt 1  
+posterior from belief, isnt 1. but should be same as reward prob  
+reward probability is 1  
+debug belief transition: belief-> belief for forward agent = belief posterior  
+using linear to apporximate the exp, may not capture all?  
+in this case, look in transition matrix and see what the matrix is doing, and finally know the prob  
+disufssion should be symetry, high/low should go to equalibrium  
+aslo look at egein  
 ### progress
 
 ### todo

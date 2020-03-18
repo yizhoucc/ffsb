@@ -2,10 +2,10 @@ import gym
 from numpy import pi
 import numpy as np
 from gym import spaces
-from gym.utils import seeding
+# from gym.utils import seeding
 from DDPGv2Agent.belief_step import BeliefStep
 from FireflyEnv.plotter_gym import Render
-from FireflyEnv.firefly_task import Model
+# from FireflyEnv.firefly_task import Model
 from DDPGv2Agent.rewards import *
 
 from .env_utils import *
@@ -65,71 +65,6 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         self.REWARD=arg.REWARD
         # reset
         self.reset()
-
-    def step(self, action): # state and action to state, and belief
-        '''
-        # input:
-            # action
-        # return:
-            # observation, a object, 
-            # reward, float, want to maximaz
-            # done, bool, when 1, reset
-            # info, dict, for debug
-
-        in this case, we want to give the belief state as observation to choose action
-        store real state in self to decide reward, done.
-
-        self.states, self.belief, action, self.noises
-        1. states update by action
-        2. belief update by action and states with noise, by kalman filter
-        
-        '''
-        # x t+1 and done
-        # fftask forward. 
-        # next_x, reached_target = self.model(x, action.view(-1))  
-        # true next state, xy position, reach target or not(have not decide if stop or not).
-        next_x = self.dynamics(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_ln_vars)
-        pos = next_x.view(-1)[:2]
-        reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
-        self.x=next_x
-
-        # o t+1
-        # belief step observations
-        # next_ox = self.belief.observations(next_x)  # observation
-        on = torch.sqrt(torch.exp(self.obs_noise_ln_vars)) * torch.randn(2) # on is observation noise
-        vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
-        ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
-        oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity
-        next_ox = torch.stack((ovel, oang_vel)) # observed x t+1
-
-        # b t+1
-        # belef step foward, kalman filter
-        # next_b, info = self.belief(b, next_ox, action, self.model.box)  # belief next state, info['stop']=terminal # reward only depends on belief
-        next_b, info = self.belief_forward(self.b, next_ox, action, self.box)  
-        self.b=next_b
-        # belief next state, info['stop']=terminal # reward only depends on belief
-        # in place update here. check
-        
-
-        # reshape b
-        # next_state = self.belief.Breshape(next_b, t, theta)  # state used in policy is different from belief
-        self.belief = self.Breshape(next_b, self.time, self.theta)  # state used in policy is different from belief
-
-        # reward
-        # reward = return_reward(episode, info, reached_target, next_b, self.model.goal_radius, REWARD, finetuning)
-        episode=1 # sb has its own countings. will discard this later
-        finetuning=0 # not doing finetuning
-        reward = return_reward(episode, info, reached_target, next_b, self.goal_radius, self.REWARD, finetuning)
-
-        # orignal return names
-        #return next_x, reached_target, next_b, reward, info, next_state, next_ox
-        # print(self.belief.shape,'this is belief shape in step')
-        self.time=self.time+1
-        stop=reached_target and info['stop'] or self.time>9
-        
-
-
-        return self.belief, reward, stop, info
 
     def reset(self): # reset env
         '''
@@ -198,6 +133,70 @@ class FireflyEnv(gym.Env): #, proc_noise_std = PROC_NOISE_STD, obs_noise_std =OB
         # return self.b, self.state, self.obs_gains, self.obs_noise_ln_vars
         # print(self.belief.shape) #1,29
         return self.belief # this is belief b0
+
+    def step(self, action): # state and action to state, and belief
+        '''
+        # input:
+            # action
+        # return:
+            # observation, a object, 
+            # reward, float, want to maximaz
+            # done, bool, when 1, reset
+            # info, dict, for debug
+
+        in this case, we want to give the belief state as observation to choose action
+        store real state in self to decide reward, done.
+
+        self.states, self.belief, action, self.noises
+        1. states update by action
+        2. belief update by action and states with noise, by kalman filter
+        
+        '''
+        # real external world states part
+        # x t+1 and done
+        # fftask forward. 
+        # next_x, reached_target = self.model(x, action.view(-1))  
+        # true next state, xy position, reach target or not(have not decide if stop or not).
+        next_x = self.dynamics(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_ln_vars)
+        pos = next_x.view(-1)[:2]
+        reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
+        self.x=next_x
+
+        # agent internal mind belief part
+        # o t+1
+        # belief step observations
+        # next_ox = self.belief.observations(next_x)  # observation
+        on = torch.sqrt(torch.exp(self.obs_noise_ln_vars)) * torch.randn(2) # on is observation noise
+        vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
+        ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
+        oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity
+        next_ox = torch.stack((ovel, oang_vel)) # observed x t+1
+
+        # b t+1
+        # belef step foward, kalman filter update with new observation
+        # next_b, info = self.belief(b, next_ox, action, self.model.box)  # belief next state, info['stop']=terminal # reward only depends on belief
+        next_b, info = self.belief_forward(self.b, next_ox, action, self.box)  
+        self.b=next_b
+        # belief next state, info['stop']=terminal # reward only depends on belief
+        # in place update here. check
+        
+        # reshape b
+        # next_state = self.belief.Breshape(next_b, t, theta)  # state used in policy is different from belief
+        self.belief = self.Breshape(next_b, self.time, self.theta)  # state used in policy is different from belief
+
+        # reward
+        # reward = return_reward(episode, info, reached_target, next_b, self.model.goal_radius, REWARD, finetuning)
+        episode=1 # sb has its own countings. will discard this later
+        finetuning=0 # not doing finetuning
+        reward = return_reward(episode, info, reached_target, next_b, self.goal_radius, self.REWARD, finetuning)
+
+        # orignal return names
+        #return next_x, reached_target, next_b, reward, info, next_state, next_ox
+        # print(self.belief.shape,'this is belief shape in step')
+        self.time=self.time+1
+        stop=reached_target and info['stop'] or self.time>9
+        
+        return self.belief, reward, stop, info
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)

@@ -141,16 +141,20 @@ in this case, look in transition matrix and see what the matrix is doing, and fi
 disufssion should be symetry, high/low should go to equalibrium  
 aslo look at egein  
 ### progress
+add some comments and organize the code to look better  
+now roughly understand the stable baseline package, should be able to make costume policy and costume algroithm  
 
 ### todo
 
 ## 3.18
 
-###  
+### reading about inverse
 
 ### progress
 
 ### todo
+
+
 
 ## 3.19
 

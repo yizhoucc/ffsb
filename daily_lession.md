@@ -143,26 +143,51 @@ aslo look at egein
 ### progress
 add some comments and organize the code to look better  
 now roughly understand the stable baseline package, should be able to make costume policy and costume algroithm  
-
 ### todo
+inverse framework
+prepare my math equations in note, to show at meeting
+
+
 
 ## 3.18
-
 ### reading about inverse
-
-### progress
-
+monkey box paper and ff paper
 ### todo
-
+invser framework  
 
 
 ## 3.19
+### zhengwei paper
+loglilihood, consist of the model dynamics  
+from the (x,o,b)at t1 to (x,o,b,a) at t  
+all summed up as the likelihood  
 
-###  
+marginalize the b  
+because we dont have a measurement of b from the outside  
+we have to estimate a best b  
+taking the intergal, to marginallize b  
+meaning: the posterior for all possible b, and we get the expectation of b by intergrating   
+
+and we simplify the loglikelihood   
+for em. so one part depends only on old theta, and another part for m step update  
+this is obersved log likelihood, rather than complete data log likelihood  
+
+start em  
+E step, using a old theta, or init random theta, calculate the upper bound  
+M step, update theta  
+
+IRC gradient question, why a'  
+because theres a' in Z, the normalizing factor  
+
 
 ### progress
-
+inverse framework seudo code done, almost  
+has much better understanding of inverse  
 ### todo
+read the book on gnerlized em  
+
+
+
 
 ## 3.20
 

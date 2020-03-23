@@ -7,7 +7,7 @@ from FireflyEnv import ffenv
 from Config import Config
 arg=Config()
 import numpy as np
-
+import time
 # # check env
 # from stable_baselines.common.env_checker import check_env
 # # env=gym.make('FF-v0')
@@ -42,7 +42,7 @@ from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckAc
 action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
 env=ffenv.FireflyEnv(arg)
 # model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./",action_noise=action_noise)
-model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb/",action_noise=action_noise,
+model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_noise=action_noise,
 
             gamma=0.99, memory_policy=None, eval_env=None, nb_train_steps=50,
             nb_rollout_steps=100, nb_eval_steps=100, param_noise=None, normalize_observations=False, tau=0.001, batch_size=128, param_noise_adaption_interval=50,
@@ -55,13 +55,14 @@ model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb/",action_noi
 # for i in range(10):
 #     model.learn(total_timesteps=30000)
 #     model.save("DDPG_ff")
-
+start=time.time()
 model.learn(total_timesteps=300000)
-model.save("DDPG_ff")
+print('training',time.time()-start)
+# model.save("DDPG_ff")
 
 # eval
 # model = DDPG.load("DDPG_ff")
-# obs = env.reset()
+obs = env.reset()
 # # del model # remove to demonstrate saving and loading
 # while True:
 #     action, _states = model.predict(obs)
@@ -72,5 +73,10 @@ model.save("DDPG_ff")
 #     # env.render()
 #     # env.Brender(b, x, arg.WORLD_SIZE, goal_radius)
 
+start=time.time()
+for i in range(300000):
+    action, _states = model.predict(obs)
+    obs, rewards, dones, info = env.step(action)
+print('testing',time.time()-start)
 
 env.close()

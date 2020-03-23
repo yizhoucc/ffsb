@@ -1,4 +1,3 @@
-
 # imports
 from stable_baselines.common import BaseRLModel
 from stable_baselines.common.policies import BasePolicy
@@ -29,6 +28,12 @@ env:
         or (x,o,a), because we know o from x, and a can be seen.
         env normally only export b,a and save x. maybe its better to have a stand alone version instead of within sb
     with phi and the (x,o,b,a), we can random init theta and start training
+
+
+Conclusion:
+    seems not very suitable for sb framework, since sb is mainly rl and in this case we just want max loglikelihood
+    it will make more sense if init some theta around phi (we are assuming the agent estimated theta is somehow close to phi)
+    and step optimze them and take the best one. in my opinion
 '''
 
 # class
@@ -45,7 +50,7 @@ class Inverse(BaseRLModel):
     # load param
 
 
-class DDPGPolicy(BasePolicy):
+class InversePolicy(BasePolicy):
     '''
     policy part. 
     '''

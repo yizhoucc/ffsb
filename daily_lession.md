@@ -190,12 +190,30 @@ read the book on gnerlized em
 
 
 ## 3.20
+### notes
+theta/phi reset every episode. that is, in training we are using a distribution of phi  
+theta is estimated, for sure it will have some uncertainty, could be represent by variance  
+and if not perfectly trained in terms of ml, or rational instead of optimal in terms of learning, there will be a displacement  
+displancement is a vector. together with variance, then the theta is a distribution of phi distribution  
 
-###  
+in inverse/testing, only using single point phi, start from single point pertuabed phi, as theta  
+the theta will move to phi?  
+
+check gym.box normalization  
 
 ### progress
-
+inverse  
+see actual files instead  
 ### todo
+inverse  
+windows enviroment, powershell, look better and use better.  
+seems wfh will last long  
+sum up the prev undones:  
+read the book on gnerlized em  
+add assign param function to ffenv  
+read example algorithms and implant mpi in inverse  
+eg, in chose action/predict(state dynimacs) part  
+
 
 
 # wk 3
@@ -207,6 +225,9 @@ read the book on gnerlized em
 ### progress
 
 ### todo
+
+
+
 
 ## 3.24
 

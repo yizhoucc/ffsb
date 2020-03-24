@@ -58,7 +58,7 @@ model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_no
 start=time.time()
 model.learn(total_timesteps=300000)
 print('training',time.time()-start)
-# model.save("DDPG_ff")
+model.save("DDPG_ff")
 
 # eval
 # model = DDPG.load("DDPG_ff")

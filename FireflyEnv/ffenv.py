@@ -113,6 +113,7 @@ class FireflyEnv(gym.Env):
         self.o=torch.zeros(2) # this is observation o at t0
         self.action=torch.zeros(2) # this will be action a at t0
         
+
         '''
         init belief state
         output: b, state, obs_gains, obs_noise_ln_vars
@@ -162,7 +163,8 @@ class FireflyEnv(gym.Env):
         reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         self.x=next_x
 
-        # o t+1
+        # o t+1 
+        # check the noise representation
         on = torch.sqrt(torch.exp(self.obs_noise_ln_vars)) * torch.randn(2) # on is observation noise
         vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
         ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
@@ -309,7 +311,7 @@ class FireflyEnv(gym.Env):
         A_[1, 2] = vel * torch.cos(ang) * dt
         return A_
 
-    def observations(self, x): # apply external noise and internal noise, to observation
+    def observations(self, x): # apply external noise and internal noise, to get observation
         '''
         takes in state x and output to observation of x
         '''
@@ -353,8 +355,6 @@ class FireflyEnv(gym.Env):
             return True
         else:
             return False
-
-
 
 
 

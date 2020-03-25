@@ -220,22 +220,45 @@ eg, in chose action/predict(state dynimacs) part
 
 ## 3.23
 
-###  
-
+### theta and phi
+theta and phi  
+check hand written notes  
 ### progress
-
+inverse, ref in code  
 ### todo
-
+inverse code, finish idealy by this week   
 
 
 
 ## 3.24
 
-###  
+### morning meeting 
+reward, have chance, predictable parts  
+arrange the figures, if symettry, looks better  
+histogram with p value, could represent the p by the color gradient  
+dont use the same color if the var is not same  
+### regarding belief not going high
+stochastic instead of determinstic belief update  
+allow for flexibility, but may not be perfect  
+belief temperture, policy temperture  
+two diff temp, if policy is high, then belief is the threshold for not push the button  
+so it should going to a higher belief  
+what is the prob for having enough belief but still not taking action? there is prob  
+why policy temp not go up when fitting real data  
+model the not pushing button as forgoting, not updating, not paying attention to the task  
+the idea is seperate it from the belief  
+location and box mismatch, for example  
+one problem with location data, monkey explore the env and go to box but not pressing  
+try to explain the result seen using model paramters, such as fast dynamics  
+### tips on model fitting
+sometimes, if the model has some problem, we think its not perfect model for real data. before fitting the real data, try some simple and simulated data, to understand the dynamics (if change some param, what direction wil some other param go), and adjust model, and fit more complex actual data  
 
 ### progress
 
 ### todo
+
+
+
 
 ## 3.25
 

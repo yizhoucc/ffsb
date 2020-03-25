@@ -8,6 +8,7 @@ from Config import Config
 arg=Config()
 import numpy as np
 import time
+import torch
 # # check env
 # from stable_baselines.common.env_checker import check_env
 # # env=gym.make('FF-v0')
@@ -52,16 +53,16 @@ model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_no
             _init_setup_model=True, policy_kwargs=None,
             full_tensorboard_log=False, seed=None, n_cpu_tf_sess=1)
 
-# for i in range(10):
-#     model.learn(total_timesteps=30000)
-#     model.save("DDPG_ff")
-start=time.time()
-model.learn(total_timesteps=300000)
-print('training',time.time()-start)
-model.save("DDPG_ff")
+
+# env.assign_presist_phi(torch.tensor([1.,2.,3.,2.,1.,2.,3.,1.,1.]))
+# env.reset()
+# # start=time.time()
+# model.learn(total_timesteps=300000)
+# print('training',time.time()-start)
+# model.save("DDPG_ff")
 
 # eval
-# model = DDPG.load("DDPG_ff")
+model = DDPG.load("DDPG_ff")
 obs = env.reset()
 # # del model # remove to demonstrate saving and loading
 # while True:
@@ -69,14 +70,22 @@ obs = env.reset()
 #     obs, rewards, dones, info = env.step(action)
 #     # if rewards != 0:
 #     #     print(rewards)
+    # if done:
+               # obs = env.reset()
 #     print(rewards)
 #     # env.render()
 #     # env.Brender(b, x, arg.WORLD_SIZE, goal_radius)
 
-start=time.time()
-for i in range(300000):
-    action, _states = model.predict(obs)
-    obs, rewards, dones, info = env.step(action)
-print('testing',time.time()-start)
+# start=time.time()
+# for i in range(30000): # no rest, 45 s
+#     action, _states = model.predict(obs)
+#     obs, rewards, dones, info = env.step(action)
+# print('testing',time.time()-start)
+
+# for i in range(30000): # reset, 105 s
+#     action, _states = model.predict(obs)
+#     obs, rewards, dones, info = env.step(action)
+#     obs = env.reset()
+# print('testing stoeps',time.time()-start)
 
 env.close()

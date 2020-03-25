@@ -40,6 +40,7 @@ class FireflyEnv(gym.Env):
         self.max_goal_radius = arg.goal_radius_range[0]
         self.GOAL_RADIUS_STEP = arg.GOAL_RADIUS_STEP_SIZE
         self.phi=None
+        self.presist_phi=None
         # belief 
         self.dt = arg.DELTA_T
         self.P = torch.eye(5) * 1e-8
@@ -57,16 +58,21 @@ class FireflyEnv(gym.Env):
         self.noise_range = arg.noise_range
         self.REWARD=arg.REWARD
         # setting belief dim
-        # [r, rel_ang, vel, ang_vel, time, vecL, 
-        # pro_gains.view(-1), pro_noise_ln_vars.view(-1), obs_gains.view(-1), 
-        # obs_noise_ln_vars.view(-1), torch.ones(1)*goal_radius]
-        low = np.append(np.append([0., -pi, -1., -1., 0.], -10*np.ones(15)),[self.gains_range[0],self.gains_range[2],self.noise_range[0],self.noise_range[2],self.gains_range[0]])
-        high = np.append(np.append([10., pi, 1., 1., 10.], 10*np.ones(15)),[self.gains_range[1],self.gains_range[3],self.noise_range[1],self.noise_range[3],self.gains_range[1]])
+        # [r, rel_ang, vel, ang_vel, time,              5 values
+        # vecL,                                         15 values
+        # pro_gains.view(-1), pro_noise_ln_vars.view(-1), obs_gains.view(-1), obs_noise_ln_vars.view(-1),   4*2 values
+        # torch.ones(1)*goal_radius]                    1 values
+        low = np.concatenate(([0., -pi, -1., -1., 0.], -10*np.ones(15),
+            [self.gains_range[0],self.gains_range[0],self.noise_range[0],self.noise_range[0],
+            self.gains_range[2],self.gains_range[2],self.noise_range[2],self.noise_range[2],self.goal_radius_range[0]])).reshape(1,29)
+        high = np.concatenate(([10., pi, 1., 1., 10.], 10*np.ones(15),
+            [self.gains_range[1],self.gains_range[1],self.noise_range[3],self.noise_range[3],
+            self.gains_range[3],self.gains_range[3],self.noise_range[3],self.noise_range[3],self.goal_radius_range[1]])).reshape(1,29)
         # Define action and observation space
         # They must be gym.spaces objects
         # box and discrete are most common
         self.action_space = spaces.Box(-np.ones(2), np.ones(2), dtype=np.float32)
-        self.observation_space = spaces.Box(low=low, high=high,shape=(1,29), dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high,dtype=np.float32)
         
         # reset
         self.reset()
@@ -88,15 +94,27 @@ class FireflyEnv(gym.Env):
         # init world state
         # output; x, pro_gains, pro_noise_ln_vars, goal_radius
         # input; gains_range, noise_range, goal_radius_range
+        if  self.phi is None: # defaul. generate new phi from range if no preset avaliable
+            self.pro_gains = torch.zeros(2)
+            self.pro_noise_ln_vars = torch.zeros(2)
+            self.pro_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  #[proc_gain_vel]
+            self.pro_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [proc_gain_ang]
+            self.pro_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) #[proc_vel_noise]
+            self.pro_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) #[proc_ang_noise]
+            self.max_goal_radius = min(self.max_goal_radius + self.GOAL_RADIUS_STEP, self.goal_radius_range[1])
+            self.goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.max_goal_radius)
 
-        self.pro_gains = torch.zeros(2)
-        self.pro_noise_ln_vars = torch.zeros(2)
-        self.pro_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  #[proc_gain_vel]
-        self.pro_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [proc_gain_ang]
-        self.pro_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) #[proc_vel_noise]
-        self.pro_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) #[proc_ang_noise]
-        self.max_goal_radius = min(self.max_goal_radius + self.GOAL_RADIUS_STEP, self.goal_radius_range[1])
-        self.goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.max_goal_radius)
+            self.obs_gains = torch.zeros(2)
+            self.obs_noise_ln_vars = torch.zeros(2)
+            self.obs_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  # [obs_gain_vel]
+            self.obs_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [obs_gain_ang]
+            self.obs_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) # [obs_vel_noise]
+            self.obs_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) # [obs_ang_noise]
+
+            self.theta = (self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars, self.goal_radius)
+        else: # use the preset phi
+            self.fetch_phi()
+            self.theta = (self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars, self.goal_radius)
 
         self.time = torch.zeros(1)
         min_r = self.goal_radius.item()
@@ -124,13 +142,7 @@ class FireflyEnv(gym.Env):
         # # self.pro_gains = pro_gains
         # self.pro_noise_ln_vars = pro_noise_ln_vars
         # self.goal_radius = goal_radius
-        self.obs_gains = torch.zeros(2)
-        self.obs_noise_ln_vars = torch.zeros(2)
-        self.obs_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  # [obs_gain_vel]
-        self.obs_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [obs_gain_ang]
-        self.obs_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) # [obs_vel_noise]
-        self.obs_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) # [obs_ang_noise]
-        self.theta = (self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars, self.goal_radius)
+
         self.P = torch.eye(5) * 1e-8 # change 4 to size function
         self.b = self.x, self.P  # belief=x because is not move yet, and no noise on x, y, angle
         self.belief = self.Breshape(self.b, self.time, self.theta)
@@ -189,7 +201,7 @@ class FireflyEnv(gym.Env):
 
         # orignal return names
         self.time=self.time+1
-        stop=reached_target and info['stop'] or self.time>9
+        stop=reached_target and info['stop'] or self.time>self.episode_len
         
         return self.belief, reward, stop, info
 
@@ -341,17 +353,27 @@ class FireflyEnv(gym.Env):
         pass
 
     def assign_phi(self,phi):
-        # call from outside to assign phi to a class var
+        # call from outside to assign phi, so next env.reset use this phi instead of generate random from range
+        #TODO, chech if given phi within box range, throw a error
+        # right now the phi is also generated using the range, so not big deal
         self.phi=phi
-        
-    
+
+    def assign_presist_phi(self,phi):
+        # call from outside to assign phi, so all next env.reset use this phi
+        # until set presist_phi to false and clear phi to none
+        self.assign_phi(phi)
+        self.presist_phi=True
+
     def fetch_phi(self):
         # call before generating new phi to fetch the assigned phi
         if self.phi is not None:
             # do assign values
-            pro_gains, pro_noise_ln_vars, obs_gains, obs_noise_ln_vars, goal_radius = torch.split(self.phi.view(-1), 2)
+            self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars,  self.goal_radius = torch.split(self.phi.view(-1), 2)
             # clear 
-            self.phi=None
+            if self.presist_phi:
+                pass
+            else:
+                self.phi=None
             return True
         else:
             return False
@@ -365,7 +387,7 @@ class FireflyEnv(gym.Env):
         return self.state
     
     @property
-    def belief(self):
+    def belief_state(self):
         return self.belief
 
     @property

@@ -18,8 +18,8 @@ class Inverse():
         self.dynamic=dynamic                    # the dynamic object that process (x,o,b,a|phi, theta)
         self.training_method=training_method    # the method used to estimate and update theta given dynamics and phi
         self.PI_STD=arg.PI_STD
-        self.model_parameters=self.get_trainable_param()
-        self.model_optimizer=Adam([torch.cat(self.model_parameters)],lr=arg.ADAM_LR)
+        self.model_parameters=torch.nn.Parameter(torch.cat(self.get_trainable_param()))
+        self.model_optimizer=Adam([self.model_parameters],lr=arg.ADAM_LR)
         # self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.model_optimizer, step_size=arg.LR_STEP,
         #                                         gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
         self.loss=torch.zeros(1)
@@ -32,14 +32,14 @@ class Inverse():
         self.policy=policy
         pass
     
-    def _run_dynamic(self,num_episode=100):
+    def _run_dynamic(self,model_param,num_episode=100):
         #run dynamic and return agent.episode.(x,o,a)
-        states,observations,observatios_mean, teacher_actions,agent_actions=self.dynamic.collect_data(num_episode)
+        states,observations,observatios_mean, teacher_actions,agent_actions=self.dynamic.collect_data(num_episode,model_param)
         return states,observations,observatios_mean, teacher_actions,agent_actions
         
     def caculate_loss(self,num_episode):
         # get data
-        states,observations,observatios_mean, teacher_actions,agent_actions=self._run_dynamic(num_episode)
+        states,observations,observatios_mean, teacher_actions,agent_actions=self._run_dynamic(num_episode=num_episode,model_param=self.model_parameters)
         # sum the losses from these episodes
         loss_sum=torch.zeros(1)
         loss_sum.retain_grad()
@@ -71,11 +71,12 @@ class Inverse():
         loss=self.caculate_loss(num_episode)
         self.model_optimizer.zero_grad()
         loss.backward(retain_graph=True)
+        print(self.model_parameters.grad)
         self.model_optimizer.step()
-        theta = theta_range(self.dynamic.agent_env.theta, 
+        self.model_parameters = theta_range(self.model_parameters, 
             self.arg.gains_range, self.arg.std_range, 
             self.arg.goal_radius_range) # keep inside of trained range
-        self._update_theta(theta)
+        self._update_theta(self.model_parameters)
 
 
     def _update_theta(self, theta):
@@ -118,7 +119,7 @@ class Dynamic():
         # the noise here is actually ln var, need to chagne into std
         _, _, self.obs_gains, self.obs_noise_stds, _ = theta
         
-    def run_episode(self):
+    def run_episode(self,model_param):
         # run dynamics for teacher and agent, for one episode.
         # keep record of observable vars, states, obervation, action.
 
@@ -130,7 +131,8 @@ class Dynamic():
         observations_mean=[]        # only applied the gain, no noise
         # init env
         teacher_belief=self.teacher_env.reset()
-        agent_belief=teacher_belief
+        agent_belief=teacher_belief             # they have same init belief
+        self.agent_env.x=self.teacher_env.x     # make sure they start the same x, so obs only due to gain/noise
         agent_belief.requires_grad=True
         teacher_done=False
         agent_done=False
@@ -147,7 +149,7 @@ class Dynamic():
             teacher_belief, _, teacher_done, _ = self.teacher_env.step(teacher_action)
             # agent dynamics
             agent_action= self.policy(agent_belief)[0]
-            agent_belief, _, agent_done, _=self.agent_env.step(teacher_action)
+            agent_belief=self.agent_env(teacher_action,model_param)
             # record keeping of a
             teacher_actions.append(teacher_action)
             agent_actions.append(agent_action)
@@ -155,7 +157,7 @@ class Dynamic():
         # return the states, teacher action, action
         return teacher_states,observations,observations_mean, teacher_actions, agent_actions
 
-    def collect_data(self, num_episode):
+    def collect_data(self, num_episode,model_param):
         # collect data for some episode
 
         # init vars
@@ -166,7 +168,7 @@ class Dynamic():
         observatios_mean=[]
         # run and append
         for episode_index in range(num_episode):
-            ep_states,ep_obs,ep_ob_mean,ep_teacher_a,ep_agent_a=self.run_episode()
+            ep_states,ep_obs,ep_ob_mean,ep_teacher_a,ep_agent_a=self.run_episode(model_param)
             states.append(ep_states)
             observations.append(ep_obs)
             observatios_mean.append(ep_ob_mean)
@@ -180,7 +182,7 @@ class Dynamic():
         
         # random generation of observation noise
         obs_noise = self.obs_noise_stds * torch.randn(2)    
-        
+
         vel, ang_vel = torch.split(states.view(-1),1)[-2:]
         
         # apply the obs gain and noise
@@ -214,26 +216,54 @@ class Dynamic():
 
 def theta_range(theta, gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
 
-    theta[0][0].data.clamp_(gains_range[0], gains_range[1])
-    theta[0][1].data.clamp_(gains_range[2], gains_range[3])  # [proc_gain_ang]
+    if type(theta)==tuple:
+        theta[0][0].data.clamp_(gains_range[0], gains_range[1])
+        theta[0][1].data.clamp_(gains_range[2], gains_range[3])  # [proc_gain_ang]
 
-    if Pro_Noise is None:
-        theta[1][0].data.clamp_(std_range[0], std_range[1])  # [proc_vel_noise]
-        theta[1][1].data.clamp_(std_range[2], std_range[3])  # [proc_ang_noise]
+        if Pro_Noise is None:
+            theta[1][0].data.clamp_(std_range[0], std_range[1])  # [proc_vel_noise]
+            theta[1][1].data.clamp_(std_range[2], std_range[3])  # [proc_ang_noise]
+        else:
+            theta[2:4].data.copy_(Pro_Noise.data)
+
+        theta[2][0].data.clamp_(gains_range[0], gains_range[1])  # [obs_gain_vel]
+        theta[2][1].data.clamp_(gains_range[2], gains_range[3])  # [obs_gain_ang]
+
+        if Obs_Noise is None:
+            theta[3][0].data.clamp_(std_range[0], std_range[1])  # [obs_vel_noise]
+            theta[3][1].data.clamp_(std_range[2], std_range[3])  # [obs_ang_noise]
+        else:
+            theta[6:8].data.copy_(Obs_Noise.data)
+
+        theta[4].data.clamp_(goal_radius_range[0], goal_radius_range[1])
+        
+        return theta
+    
     else:
-        theta[2:4].data.copy_(Pro_Noise.data)
+            
+        theta[0].data.clamp_(gains_range[0], gains_range[1])
+        theta[1].data.clamp_(gains_range[2], gains_range[3])  # [proc_gain_ang]
 
-    theta[2][0].data.clamp_(gains_range[0], gains_range[1])  # [obs_gain_vel]
-    theta[2][1].data.clamp_(gains_range[2], gains_range[3])  # [obs_gain_ang]
+        if Pro_Noise is None:
+            theta[2].data.clamp_(std_range[0], std_range[1])  # [proc_vel_noise]
+            theta[3].data.clamp_(std_range[2], std_range[3])  # [proc_ang_noise]
+        else:
+            theta[2:4].data.copy_(Pro_Noise.data)
 
-    if Obs_Noise is None:
-        theta[3][0].data.clamp_(std_range[0], std_range[1])  # [obs_vel_noise]
-        theta[3][1].data.clamp_(std_range[2], std_range[3])  # [obs_ang_noise]
-    else:
-        theta[6:8].data.copy_(Obs_Noise.data)
+        theta[4].data.clamp_(gains_range[0], gains_range[1])  # [obs_gain_vel]
+        theta[5].data.clamp_(gains_range[2], gains_range[3])  # [obs_gain_ang]
 
-    theta[4].data.clamp_(goal_radius_range[0], goal_radius_range[1])
+        if Obs_Noise is None:
+            theta[6].data.clamp_(std_range[0], std_range[1])  # [obs_vel_noise]
+            theta[7].data.clamp_(std_range[2], std_range[3])  # [obs_ang_noise]
+        else:
+            theta[6:8].data.copy_(Obs_Noise.data)
+
+        theta[8].data.clamp_(goal_radius_range[0], goal_radius_range[1])
 
 
-    return theta
+        return theta
+
+
+
 

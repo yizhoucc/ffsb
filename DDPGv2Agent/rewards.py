@@ -20,8 +20,8 @@ def return_reward(episode, info, reached_target, b, goal_radius, REWARD, finetun
         if finetuning == 0:
             reward = get_reward(b, goal_radius, REWARD)
             if reached_target == 1:
-                # pass
-                print("Ep {}: Good Job!!, reward= {:0.3f}".format(episode, reward[-1]))
+                pass
+                # print("Ep {}: Good Job!!, reward= {:0.3f}".format(episode, reward[-1]))
             else:
                 pass #print("reward= %.3f" % reward.view(-1)) #pass
         elif finetuning == 1 and reached_target == 1:

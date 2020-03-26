@@ -84,7 +84,7 @@ dynamic=Dynamic(policy, teacher_env,agent_env)
 model=Inverse(dynamic=dynamic,arg=inverse_arg)
 while True:
 
-    model.learn(5)
+    model.learn(222)
     print("teacher",teacher_env.theta)
     print("learner",(agent_env.theta))
     print('===')

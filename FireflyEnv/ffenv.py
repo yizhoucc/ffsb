@@ -167,7 +167,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # return self.b, self.state, self.obs_gains, self.obs_noise_ln_vars
         # print(self.belief.shape) #1,29
         return self.belief # this is belief at t0
-
+    
     def step(self, action): # state and action to state, and belief
         '''
         # input:
@@ -402,10 +402,12 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         else:
             return False
 
-    def forward(self,x, action):
+    def forward(self, action,theta):
 
+        # unpack theta
+        self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius = torch.split(theta.view(-1), 2)
         # true next state, xy position, reach target or not(have not decide if stop or not).
-        next_x = self.x_step(x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
+        next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
         pos = next_x.view(-1)[:2]
         reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         x=next_x
@@ -438,7 +440,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.time=self.time+1
         stop=reached_target and info['stop'] or self.time>self.episode_len
         
-        return self.belief, reward, stop, info
+        return self.belief
 
 
 

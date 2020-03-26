@@ -24,9 +24,7 @@ class Inverse():
         #                                         gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
         self.loss=torch.zeros(1)
         self.arg=arg
-        self.pro_gains = pro_gains
-        self.pro_noise_stds = pro_noise_stds
-        self.goal_radius = goal_radius
+
 
 
 
@@ -181,8 +179,8 @@ class Dynamic():
     def get_observation(self,states):
         
         # random generation of observation noise
-        obs_noise = torch.sqrt(torch.exp(self.obs_noise_stds)) * torch.randn(2)    
-        # obs_noise = self.obs_noise_stds * torch.randn(2) 
+        obs_noise = self.obs_noise_stds * torch.randn(2)    
+        
         vel, ang_vel = torch.split(states.view(-1),1)[-2:]
         
         # apply the obs gain and noise

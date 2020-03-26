@@ -44,9 +44,9 @@ class Inverse_Config:
         #self.action_ang_weight = 1
         self.monkey_filename = '../firefly-inverse-data/monkey_traj.csv'
 
-        self.gains_range = [8, 12, 13, 17]  # [vel min, vel max, ang min, ang max]
-        self.std_range = [0, 1, 0, 1]  # [vel min, vel max, ang min, ang max]
-        self.goal_radius_range = [0.3 * self.WORLD_SIZE, 0.45 * self.WORLD_SIZE] #0.374
+        self.gains_range = [0.8, 1.2, pi/5, 3*pi/10]  # [vel min, vel max, ang min, ang max]
+        self.std_range = [1e-2, 2, 1e-2, 2]  # [vel min, vel max, ang min, ang max]
+        self.goal_radius_range = [0.2 * self.WORLD_SIZE, 0.5 * self.WORLD_SIZE] #0.374
 
 
 

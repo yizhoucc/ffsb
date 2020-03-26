@@ -285,7 +285,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         bx_ = bx_.t() # make a column vector
         A = self.A(bx_) # calculate the A matrix, to apply on covariance matrix 
         P_ = A.mm(P).mm(A.t())+Q # estimate Pt+1 = APA^T+Q, 
-        if not is_pos_def(P_): # should be positive definate. if not, show debug
+        if not is_pos_def(P_): # should be positive definate. if not, show debug. 
+            # if noise go to 0, happens.
             print("P_:", P_)
             print("P:", P)
             print("A:", A)

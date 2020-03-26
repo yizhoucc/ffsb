@@ -357,6 +357,7 @@ class FireflyEnv(gym.Env):
         #TODO, chech if given phi within box range, throw a error
         # right now the phi is also generated using the range, so not big deal
         self.phi=phi
+        self.reset()
 
     def assign_presist_phi(self,phi):
         # call from outside to assign phi, so all next env.reset use this phi
@@ -384,7 +385,7 @@ class FireflyEnv(gym.Env):
 
     @property
     def state(self):
-        return self.state
+        return self.x
     
     @property
     def belief_state(self):

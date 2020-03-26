@@ -1,5 +1,5 @@
 import gym
-from stable_baselines.ddpg.policies import LnMlpPolicy
+from stable_baselines.ddpg.policies import MlpPolicy
 from stable_baselines import A2C
 # from stable_baselines.common.policies import MlpPolicy
 from stable_baselines import DDPG
@@ -43,7 +43,7 @@ from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckAc
 action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
 env=ffenv.FireflyEnv(arg)
 # model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./",action_noise=action_noise)
-model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_noise=action_noise,
+model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_noise=action_noise,
 
             gamma=0.99, memory_policy=None, eval_env=None, nb_train_steps=50,
             nb_rollout_steps=100, nb_eval_steps=100, param_noise=None, normalize_observations=False, tau=0.001, batch_size=128, param_noise_adaption_interval=50,
@@ -57,13 +57,13 @@ model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_no
 # env.assign_presist_phi(torch.tensor([1.,2.,3.,2.,1.,2.,3.,1.,1.]))
 # env.reset()
 # # start=time.time()
-# model.learn(total_timesteps=300000)
+model.learn(total_timesteps=200000)
 # print('training',time.time()-start)
-# model.save("DDPG_ff")
+model.save("DDPG_ff_mlp")
 
 # eval
-model = DDPG.load("DDPG_ff")
-obs = env.reset()
+# model = DDPG.load("DDPG_ff")
+# obs = env.reset()
 # # del model # remove to demonstrate saving and loading
 # while True:
 #     action, _states = model.predict(obs)

@@ -23,7 +23,8 @@ class Inverse():
         # self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.model_optimizer, step_size=arg.LR_STEP,
         #                                         gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
         self.loss=torch.zeros(1)
-        
+        self.arg=arg
+
     def setup(self, policy):
         self.policy=policy
         pass
@@ -40,7 +41,7 @@ class Inverse():
         loss_sum=torch.zeros(1)
         loss_sum.retain_grad()
         loss_sum=self._action_loss(teacher_actions,agent_actions)+self._observation_loss(observations,observatios_mean)
-        print("loss: {}".format(loss_sum))
+        # print("loss: {}".format(loss_sum))
         return loss_sum
         
     def _action_loss(self,teacher_actions,agent_actions):
@@ -67,7 +68,9 @@ class Inverse():
         self.model_optimizer.zero_grad()
         loss.backward(retain_graph=True)
         self.model_optimizer.step()
-        theta = theta_range(self.dynamic.agent_env.theta, arg.gains_range, arg.std_range, arg.goal_radius_range, Pro_Noise, Obs_Noise) # keep inside of trained range
+        theta = theta_range(self.dynamic.agent_env.theta, 
+            self.arg.gains_range, self.arg.std_range, 
+            self.arg.goal_radius_range) # keep inside of trained range
         self._update_theta(theta)
 
 
@@ -135,10 +138,10 @@ class Dynamic():
             observations.append(self.get_observation(self.teacher_env.state))
             observations_mean.append(self.get_observation_no_noise(self.teacher_env.state))
             # teacher dynamics
-            teacher_action, _ = self.policy.predict(teacher_belief)
+            teacher_action = self.policy(teacher_belief)[0]
             teacher_belief, _, teacher_done, _ = self.teacher_env.step(teacher_action)
             # agent dynamics
-            agent_action, _ = self.policy.predict(agent_belief)
+            agent_action= self.policy(agent_belief)[0]
             agent_belief, _, agent_done, _=self.agent_env.step(teacher_action)
             # record keeping of a
             teacher_actions.append(teacher_action)
@@ -205,25 +208,25 @@ class Dynamic():
 
 def theta_range(theta, gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
 
-    theta[0].data.clamp_(gains_range[0], gains_range[1])
-    theta[1].data.clamp_(gains_range[2], gains_range[3])  # [proc_gain_ang]
+    theta[0][0].data.clamp_(gains_range[0], gains_range[1])
+    theta[0][1].data.clamp_(gains_range[2], gains_range[3])  # [proc_gain_ang]
 
     if Pro_Noise is None:
-        theta[2].data.clamp_(std_range[0], std_range[1])  # [proc_vel_noise]
-        theta[3].data.clamp_(std_range[2], std_range[3])  # [proc_ang_noise]
+        theta[1][0].data.clamp_(std_range[0], std_range[1])  # [proc_vel_noise]
+        theta[1][1].data.clamp_(std_range[2], std_range[3])  # [proc_ang_noise]
     else:
         theta[2:4].data.copy_(Pro_Noise.data)
 
-    theta[4].data.clamp_(gains_range[0], gains_range[1])  # [obs_gain_vel]
-    theta[5].data.clamp_(gains_range[2], gains_range[3])  # [obs_gain_ang]
+    theta[2][0].data.clamp_(gains_range[0], gains_range[1])  # [obs_gain_vel]
+    theta[2][1].data.clamp_(gains_range[2], gains_range[3])  # [obs_gain_ang]
 
     if Obs_Noise is None:
-        theta[6].data.clamp_(std_range[0], std_range[1])  # [obs_vel_noise]
-        theta[7].data.clamp_(std_range[2], std_range[3])  # [obs_ang_noise]
+        theta[3][0].data.clamp_(std_range[0], std_range[1])  # [obs_vel_noise]
+        theta[3][1].data.clamp_(std_range[2], std_range[3])  # [obs_ang_noise]
     else:
         theta[6:8].data.copy_(Obs_Noise.data)
 
-    theta[8].data.clamp_(goal_radius_range[0], goal_radius_range[1])
+    theta[4].data.clamp_(goal_radius_range[0], goal_radius_range[1])
 
 
     return theta

@@ -12,7 +12,7 @@ from .env_utils import *
 from DDPGv2Agent.rewards import * #reward
 
 
-class FireflyEnv(gym.Env): 
+class FireflyEnv(gym.Env, torch.nn.Module): 
     metadata = {
         'render.modes': ['human', 'rgb_array'],
         'video.frames_per_second': 60
@@ -369,7 +369,10 @@ class FireflyEnv(gym.Env):
         # call before generating new phi to fetch the assigned phi
         if self.phi is not None:
             # do assign values
-            self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars,  self.goal_radius = torch.split(self.phi.view(-1), 2)
+            if type(self.phi)==tuple:
+                self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars,  self.goal_radius=self.phi
+            else:
+                self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars,  self.goal_radius = torch.split(self.phi.view(-1), 2)
             # clear 
             if self.presist_phi:
                 pass
@@ -379,6 +382,43 @@ class FireflyEnv(gym.Env):
         else:
             return False
 
+    def forward(self,x, action):
+
+        # true next state, xy position, reach target or not(have not decide if stop or not).
+        next_x = self.x_step(x, action, self.dt, self.box, self.pro_gains, self.pro_noise_ln_vars)
+        pos = next_x.view(-1)[:2]
+        reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
+        x=next_x
+
+        # o t+1 
+        # check the noise representation
+        on = torch.sqrt(torch.exp(self.obs_noise_ln_vars)) * torch.randn(2) # on is observation noise
+        vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two.
+        ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
+        oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity
+        next_ox = torch.stack((ovel, oang_vel)) # observed x t+1
+        self.o=next_ox
+
+        # b t+1
+        # belef step foward, kalman filter update with new observation
+        next_b, info = self.belief_step(self.b, next_ox, action, self.box)  
+        self.b=next_b
+        # belief next state, info['stop']=terminal # reward only depends on belief
+        # in place update here. check
+        
+        # reshape b to give to policy
+        self.belief = self.Breshape(next_b, self.time, self.theta)  # state used in policy is different from belief
+
+        # reward
+        episode=1 # sb has its own countings. will discard this later
+        finetuning=0 # not doing finetuning
+        reward = return_reward(episode, info, reached_target, next_b, self.goal_radius, self.REWARD, finetuning)
+
+        # orignal return names
+        self.time=self.time+1
+        stop=reached_target and info['stop'] or self.time>self.episode_len
+        
+        return self.belief, reward, stop, info
 
 
 

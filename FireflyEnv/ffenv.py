@@ -18,7 +18,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         'video.frames_per_second': 60
     }
 
-    def __init__(self,arg):
+    def __init__(self,arg,pro_gains = None, pro_noise_stds = None, obs_gains = None, obs_noise_stds = None):
         '''
         state-observation-blief-action-next state
         arg:
@@ -56,6 +56,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.GOAL_RADIUS_STEP_SIZE = arg.GOAL_RADIUS_STEP_SIZE
         self.gains_range = arg.gains_range
         self.noise_range = arg.noise_range
+        self.std_range=arg.std_range
         self.REWARD=arg.REWARD
         # setting belief dim
         # [r, rel_ang, vel, ang_vel, time,              5 values
@@ -73,7 +74,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # box and discrete are most common
         self.action_space = spaces.Box(-np.ones(2), np.ones(2), dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high,dtype=np.float32)
-        
+        self.pro_gains=pro_gains
+        self.pro_noise_stds=pro_noise_stds
+        self.obs_gains=obs_gains
+        self.obs_noise_stds=obs_noise_stds
+
         # reset
         self.reset()
 
@@ -92,29 +97,48 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
 
         # init world state
-        # output; x, pro_gains, pro_noise_ln_vars, goal_radius
         # input; gains_range, noise_range, goal_radius_range
         if  self.phi is None: # defaul. generate new phi from range if no preset avaliable
-            self.pro_gains = torch.zeros(2)
-            self.pro_noise_ln_vars = torch.zeros(2)
-            self.pro_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  #[proc_gain_vel]
-            self.pro_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [proc_gain_ang]
-            self.pro_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) #[proc_vel_noise]
-            self.pro_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) #[proc_ang_noise]
+            
+            if self.pro_gains==None:
+                self.pro_gains = torch.zeros(2)
+                self.pro_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  #[proc_gain_vel]
+                self.pro_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [proc_gain_ang]
+            
+            # self.pro_noise_ln_vars = torch.zeros(2)
+            # self.pro_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) #[proc_vel_noise]
+            # self.pro_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) #[proc_ang_noise]
+            
+            if self.pro_noise_stds==None:
+                self.pro_noise_stds=torch.zeros(2)
+                self.pro_noise_stds[0]=torch.zeros(1).uniform_(self.std_range[0], self.std_range[1])
+                self.pro_noise_stds[1]=torch.zeros(1).uniform_(self.std_range[2],self.std_range[3])
+            
             self.max_goal_radius = min(self.max_goal_radius + self.GOAL_RADIUS_STEP, self.goal_radius_range[1])
             self.goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.max_goal_radius)
 
-            self.obs_gains = torch.zeros(2)
-            self.obs_noise_ln_vars = torch.zeros(2)
-            self.obs_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  # [obs_gain_vel]
-            self.obs_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [obs_gain_ang]
-            self.obs_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) # [obs_vel_noise]
-            self.obs_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) # [obs_ang_noise]
+            if self.obs_gains==None:
+                self.obs_gains = torch.zeros(2)
+                self.obs_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  # [obs_gain_vel]
+                self.obs_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [obs_gain_ang]
+            if self.obs_noise_stds==None:
+                self.obs_noise_stds=torch.zeros(2)
+                self.obs_noise_stds[0]=torch.zeros(1).uniform_(self.std_range[0], self.std_range[1])
+                self.obs_noise_stds[1]=torch.zeros(1).uniform_(self.std_range[2],self.std_range[3])
 
-            self.theta = (self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars, self.goal_radius)
-        else: # use the preset phi
+            # self.obs_noise_ln_vars = torch.zeros(2)
+            # self.obs_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) # [obs_vel_noise]
+            # self.obs_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) # [obs_ang_noise]
+
+            self.theta = (self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius)
+        
+        else: 
+            # use the preset phi
             self.fetch_phi()
-            self.theta = (self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars, self.goal_radius)
+            self.theta = (self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius)
+
+
+
 
         self.time = torch.zeros(1)
         min_r = self.goal_radius.item()
@@ -134,14 +158,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         '''
         init belief state
-        output: b, state, obs_gains, obs_noise_ln_vars
-        input: (x, torch.zeros(1) , pro_gains, pro_noise_ln_vars, goal_radius, gains_range, noise_range)
-        orignal call, belief.reset
         '''
-        # is progain same in belief and state? 
-        # # self.pro_gains = pro_gains
-        # self.pro_noise_ln_vars = pro_noise_ln_vars
-        # self.goal_radius = goal_radius
+
 
         self.P = torch.eye(5) * 1e-8 # change 4 to size function
         self.b = self.x, self.P  # belief=x because is not move yet, and no noise on x, y, angle
@@ -170,14 +188,14 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         '''
         # x t+1
         # true next state, xy position, reach target or not(have not decide if stop or not).
-        next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_ln_vars)
+        next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
         pos = next_x.view(-1)[:2]
         reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         self.x=next_x
 
         # o t+1 
         # check the noise representation
-        on = torch.sqrt(torch.exp(self.obs_noise_ln_vars)) * torch.randn(2) # on is observation noise
+        on = self.obs_noise_stds * torch.randn(2) # on is observation noise
         vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
         ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
         oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity
@@ -221,7 +239,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         r = torch.norm(pos).item()
         return pos, r
 
-    def x_step(self,x, a, dt, box, pro_gains, pro_noise_ln_vars): # to state next
+    def x_step(self,x, a, dt, box, pro_gains, pro_noise_stds): # to state next
         '''
         oringal in fireflytask forward, return next state x.
         questions, progain and pronoise is applied even when calculating the new x. is it corret?
@@ -232,7 +250,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         a_v = a[0]  # action for velocity
         a_w = a[1]  # action for angular velocity
 
-        w = torch.sqrt(torch.exp(pro_noise_ln_vars)) * torch.randn(2) # std * randn #random process noise for [vel, ang_vel]
+        w = self.pro_noise_stds * torch.randn(2) # std * randn #random process noise for [vel, ang_vel]
 
         vel = 0.0 * vel + pro_gains[0] * a_v + w[0] # discard prev velocity and new v=gain*new v+noise
         ang_vel = 0.0 * ang_vel + pro_gains[1] * a_w + w[1]
@@ -252,10 +270,10 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # Q matrix, process noise for tranform xt to xt+1. only applied to v and w
         Q = torch.zeros(5, 5)
-        Q[-2:, -2:] = torch.diag(torch.exp(self.pro_noise_ln_vars)) # variance of vel, ang_vel
+        Q[-2:, -2:] = torch.diag(self.pro_noise_stds**2) # variance of vel, ang_vel
         
         # R matrix, observe noise for observation
-        R = torch.diag(torch.exp(self.obs_noise_ln_vars))
+        R = torch.diag(self.obs_noise_stds ** 2)
 
         # H matrix, transform x into observe space. only applied to v and w.
         H = torch.zeros(2, 5)
@@ -263,7 +281,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # Extended Kalman Filter
         pre_bx_, P = b
-        bx_ = self.x_step(pre_bx_, a, self.dt, box, self.pro_gains, self.pro_noise_ln_vars) # estimate xt+1 from xt and at
+        bx_ = self.x_step(pre_bx_, a, self.dt, box, self.pro_gains, self.pro_noise_stds) # estimate xt+1 from xt and at
         bx_ = bx_.t() # make a column vector
         A = self.A(bx_) # calculate the A matrix, to apply on covariance matrix 
         P_ = A.mm(P).mm(A.t())+Q # estimate Pt+1 = APA^T+Q, 
@@ -297,14 +315,14 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         '''
         reshape belief for policy
         '''
-        pro_gains, pro_noise_ln_vars, obs_gains, obs_noise_ln_vars, goal_radius = theta # unpack the theta
+        pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = theta # unpack the theta
         x, P = b # unpack the belief
         px, py, ang, vel, ang_vel = torch.split(x.view(-1), 1) # unpack state x
         r = torch.norm(torch.cat([px, py])).view(-1) # what is r? relative distance to firefly
         rel_ang = ang - torch.atan2(-py, -px).view(-1) # relative angel
         rel_ang = range_angle(rel_ang) # resize relative angel into -pi pi range.
         vecL = vectorLowerCholesky(P) # take the lower triangle of P
-        state = torch.cat([r, rel_ang, vel, ang_vel, time, vecL, pro_gains.view(-1), pro_noise_ln_vars.view(-1), obs_gains.view(-1), obs_noise_ln_vars.view(-1), torch.ones(1)*goal_radius]) # original
+        state = torch.cat([r, rel_ang, vel, ang_vel, time, vecL, pro_gains.view(-1), pro_noise_stds.view(-1), obs_gains.view(-1), obs_noise_stds.view(-1), torch.ones(1)*goal_radius]) # original
         #state = torch.cat([r, rel_ang, vel, ang_vel]) #, time, vecL]) #simple
 
         return state.view(1, -1)
@@ -328,7 +346,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         takes in state x and output to observation of x
         '''
         # observation of velocity and angle have gain and noise, but no noise of position
-        on = torch.sqrt(torch.exp(self.obs_noise_ln_vars)) * torch.randn(2) # on is observation noise
+        on = self.obs_noise_stds * torch.randn(2) # on is observation noise
         vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
 
         ovel = self.obs_gains[0] * vel + on[0] # observe velocity
@@ -362,17 +380,18 @@ class FireflyEnv(gym.Env, torch.nn.Module):
     def assign_presist_phi(self,phi):
         # call from outside to assign phi, so all next env.reset use this phi
         # until set presist_phi to false and clear phi to none
-        self.assign_phi(phi)
         self.presist_phi=True
+        self.assign_phi(phi)
+
 
     def fetch_phi(self):
         # call before generating new phi to fetch the assigned phi
         if self.phi is not None:
             # do assign values
             if type(self.phi)==tuple:
-                self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars,  self.goal_radius=self.phi
+                self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds,  self.goal_radius=self.phi
             else:
-                self.pro_gains, self.pro_noise_ln_vars, self.obs_gains, self.obs_noise_ln_vars,  self.goal_radius = torch.split(self.phi.view(-1), 2)
+                self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds,  self.goal_radius = torch.split(self.phi.view(-1), 2)
             # clear 
             if self.presist_phi:
                 pass
@@ -385,14 +404,14 @@ class FireflyEnv(gym.Env, torch.nn.Module):
     def forward(self,x, action):
 
         # true next state, xy position, reach target or not(have not decide if stop or not).
-        next_x = self.x_step(x, action, self.dt, self.box, self.pro_gains, self.pro_noise_ln_vars)
+        next_x = self.x_step(x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
         pos = next_x.view(-1)[:2]
         reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         x=next_x
 
         # o t+1 
         # check the noise representation
-        on = torch.sqrt(torch.exp(self.obs_noise_ln_vars)) * torch.randn(2) # on is observation noise
+        on = self.obs_noise_stds * torch.randn(2) # on is observation noise
         vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two.
         ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
         oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity

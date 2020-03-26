@@ -263,7 +263,8 @@ sometimes, if the model has some problem, we think its not perfect model for rea
 ## 3.25
 
 ###  
-
+inverse likelihood, forward, feature space for both    
+inductive bias in input  
 ### progress
 
 ### todo

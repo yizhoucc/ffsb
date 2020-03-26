@@ -19,11 +19,16 @@ class Inverse():
         self.training_method=training_method    # the method used to estimate and update theta given dynamics and phi
         self.PI_STD=arg.PI_STD
         self.model_parameters=self.get_trainable_param()
-        self.model_optimizer=Adam(self.model_parameters,lr=arg.ADAM_LR)
+        self.model_optimizer=Adam([torch.cat(self.model_parameters)],lr=arg.ADAM_LR)
         # self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.model_optimizer, step_size=arg.LR_STEP,
         #                                         gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
         self.loss=torch.zeros(1)
         self.arg=arg
+        self.pro_gains = pro_gains
+        self.pro_noise_stds = pro_noise_stds
+        self.goal_radius = goal_radius
+
+
 
     def setup(self, policy):
         self.policy=policy
@@ -56,7 +61,8 @@ class Inverse():
         # return the observation loss
         loss=torch.zeros(1)
         #TODO transform from this noise to std
-        obs_noise_stds=self.dynamic.agent_env.obs_noise_ln_vars
+        # obs_noise = torch.sqrt(torch.exp(self.obs_noise_stds)) * torch.randn(2) 
+        obs_noise_stds=self.dynamic.agent_env.obs_noise_stds
         for episode, episode_obs in enumerate(observations):
             for timestep, obs in enumerate(episode_obs):
                     loss+= (5*torch.ones(2)+torch.log(np.sqrt(2* pi)*obs_noise_stds) +(obs - observatios_mean[episode][timestep]).view(-1) ** 2/2/(obs_noise_stds**2)).sum()
@@ -127,6 +133,7 @@ class Dynamic():
         # init env
         teacher_belief=self.teacher_env.reset()
         agent_belief=teacher_belief
+        agent_belief.requires_grad=True
         teacher_done=False
         agent_done=False
 
@@ -173,8 +180,9 @@ class Dynamic():
     
     def get_observation(self,states):
         
-        # random generation of observation noise    
-        obs_noise = self.obs_noise_stds * torch.randn(2) 
+        # random generation of observation noise
+        obs_noise = torch.sqrt(torch.exp(self.obs_noise_stds)) * torch.randn(2)    
+        # obs_noise = self.obs_noise_stds * torch.randn(2) 
         vel, ang_vel = torch.split(states.view(-1),1)[-2:]
         
         # apply the obs gain and noise

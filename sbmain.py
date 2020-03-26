@@ -46,7 +46,8 @@ env=ffenv.FireflyEnv(arg)
 model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_noise=action_noise,
 
             gamma=0.99, memory_policy=None, eval_env=None, nb_train_steps=50,
-            nb_rollout_steps=100, nb_eval_steps=100, param_noise=None, normalize_observations=False, tau=0.001, batch_size=128, param_noise_adaption_interval=50,
+            nb_rollout_steps=100, nb_eval_steps=100, param_noise=None, normalize_observations=False, 
+            tau=0.001, batch_size=128, param_noise_adaption_interval=50,
             normalize_returns=False, enable_popart=False, observation_range=(-5., 5.), critic_l2_reg=0.,
             return_range=(-np.inf, np.inf), actor_lr=1e-4, critic_lr=1e-3, clip_norm=None, reward_scale=1.,
             render=False, render_eval=False, memory_limit=None, buffer_size=50000, random_exploration=0.0,
@@ -59,7 +60,7 @@ model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_nois
 # # start=time.time()
 model.learn(total_timesteps=200000)
 # print('training',time.time()-start)
-model.save("DDPG_ff_mlp")
+# model.save("DDPG_ff_mlp_32")
 
 # eval
 # model = DDPG.load("DDPG_ff")

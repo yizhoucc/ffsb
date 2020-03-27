@@ -53,7 +53,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.rendering = Render()
         # from config
         self.goal_radius_range = arg.goal_radius_range
-        self.GOAL_RADIUS_STEP_SIZE = arg.GOAL_RADIUS_STEP_SIZE
         self.gains_range = arg.gains_range
         # self.noise_range = arg.noise_range
         self.std_range=arg.std_range
@@ -78,7 +77,9 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.pro_noise_stds=pro_noise_stds
         self.obs_gains=obs_gains
         self.obs_noise_stds=obs_noise_stds
-
+        self.goal_radius=None
+        self.stop=False
+        self.reset_theta=True
         # reset
         self.reset()
 
@@ -95,12 +96,13 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         finally, return state
         '''
 
+        
 
         # init world state
         # input; gains_range, noise_range, goal_radius_range
-        if  self.phi is None: # defaul. generate new phi from range if no preset avaliable
+        if  self.phi is None: # defaul. generate theta from range if no preset phi avaliable
             
-            if self.pro_gains==None:
+            if self.pro_gains==None or self.reset_theta:
                 self.pro_gains = torch.zeros(2)
                 self.pro_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  #[proc_gain_vel]
                 self.pro_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [proc_gain_ang]
@@ -109,19 +111,20 @@ class FireflyEnv(gym.Env, torch.nn.Module):
             # self.pro_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) #[proc_vel_noise]
             # self.pro_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) #[proc_ang_noise]
             
-            if self.pro_noise_stds==None:
+            if self.pro_noise_stds==None or self.reset_theta:
                 self.pro_noise_stds=torch.zeros(2)
                 self.pro_noise_stds[0]=torch.zeros(1).uniform_(self.std_range[0], self.std_range[1])
                 self.pro_noise_stds[1]=torch.zeros(1).uniform_(self.std_range[2],self.std_range[3])
             
-            self.max_goal_radius = min(self.max_goal_radius + self.GOAL_RADIUS_STEP, self.goal_radius_range[1])
-            self.goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.max_goal_radius)
+            if self.goal_radius==None or self.reset_theta:
+                self.max_goal_radius = min(self.max_goal_radius + self.GOAL_RADIUS_STEP, self.goal_radius_range[1])
+                self.goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.max_goal_radius)
 
-            if self.obs_gains==None:
+            if self.obs_gains==None or self.reset_theta:
                 self.obs_gains = torch.zeros(2)
                 self.obs_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  # [obs_gain_vel]
                 self.obs_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [obs_gain_ang]
-            if self.obs_noise_stds==None:
+            if self.obs_noise_stds==None or self.reset_theta:
                 self.obs_noise_stds=torch.zeros(2)
                 self.obs_noise_stds[0]=torch.zeros(1).uniform_(self.std_range[0], self.std_range[1])
                 self.obs_noise_stds[1]=torch.zeros(1).uniform_(self.std_range[2],self.std_range[3])
@@ -141,6 +144,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # print(self.theta)
 
         self.time = torch.zeros(1)
+        self.stop=False
         min_r = self.goal_radius.item()
         r = torch.zeros(1).uniform_(min_r, self.box)  # GOAL_RADIUS, self.box is world size
         loc_ang = torch.zeros(1).uniform_(-pi, pi) # location angel: to determine initial location
@@ -219,9 +223,9 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # orignal return names
         self.time=self.time+1
-        stop=reached_target and info['stop'] or self.time>self.episode_len
+        self.stop=reached_target and info['stop'] or self.time>self.episode_len
         
-        return self.belief, reward, stop, info
+        return self.belief, reward, self.stop, info
 
     def Brender(self, b, x, WORLD_SIZE=1.0, GOAL_RADIUS=0.2): # wrapper of belief and real state render
         bx, P = b
@@ -354,6 +358,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         oang_vel = self.obs_gains[1] * ang_vel + on[1]
         ox = torch.stack((ovel, oang_vel)) # observed x
         return ox
+
     def observations_mean(self, x): # apply external noise and internal noise, to get observation
         '''
         takes in state x and output to observation of x
@@ -424,11 +429,12 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         pos = next_x.view(-1)[:2]
         reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         x=next_x
+        self.x=next_x
 
         # o t+1 
         # check the noise representation
         on = self.obs_noise_stds * torch.randn(2) # on is observation noise
-        vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two.
+        vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
         ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
         oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity
         next_ox = torch.stack((ovel, oang_vel)) # observed x t+1
@@ -451,7 +457,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # orignal return names
         self.time=self.time+1
-        stop=reached_target and info['stop'] or self.time>self.episode_len
+        self.stop=reached_target and info['stop'] or self.time>self.episode_len
         
         return self.belief
 

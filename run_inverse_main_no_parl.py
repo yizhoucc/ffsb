@@ -97,24 +97,33 @@ for num_thetas in range(1):
     # true theta
     true_theta = reset_theta(arg.gains_range, arg.std_range, arg.goal_radius_range)
     # true theta for DDPG_theta
-    true_theta=torch.tensor([1.0537, 0.7328, 0.7053, 1.2038, 0.9661, 0.8689, 0.2930, 1.9330, 0.2000])
+    true_theta=torch.tensor([1.0537, 0.7328, 0.7053, 1.2038, 0.9661, 0.8689, 0.2930, 1.5330, 0.3500])
     true_theta_log.append(true_theta.data.clone())
     x_traj, obs_traj, a_traj, _ = trajectory(agent, true_theta, env, arg, arg.gains_range, arg.std_range,
                                              arg.goal_radius_range, arg.NUM_EP)  # generate true trajectory
-    print('got trajectory!')
-    true_loss, true_loss_act, true_loss_obs = getLoss(agent, x_traj, a_traj, true_theta, env, arg.gains_range, arg.std_range, arg.PI_STD,
-                        arg.NUM_SAMPLES)  # this is the lower bound of loss?
-    print('got loss!') # this loss is completely due to obs noise  
-    #true_loss_log.append(true_loss)
-    #true_loss_act_log.append(true_loss_act)
-    #true_loss_obs_log.append(true_loss_obs)
 
-    print("true loss:{}".format(true_loss))
-    print("true act loss:{}".format(true_loss_act))
-    print("true obs loss:{}".format(true_loss_obs))
+    '''
+        # print('got trajectory!')
+        # true_loss, true_loss_act, true_loss_obs = getLoss(agent, x_traj, a_traj, true_theta, env, arg.gains_range, arg.std_range, arg.PI_STD,
+        #                     arg.NUM_SAMPLES)  # this is the lower bound of loss?
+        # print('got loss!') # this loss is completely due to obs noise  
+        # #true_loss_log.append(true_loss)
+        # #true_loss_act_log.append(true_loss_act)
+        # #true_loss_obs_log.append(true_loss_obs)
 
-    print("true_theta:{}".format(true_theta))
+        # print("true loss:{}".format(true_loss))
+        # print("true act loss:{}".format(true_loss_act))
+        # print("true obs loss:{}".format(true_loss_obs))
 
+        # print("true_theta:{}".format(true_theta))
+
+    '''
+
+    # xlens=[]
+    # for x in x_traj:
+    #     xlens.append(len(x))
+
+    # print('check len')
 
     result = single_inverse(true_theta, arg, env, agent, x_traj, a_traj, filename, num_thetas)
     #result = single_inverse(true_theta, arg, env, agent, x_traj, a_traj, filename, num_thetas)

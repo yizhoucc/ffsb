@@ -299,6 +299,13 @@ reorganize
 
 ### progress
 inverse debuggigg  
+turn out to be i was using a bad teacher  
+on amost half of the trials, the teacher spend 10 steps and not getting a reward.  
+may because the teacher was trained in a large goal radius setting  
+and in inverse, the reset theta happens to give the teacher a small radius, and the teacher is not doing action optimaly  
+if the teacher isnt giving out good actions, it would be very hard to infer its belief, so that the inverse model convert to some random wrong point.  
+
+need to train a almost perfect agent as teacher  
 ### todo
 make inverse fully working  
 then think about make it faster  

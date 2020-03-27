@@ -22,10 +22,7 @@ def trajectory(agent, theta, env, arg, gains_range, std_range, goal_radius_range
     env.obs_gains=obs_gains
     env.obs_noise_stds=obs_noise_stds
 
-    env.reset()
-    x=env.state
-    #ox = agent.Bstep.observations(x)  # observation
-    state=env.belief_state
+    env.reset()     # apply the true theta to env
 
 
     episode = 0
@@ -42,31 +39,21 @@ def trajectory(agent, theta, env, arg, gains_range, std_range, goal_radius_range
 
         while t < arg.EPISODE_LEN: # for a single FF
 
-            action = agent(state)[0]
-
-            env( action.view(-1)) #track true next_x of monkey
-
-            next_ox = env.observations(env.state)  # observation
-
-            next_state, _,_,info = env.step(action)#b, next_ox, action, env.box) # belief next state, info['stop']=terminal # reward only depends on belief
+            action = agent(env.belief_state)[0] # TODO action rounded, not precise
+            a_traj_ep.append(action)
+            x_traj_ep.append(env.x)
+            env(action.view(-1)) # so env.x env.belief updated by action and next o
+            obs_traj_ep.append(env.o) # the same next obs used to update belief
 
             # check time limit
             TimeEnd = (t+1 == arg.EPISODE_LEN) # if the monkey can't catch the firefly in EPISODE_LEN, reset the game.
             mask = torch.tensor([1 - float(TimeEnd)]) # mask = 0: episode is over
 
-            x_traj_ep.append(x)
-            obs_traj_ep.append(next_ox)
-            a_traj_ep.append(action)
-            # b_traj_ep.append(b)
-
-            x = env.state
-            state = next_state
-            # b = next_b
-            #ox = next_ox
             tot_t += 1.
             t += 1
-
-            if info['stop'] or TimeEnd:  # if the monkey stops or pass the time limit, start the new firefly
+            if env.stop:
+                pass
+            if env.stop or TimeEnd:  # if the monkey stops or pass the time limit, start the new firefly
                 
                 env.pro_gains = pro_gains
                 env.pro_noise_stds = pro_noise_stds
@@ -75,9 +62,7 @@ def trajectory(agent, theta, env, arg, gains_range, std_range, goal_radius_range
                 env.obs_noise_stds=obs_noise_stds
 
                 env.reset()
-                x=env.state
-                #ox = agent.Bstep.observations(x)  # observation
-                state=env.belief_state
+
                 break
         x_traj.append(x_traj_ep)
         obs_traj.append(obs_traj_ep)
@@ -113,9 +98,11 @@ def getLoss(agent, x_traj, a_traj, theta, env, gains_range, std_range, PI_STD, N
             env.pro_noise_stds = pro_noise_stds
             env.goal_radius = goal_radius
             env.reset()  # reset monkey's internal model
+
             env.x=x
             state= env.belief_state
             b=x,env.P
+            
             for it, next_x in enumerate(x_traj_ep): # repeat for steps in episode
                 action = agent(state)[0] # simulated acton
 

@@ -49,8 +49,8 @@ env_arg=Config()
 
 # print(os.getcwd())
 
-phi=reset_theta(inverse_arg.gains_range, inverse_arg.std_range, inverse_arg.goal_radius_range)
-
+# phi=reset_theta(inverse_arg.gains_range, inverse_arg.std_range, inverse_arg.goal_radius_range)
+phi=torch.tensor([1.0537, 0.7328, 0.7053, 1.2038, 0.9661, 0.8689, 0.2930, 1.9330, 0.2000])
 theta=reset_theta(inverse_arg.gains_range, inverse_arg.std_range, inverse_arg.goal_radius_range)
 
 
@@ -80,12 +80,12 @@ dynamic=Dynamic(policy, teacher_env,agent_env)
 # a,b,c,d,e=dynamic.collect_data(3)
 
 
-
+inverse_arg.ADAM_LR=0.001
 # testing inverse model
 model=Inverse(dynamic=dynamic,arg=inverse_arg)
-while True:
 
-    model.learn(20000)
+
+model.learn(200000)
 
 print("end")
 

@@ -4,3 +4,5 @@
 data/
 DDPG*/
 .vscode/settings.json
+inverse_data/
+*.zip

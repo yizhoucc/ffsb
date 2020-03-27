@@ -263,28 +263,45 @@ sometimes, if the model has some problem, we think its not perfect model for rea
 ## 3.25
 
 ###  
-inverse likelihood, forward, feature space for both    
+   
 inductive bias in input  
 ### progress
-
+inverse  
 ### todo
+inverse  
+  
+
 
 ## 3.26
 
-###  
+###  morning meeting  
+the main point for inverse:  
+inverse likelihood, forward, feature space for both   
+think about it  
+
+foraging task  
+not push the button, could due to  
+belief p, action p  
+each take some weights, depends on individual time points  
 
 ### progress
-
+inverse finished  
+inverse not optimal, like to go max first and slowly come back    
 ### todo
+check inverse noise representation  
+reorganize  
+
+
 
 ## 3.27
 
 ###  
 
 ### progress
-
+inverse debuggigg  
 ### todo
-
+make inverse fully working  
+then think about make it faster  
 
 
 # wk 4

@@ -58,9 +58,10 @@ model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_nois
 # env.assign_presist_phi(torch.tensor([1.,2.,3.,2.,1.,2.,3.,1.,1.]))
 # env.reset()
 # # start=time.time()
+print(env.theta)
 model.learn(total_timesteps=200000)
 # print('training',time.time()-start)
-model.save("DDPG_ff_mlp_32")
+model.save("DDPG_theta")
 
 # eval
 # model = DDPG.load("DDPG_ff")

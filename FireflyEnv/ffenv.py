@@ -129,16 +129,16 @@ class FireflyEnv(gym.Env, torch.nn.Module):
             # self.obs_noise_ln_vars = torch.zeros(2)
             # self.obs_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) # [obs_vel_noise]
             # self.obs_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) # [obs_ang_noise]
-
-            self.theta = (self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius)
         
         else: 
             # use the preset phi
             self.fetch_phi()
-            self.theta = (self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius)
+        
+        self.theta = (self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius)
 
 
 
+        # print(self.theta)
 
         self.time = torch.zeros(1)
         min_r = self.goal_radius.item()
@@ -354,6 +354,18 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         oang_vel = self.obs_gains[1] * ang_vel + on[1]
         ox = torch.stack((ovel, oang_vel)) # observed x
         return ox
+    def observations_mean(self, x): # apply external noise and internal noise, to get observation
+        '''
+        takes in state x and output to observation of x
+        '''
+        # observation of velocity and angle have gain and noise, but no noise of position
+        on = 0*self.obs_noise_stds * torch.randn(2) # on is observation noise
+        vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
+
+        ovel = self.obs_gains[0] * vel + on[0] # observe velocity
+        oang_vel = self.obs_gains[1] * ang_vel + on[1]
+        ox = torch.stack((ovel, oang_vel)) # observed x
+        return ox
     
     def _isTerminal(self, x, a, log=True): # if 
         terminal_vel = self.terminal_vel
@@ -402,10 +414,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         else:
             return False
 
-    def forward(self, action,theta):
+    def forward(self, action,theta=None):
 
         # unpack theta
-        self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius = torch.split(theta.view(-1), 2)
+        if theta is not None:
+            self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius = torch.split(theta.view(-1), 2)
         # true next state, xy position, reach target or not(have not decide if stop or not).
         next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
         pos = next_x.view(-1)[:2]

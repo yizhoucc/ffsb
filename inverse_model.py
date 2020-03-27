@@ -22,8 +22,8 @@ class Inverse():
         self.PI_STD=arg.PI_STD
         self.model_parameters=torch.nn.Parameter(torch.cat(self.get_trainable_param()))
         self.model_optimizer=Adam([self.model_parameters],lr=arg.ADAM_LR)
-        # self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.model_optimizer, step_size=arg.LR_STEP,
-        #                                         gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
+        self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.model_optimizer, step_size=arg.LR_STEP,
+                                                gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
         self.loss=torch.zeros(1)
         self.arg=arg
         self.log_dir="./inverse_data"
@@ -45,7 +45,7 @@ class Inverse():
         # sum the losses from these episodes
         loss_sum=torch.zeros(1)
         loss_sum.retain_grad()
-        loss_sum=self._action_loss(teacher_actions,agent_actions)+self._observation_loss(observations,observatios_mean)
+        loss_sum=self._action_loss(teacher_actions,agent_actions)#+self._observation_loss(observations,observatios_mean)
         # print("loss: {}".format(loss_sum))
         return loss_sum
         
@@ -71,33 +71,42 @@ class Inverse():
 
     def learn(self,num_episode,log_interval=100):
         current_ep=0
-        with SummaryWriter(log_dir=self.log_dir) as writer:
+        with SummaryWriter(log_dir=self.log_dir+'/theta1') as writer:
+            step=10
             while True:
-                loss=self.caculate_loss(100)
+                loss=self.caculate_loss(step)
                 self.model_optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 # print(self.model_parameters.grad)
+                torch.nn.utils.clip_grad_norm_(self.model_parameters, 0.2)
                 self.model_optimizer.step()
                 self.model_parameters = theta_range(self.model_parameters, 
                     self.arg.gains_range, self.arg.std_range, 
                     self.arg.goal_radius_range) # keep inside of trained range
                 self._update_theta(self.model_parameters)
 
-                current_ep+=100
-                print("episode ",current_ep)
-                print("teacher ",torch.cat(self.dynamic.teacher_env.theta).data)
-                print("learner ",(self.model_parameters).data)
-                print('\n===')
-                writer.add_scalar('Loss',loss.sum(),current_ep)
-                writer.add_scalar('pro gain v',self.model_parameters[0],current_ep)
-                writer.add_scalar('pro noise v',self.model_parameters[2],current_ep)
-                writer.add_scalar('pro gain w',self.model_parameters[1],current_ep)
-                writer.add_scalar('pro noise w',self.model_parameters[3],current_ep)
-                writer.add_scalar('obs gain v',self.model_parameters[4],current_ep)
-                writer.add_scalar('obs noise v',self.model_parameters[6],current_ep)
-                writer.add_scalar('obs gain w',self.model_parameters[5],current_ep)
-                writer.add_scalar('obs noise w',self.model_parameters[7],current_ep)
-                writer.add_scalar('goal radius',self.model_parameters[8],current_ep)
+                # if current_ep/5<self.arg.LR_STOP:
+                #     self.learning_schedualer.step()
+                
+                
+                writer.add_scalar('pro gain v',self.model_parameters[0].data,current_ep)
+                writer.add_scalar('pro noise v',self.model_parameters[2].data,current_ep)
+                writer.add_scalar('pro gain w',self.model_parameters[1].data.data,current_ep)
+                writer.add_scalar('pro noise w',self.model_parameters[3].data,current_ep)
+                writer.add_scalar('obs gain v',self.model_parameters[4].data,current_ep)
+                writer.add_scalar('obs noise v',self.model_parameters[6].data,current_ep)
+                writer.add_scalar('obs gain w',self.model_parameters[5].data,current_ep)
+                writer.add_scalar('obs noise w',self.model_parameters[7].data,current_ep)
+                writer.add_scalar('goal radius',self.model_parameters[8].data,current_ep)
+
+                current_ep+=step
+                if current_ep%100==0:
+                    print('Loss',loss.sum().data,current_ep," learning rate ", (self.learning_schedualer.get_lr()))
+                    print('grad ', self.model_parameters.grad)
+                    print("episode ",current_ep)
+                    print("teacher ",torch.cat(self.dynamic.teacher_env.theta).data)
+                    print("learner ",(self.model_parameters).data)
+                    print('\n===')
 
                 if current_ep >= num_episode:
                     break

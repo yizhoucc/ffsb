@@ -34,7 +34,7 @@ class Inverse_Config:
         self.NUM_IT = 60 # number of iteration for gradient descent
         self.NUM_thetas = 15
 
-        self.ADAM_LR = 5e-1 #for learning rate annealing#5e-3
+        self.ADAM_LR = 1e-2 #for learning rate annealing#5e-3
         self.LR_STEP = 1
         self.LR_STOP = 50
         self.lr_gamma = 0.95

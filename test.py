@@ -47,10 +47,11 @@ inverse_arg=Inverse_Config()
 env_arg=Config()
 # policy=DDPG.load("DDPG_ff")
 
-print(os.getcwd())
+# print(os.getcwd())
 
 phi=reset_theta(inverse_arg.gains_range, inverse_arg.std_range, inverse_arg.goal_radius_range)
 
+theta=reset_theta(inverse_arg.gains_range, inverse_arg.std_range, inverse_arg.goal_radius_range)
 
 
 
@@ -59,10 +60,10 @@ teacher_env=ffenv.FireflyEnv(env_arg)
 agent_env=ffenv.FireflyEnv(env_arg)
 
 teacher_env.assign_presist_phi(phi) 
-print(teacher_env.theta)
-agent_env.assign_presist_phi((phi-0.5)) 
-print(agent_env.theta)
-print('state',agent_env.state)
+# print(teacher_env.theta)
+agent_env.assign_presist_phi(theta) 
+# print(agent_env.theta)
+# print('state',agent_env.state)
 
 
 # testing torch agent
@@ -84,9 +85,7 @@ dynamic=Dynamic(policy, teacher_env,agent_env)
 model=Inverse(dynamic=dynamic,arg=inverse_arg)
 while True:
 
-    model.learn(222)
-    print("teacher",teacher_env.theta)
-    print("learner",(agent_env.theta))
-    print('===')
+    model.learn(20000)
+
 print("end")
 

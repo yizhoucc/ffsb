@@ -2,6 +2,8 @@ import numpy as np
 from numpy import pi 
 import torch
 from torch.optim import Adam
+# import tensorflow as tf
+from torch.utils.tensorboard import SummaryWriter
 
 class Inverse():
     '''
@@ -24,7 +26,7 @@ class Inverse():
         #                                         gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
         self.loss=torch.zeros(1)
         self.arg=arg
-
+        self.log_dir="./inverse_data"
 
 
 
@@ -67,17 +69,39 @@ class Inverse():
         return loss
 
 
-    def learn(self,num_episode):
-        loss=self.caculate_loss(num_episode)
-        self.model_optimizer.zero_grad()
-        loss.backward(retain_graph=True)
-        print(self.model_parameters.grad)
-        self.model_optimizer.step()
-        self.model_parameters = theta_range(self.model_parameters, 
-            self.arg.gains_range, self.arg.std_range, 
-            self.arg.goal_radius_range) # keep inside of trained range
-        self._update_theta(self.model_parameters)
+    def learn(self,num_episode,log_interval=100):
+        current_ep=0
+        with SummaryWriter(log_dir=self.log_dir) as writer:
+            while True:
+                loss=self.caculate_loss(100)
+                self.model_optimizer.zero_grad()
+                loss.backward(retain_graph=True)
+                # print(self.model_parameters.grad)
+                self.model_optimizer.step()
+                self.model_parameters = theta_range(self.model_parameters, 
+                    self.arg.gains_range, self.arg.std_range, 
+                    self.arg.goal_radius_range) # keep inside of trained range
+                self._update_theta(self.model_parameters)
 
+                current_ep+=100
+                print("episode ",current_ep)
+                print("teacher ",torch.cat(self.dynamic.teacher_env.theta).data)
+                print("learner ",(self.model_parameters).data)
+                print('\n===')
+                writer.add_scalar('Loss',loss.sum(),current_ep)
+                writer.add_scalar('pro gain v',self.model_parameters[0],current_ep)
+                writer.add_scalar('pro noise v',self.model_parameters[2],current_ep)
+                writer.add_scalar('pro gain w',self.model_parameters[1],current_ep)
+                writer.add_scalar('pro noise w',self.model_parameters[3],current_ep)
+                writer.add_scalar('obs gain v',self.model_parameters[4],current_ep)
+                writer.add_scalar('obs noise v',self.model_parameters[6],current_ep)
+                writer.add_scalar('obs gain w',self.model_parameters[5],current_ep)
+                writer.add_scalar('obs noise w',self.model_parameters[7],current_ep)
+                writer.add_scalar('goal radius',self.model_parameters[8],current_ep)
+
+                if current_ep >= num_episode:
+                    break
+        return current_ep
 
     def _update_theta(self, theta):
         self.dynamic.agent_env.assign_presist_phi(theta)
@@ -87,7 +111,7 @@ class Inverse():
 
     def logger(self):
         # save some inputs. such as training loss
-        pass
+        self.writer = tf.summary.FileWriter(dir,)
     
     def get_trainable_param(self):
         return self.dynamic.agent_env.theta

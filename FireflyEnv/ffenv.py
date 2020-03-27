@@ -55,7 +55,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.goal_radius_range = arg.goal_radius_range
         self.GOAL_RADIUS_STEP_SIZE = arg.GOAL_RADIUS_STEP_SIZE
         self.gains_range = arg.gains_range
-        self.noise_range = arg.noise_range
+        # self.noise_range = arg.noise_range
         self.std_range=arg.std_range
         self.REWARD=arg.REWARD
         # setting belief dim
@@ -64,11 +64,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # pro_gains.view(-1), pro_noise_ln_vars.view(-1), obs_gains.view(-1), obs_noise_ln_vars.view(-1),   4*2 values
         # torch.ones(1)*goal_radius]                    1 values
         low = np.concatenate(([0., -pi, -1., -1., 0.], -10*np.ones(15),
-            [self.gains_range[0],self.gains_range[0],self.noise_range[0],self.noise_range[0],
-            self.gains_range[2],self.gains_range[2],self.noise_range[2],self.noise_range[2],self.goal_radius_range[0]])).reshape(1,29)
+            [self.gains_range[0],self.gains_range[0],self.std_range[0],self.std_range[0],
+            self.gains_range[2],self.gains_range[2],self.std_range[2],self.std_range[2],self.goal_radius_range[0]])).reshape(1,29)
         high = np.concatenate(([10., pi, 1., 1., 10.], 10*np.ones(15),
-            [self.gains_range[1],self.gains_range[1],self.noise_range[3],self.noise_range[3],
-            self.gains_range[3],self.gains_range[3],self.noise_range[3],self.noise_range[3],self.goal_radius_range[1]])).reshape(1,29)
+            [self.gains_range[1],self.gains_range[1],self.std_range[3],self.std_range[3],
+            self.gains_range[3],self.gains_range[3],self.std_range[3],self.std_range[3],self.goal_radius_range[1]])).reshape(1,29)
         # Define action and observation space
         # They must be gym.spaces objects
         # box and discrete are most common

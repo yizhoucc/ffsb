@@ -40,8 +40,10 @@ def trajectory(agent, theta, env, arg, gains_range, std_range, goal_radius_range
         while t < arg.EPISODE_LEN: # for a single FF
 
             action = agent(env.belief_state)[0] # TODO action rounded, not precise
+            # action=agent.predict(env.belief_state)[0]
             a_traj_ep.append(action)
             x_traj_ep.append(env.x)
+            # env(action)
             env(action.view(-1)) # so env.x env.belief updated by action and next o
             obs_traj_ep.append(env.o) # the same next obs used to update belief
 
@@ -73,7 +75,7 @@ def trajectory(agent, theta, env, arg, gains_range, std_range, goal_radius_range
 
 
 # MCEM based approach 
-def getLoss(agent, x_traj, a_traj, theta, env, gains_range, std_range, PI_STD, NUM_SAMPLES):
+def getLoss(agent, x_traj,obs_traj, a_traj, theta, env, gains_range, std_range, PI_STD, NUM_SAMPLES):
 
     logPr = torch.zeros(1) #torch.FloatTensor([])
     logPr_act = torch.zeros(1)
@@ -81,12 +83,11 @@ def getLoss(agent, x_traj, a_traj, theta, env, gains_range, std_range, PI_STD, N
 
     pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = torch.split(theta.view(-1), 2)
 
-
-
     for num_it in range(NUM_SAMPLES): # what is the numsample/particle here? default is 50
 
         for ep, x_traj_ep in enumerate(x_traj): # repeat for 501 episodes
             a_traj_ep = a_traj[ep]
+            obs_traj_ep=obs_traj[ep]
             logPr_ep = torch.zeros(1)
             logPr_act_ep = torch.zeros(1)
             logPr_obs_ep = torch.zeros(1)
@@ -97,36 +98,27 @@ def getLoss(agent, x_traj, a_traj, theta, env, gains_range, std_range, PI_STD, N
             env.pro_gains = pro_gains
             env.pro_noise_stds = pro_noise_stds
             env.goal_radius = goal_radius
+            env.obs_gains=obs_gains
+            env.obs_noise_stds=obs_noise_stds
             env.reset()  # reset monkey's internal model
 
             env.x=x
             state= env.belief_state
             b=x,env.P
-            
+
             for it, next_x in enumerate(x_traj_ep): # repeat for steps in episode
-                action = agent(state)[0] # simulated acton
+                action = agent(env.belief_state)[0] # simulated acton
 
-
-
-                #next_ox = env.input(next_x, obs_gains) # multiplied by observation gain, no noise
                 next_ox = env.observations_mean(next_x) # multiplied by observation gain, no noise
                 next_ox_ = env.observations(next_x)  # simulated observation (with noise)
-                # this is the only thing changes action-trajectory action, part of the action loss
-
-
-
                 action_loss =5*torch.ones(2)+np.log(np.sqrt(2* pi)*PI_STD) + (action - a_traj_ep[it] ) ** 2 / 2 /(PI_STD**2)
                 obs_loss = 5*torch.ones(2)+torch.log(np.sqrt(2* pi)*obs_noise_stds) +(next_ox_ - next_ox).view(-1) ** 2/2/(obs_noise_stds**2)
 
                 logPr_act_ep = logPr_act_ep + action_loss.sum()
                 logPr_obs_ep = logPr_obs_ep + obs_loss.sum()
-
-
-
                 logPr_ep = logPr_ep + logPr_act_ep + logPr_obs_ep
-                #logPr_ep = logPr_ep +   (obs_loss).sum()
 
-                next_b, info = env.belief_step(b, next_ox_, a_traj_ep[it], env.box)  # action: use real data
+                next_b, info = env.belief_step(b, obs_traj_ep[it], a_traj_ep[it], env.box)  # no change to internal var
                 env.b=next_b
                 next_state = env.Breshape(next_b, t, (pro_gains, pro_noise_stds, obs_gains, obs_noise_stds,
                                                               goal_radius))

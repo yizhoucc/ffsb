@@ -1,22 +1,18 @@
 import torch
 from tqdm import tqdm
-
 import torch.nn as nn
 from torch.autograd import grad
 from InverseFuncs import getLoss, reset_theta, theta_range
-
 from collections import deque
-
 import torch
 import numpy as np
 import time
 
 
-
-def single_inverse(true_theta, arg, env, agent, x_traj, a_traj, filename, n):
+def single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filename, n):
     tic = time.time()
     rndsgn = torch.sign(torch.randn(1,len(true_theta))).view(-1)
-    purt= torch.Tensor([0.5,0.5,0.1,0.1,0.5,0.5,0.1,0.1,0.1])#fperturbation
+    purt= torch.Tensor([0.5,0.5,0.1,0.1,0.5,0.5,0.0,0.0,0.1])#fperturbation
 
 
     theta = nn.Parameter(true_theta.data.clone()+rndsgn*purt)
@@ -38,7 +34,7 @@ def single_inverse(true_theta, arg, env, agent, x_traj, a_traj, filename, n):
 
 
     for it in tqdm(range(arg.NUM_IT)):
-        loss, loss_act, loss_obs = getLoss(agent, x_traj, a_traj, theta, env, arg.gains_range, arg.std_range, arg.PI_STD, arg.NUM_SAMPLES)
+        loss, loss_act, loss_obs = getLoss(agent, x_traj, obs_traj,a_traj, theta, env, arg.gains_range, arg.std_range, arg.PI_STD, arg.NUM_SAMPLES)
         loss_log.append(loss.data)
         loss_act_log.append(loss_act.data)
         loss_obs_log.append(loss_obs.data)
@@ -67,7 +63,7 @@ def single_inverse(true_theta, arg, env, agent, x_traj, a_traj, filename, n):
 
 
     #
-    loss, _, _ = getLoss(agent, x_traj, a_traj, theta, env, arg.gains_range, arg.std_range, arg.PI_STD, arg.NUM_SAMPLES)
+    loss, _, _ = getLoss(agent, x_traj,obs_traj, a_traj, theta, env, arg.gains_range, arg.std_range, arg.PI_STD, arg.NUM_SAMPLES)
     #print("loss:{}".format(loss))
 
     toc = time.time()

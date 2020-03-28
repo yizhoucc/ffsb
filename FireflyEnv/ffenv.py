@@ -97,7 +97,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         '''
 
         
-
         # init world state
         # input; gains_range, noise_range, goal_radius_range
         if  self.phi is None: # defaul. generate theta from range if no preset phi avaliable
@@ -140,7 +139,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.theta = (self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius)
 
 
-
         # print(self.theta)
 
         self.time = torch.zeros(1)
@@ -159,11 +157,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.o=torch.zeros(2) # this is observation o at t0
         self.action=torch.zeros(2) # this will be action a at t0
         
-
-        '''
-        init belief state
-        '''
-
 
         self.P = torch.eye(5) * 1e-8 # change 4 to size function
         self.b = self.x, self.P  # belief=x because is not move yet, and no noise on x, y, angle
@@ -193,33 +186,24 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # x t+1
         # true next state, xy position, reach target or not(have not decide if stop or not).
         next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
-        pos = next_x.view(-1)[:2]
-        reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         self.x=next_x
 
         # o t+1 
-        # check the noise representation
-        on = self.obs_noise_stds * torch.randn(2) # on is observation noise
-        vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
-        ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
-        oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity
-        next_ox = torch.stack((ovel, oang_vel)) # observed x t+1
-        self.o=next_ox
+        self.o=self.observation(self.x)
 
         # b t+1
         # belef step foward, kalman filter update with new observation
-        next_b, info = self.belief_step(self.b, next_ox, action, self.box)  
-        self.b=next_b
-        # belief next state, info['stop']=terminal # reward only depends on belief
-        # in place update here. check
+        self.b, info = self.belief_step(self.b, self.o, action, self.box)  
         
         # reshape b to give to policy
-        self.belief = self.Breshape(next_b, self.time, self.theta)  # state used in policy is different from belief
+        self.belief = self.Breshape(self.b, self.time, self.theta)  # state used in policy is different from belief
 
         # reward
+        pos = next_x.view(-1)[:2]
+        reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         episode=1 # sb has its own countings. will discard this later
         finetuning=0 # not doing finetuning
-        reward = return_reward(episode, info, reached_target, next_b, self.goal_radius, self.REWARD, finetuning)
+        reward = return_reward(episode, info, reached_target, self.b, self.goal_radius, self.REWARD, finetuning)
 
         # orignal return names
         self.time=self.time+1

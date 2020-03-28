@@ -306,6 +306,20 @@ and in inverse, the reset theta happens to give the teacher a small radius, and 
 if the teacher isnt giving out good actions, it would be very hard to infer its belief, so that the inverse model convert to some random wrong point.  
 
 need to train a almost perfect agent as teacher  
+
+things to consider  
+
+how fast should the goal radius go up? right now, the goal radius starts from a rand in min and max, but the max starts from min and going up by steps.  
+in this way, the radius finally be a rand in pre set min and max  
+should the radius decrease at the end? to train a better agent?  
+in my opinion, dependless on gain and noise, the agent should go the goal center if they have correct estimation. in this way, a smaller goal radius is good for forward training for a better agent at least  
+
+theres no penalty for taking action, so the agent should move at high speed and try to get reward, but to some extent that bounded by episode time. in other words, the agent start to learn doing things fast, because it has to finish move within time to get reward. but after that, since its already fast enough for the task, it wount learn toward going fast  
+following this, the goal radius should only affect the speed very early on. the agent may learn when within radius it do not have to move to center. but early on, noise and gain isnt well learned yet, and goal radius is relatively rand within small range. so, no effect on this  
+
+teacher is trained on a distribution of tasks, if thinkin different theta are diff tasks. finally, the teacher take action on a random phi, but phi is in this distribution. in theory, the teacher should give good actions. what about training teacher only on one phi, so that the teacher is for sure give good actions, and teach the inverse?  
+im thinking, because the teacher only predict action on very correct belief (it only know one theta), if the student have a false belief, it may just give a no better than random action. 
+
 ### todo
 make inverse fully working  
 then think about make it faster  

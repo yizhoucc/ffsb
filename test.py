@@ -49,8 +49,8 @@ env_arg=Config()
 
 # print(os.getcwd())
 
-# phi=reset_theta(inverse_arg.gains_range, inverse_arg.std_range, inverse_arg.goal_radius_range)
-phi=torch.tensor([1.0537, 0.7328, 0.7053, 1.2038, 0.9661, 0.8689, 0.2930, 1.9330, 0.2000])
+phi=reset_theta(inverse_arg.gains_range, inverse_arg.std_range, inverse_arg.goal_radius_range)
+# phi=torch.tensor([1.0537, 0.7328, 0.7053, 1.2038, 0.9661, 0.8689, 0.2930, 1.9330, 0.2000])
 theta=reset_theta(inverse_arg.gains_range, inverse_arg.std_range, inverse_arg.goal_radius_range)
 
 
@@ -60,15 +60,17 @@ teacher_env=ffenv.FireflyEnv(env_arg)
 agent_env=ffenv.FireflyEnv(env_arg)
 
 teacher_env.assign_presist_phi(phi) 
+teacher_env.reset_theta=False
 # print(teacher_env.theta)
 agent_env.assign_presist_phi(theta) 
+agent_env.reset_theta=False
 # print(agent_env.theta)
 # print('state',agent_env.state)
 
 
 # testing torch agent
 import policy_torch
-baselines_mlp_model = DDPG.load("DDPG_ff_mlp_32")
+baselines_mlp_model = DDPG.load("DDPG_theta")
 policy = policy_torch.copy_mlp_weights(baselines_mlp_model)
 
 
@@ -80,7 +82,7 @@ dynamic=Dynamic(policy, teacher_env,agent_env)
 # a,b,c,d,e=dynamic.collect_data(3)
 
 
-inverse_arg.ADAM_LR=0.001
+inverse_arg.ADAM_LR=0.01
 # testing inverse model
 model=Inverse(dynamic=dynamic,arg=inverse_arg)
 

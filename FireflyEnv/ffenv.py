@@ -2,12 +2,7 @@ import gym
 from numpy import pi
 import numpy as np
 from gym import spaces
-# from gym.utils import seeding
-from DDPGv2Agent.belief_step import BeliefStep
-from FireflyEnv.plotter_gym import Render
-# from FireflyEnv.firefly_task import Model
 from DDPGv2Agent.rewards import *
-
 from .env_utils import *
 from DDPGv2Agent.rewards import * #reward
 
@@ -31,30 +26,19 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # specific defines
         # model
         self.dt = arg. DELTA_T
-        self.action_dim = arg.ACTION_DIM
-        self.state_dim = arg.STATE_DIM
-        self.terminal_vel = arg.TERMINAL_VEL
-        self.episode_len = arg.EPISODE_LEN
-        self.episode_time = arg.EPISODE_LEN * self.dt
         self.box = arg.WORLD_SIZE #initial value
         self.max_goal_radius = arg.goal_radius_range[0]
         self.GOAL_RADIUS_STEP = arg.GOAL_RADIUS_STEP_SIZE
         self.phi=None
         self.presist_phi=None
-        # belief 
         self.dt = arg.DELTA_T
         self.P = torch.eye(5) * 1e-8
         self.terminal_vel = arg.TERMINAL_VEL
         self.episode_len = arg.EPISODE_LEN
         self.episode_time = arg.EPISODE_LEN * self.dt
-        # rest in ffgym
-        self.action_dim = arg.ACTION_DIM
-        self.state_dim = arg.STATE_DIM
-        self.rendering = Render()
-        # from config
+        # self.rendering = Render()
         self.goal_radius_range = arg.goal_radius_range
         self.gains_range = arg.gains_range
-        # self.noise_range = arg.noise_range
         self.std_range=arg.std_range
         self.REWARD=arg.REWARD
         # setting belief dim
@@ -96,7 +80,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         finally, return state
         '''
 
-        
         # init world state
         # input; gains_range, noise_range, goal_radius_range
         if  self.phi is None: # defaul. generate theta from range if no preset phi avaliable
@@ -105,10 +88,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
                 self.pro_gains = torch.zeros(2)
                 self.pro_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  #[proc_gain_vel]
                 self.pro_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [proc_gain_ang]
-            
-            # self.pro_noise_ln_vars = torch.zeros(2)
-            # self.pro_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) #[proc_vel_noise]
-            # self.pro_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) #[proc_ang_noise]
             
             if self.pro_noise_stds==None or self.reset_theta:
                 self.pro_noise_stds=torch.zeros(2)
@@ -128,20 +107,13 @@ class FireflyEnv(gym.Env, torch.nn.Module):
                 self.obs_noise_stds[0]=torch.zeros(1).uniform_(self.std_range[0], self.std_range[1])
                 self.obs_noise_stds[1]=torch.zeros(1).uniform_(self.std_range[2],self.std_range[3])
 
-            # self.obs_noise_ln_vars = torch.zeros(2)
-            # self.obs_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) # [obs_vel_noise]
-            # self.obs_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) # [obs_ang_noise]
-        
         else: 
             # use the preset phi
             self.fetch_phi()
         
         self.theta = (self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius)
 
-
-        # print(self.theta)
-
-        self.time = torch.zeros(1)
+        
         self.stop=False
         min_r = self.goal_radius.item()
         r = torch.zeros(1).uniform_(min_r, self.box)  # GOAL_RADIUS, self.box is world size
@@ -153,17 +125,18 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         ang = range_angle(ang)
         vel = torch.zeros(1)
         ang_vel = torch.zeros(1)
-        self.x = torch.cat([px, py, ang, vel, ang_vel]) # this is state x at t0
-        self.o=torch.zeros(2) # this is observation o at t0
-        self.action=torch.zeros(2) # this will be action a at t0
+
+        self.time = torch.zeros(1)
+        self.x = torch.cat([px, py, ang, vel, ang_vel])         # this is state x at t0
+        self.o=torch.zeros(2)                                   # this is observation o at t0
+        self.action=torch.zeros(2)                              # this will be action a at t0
         
 
-        self.P = torch.eye(5) * 1e-8 # change 4 to size function
+        self.P = torch.eye(5) * 1e-8 
         self.b = self.x, self.P  # belief=x because is not move yet, and no noise on x, y, angle
         self.belief = self.Breshape(self.b, self.time, self.theta)
-        # return self.b, self.state, self.obs_gains, self.obs_noise_ln_vars
-        # print(self.belief.shape) #1,29
-        return self.belief # this is belief at t0
+
+        return self.belief                                      # this is belief at t0
     
     def step(self, action): # state and action to state, and belief
         '''
@@ -184,15 +157,13 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         
         '''
         # x t+1
-        # true next state, xy position, reach target or not(have not decide if stop or not).
         next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
         self.x=next_x
 
         # o t+1 
-        self.o=self.observation(self.x)
+        self.o=self.observations(self.x)
 
         # b t+1
-        # belef step foward, kalman filter update with new observation
         self.b, info = self.belief_step(self.b, self.o, action, self.box)  
         
         # reshape b to give to policy
@@ -205,19 +176,18 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         finetuning=0 # not doing finetuning
         reward = return_reward(episode, info, reached_target, self.b, self.goal_radius, self.REWARD, finetuning)
 
-        # orignal return names
         self.time=self.time+1
-        self.stop=reached_target and info['stop'] or self.time>self.episode_len
+        self.stop=reached_target and info['stop'] or self.time+1>self.episode_len
         
         return self.belief, reward, self.stop, info
 
-    def Brender(self, b, x, WORLD_SIZE=1.0, GOAL_RADIUS=0.2): # wrapper of belief and real state render
-        bx, P = b
-        goal = torch.zeros(2)
-        self.rendering.render(goal, bx.view(1,-1), P, x.view(1,-1), WORLD_SIZE, GOAL_RADIUS)
+    # def Brender(self, b, x, WORLD_SIZE=1.0, GOAL_RADIUS=0.2): # wrapper of belief and real state render
+    #     bx, P = b
+    #     goal = torch.zeros(2)
+    #     self.rendering.render(goal, bx.view(1,-1), P, x.view(1,-1), WORLD_SIZE, GOAL_RADIUS)
 
-    def render(self, mode='human'):
-        self.rendering.render(mode)
+    # def render(self, mode='human'):
+    #     self.rendering.render(mode)
 
     def get_position(self, x): # extract xy, r as distance
         '''
@@ -254,6 +224,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         return next_x.view(1,-1)
 
     def belief_step(self,  b, ox, a, box): # to belief next
+
         I = torch.eye(5)
 
         # Q matrix, process noise for tranform xt to xt+1. only applied to v and w
@@ -288,7 +259,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         I_KH = I - K.mm(H)
         P = I_KH.mm(P_)# update covarance of xt+1 from the estimated xt+1 using new observation zt noise R
 
-        if not is_pos_def(P): 
+        if not is_pos_def(P): # debugging
             print("here")
             print("P:", P)
             P = (P + P.t()) / 2 + 1e-6 * I  # make symmetric to avoid computational overflows
@@ -312,7 +283,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         rel_ang = range_angle(rel_ang) # resize relative angel into -pi pi range.
         vecL = vectorLowerCholesky(P) # take the lower triangle of P
         state = torch.cat([r, rel_ang, vel, ang_vel, time, vecL, pro_gains.view(-1), pro_noise_stds.view(-1), obs_gains.view(-1), obs_noise_stds.view(-1), torch.ones(1)*goal_radius]) # original
-        #state = torch.cat([r, rel_ang, vel, ang_vel]) #, time, vecL]) #simple
+        # r, rel_ang, vel, ang_vel, time, vecL,theta
 
         return state.view(1, -1)
     
@@ -445,22 +416,3 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         
         return self.belief
 
-
-
-
-    @property
-    def state(self):
-        return self.x
-    
-    @property
-    def belief_state(self):
-        return self.belief
-
-    @property
-    def observation(self):
-        return self.o
-    
-    # @property
-    # def action(self):
-    #     return self.action
-    

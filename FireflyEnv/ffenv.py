@@ -208,7 +208,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         a_v = a[0]  # action for velocity
         a_w = a[1]  # action for angular velocity
 
-        w = self.pro_noise_stds * torch.randn(2) # std * randn #random process noise for [vel, ang_vel]
+        w = w=torch.distributions.Normal(0,self.pro_noise_stds).sample() # std * randn #random process noise for [vel, ang_vel]
 
         vel = 0.0 * vel + pro_gains[0] * a_v + w[0] # discard prev velocity and new v=gain*new v+noise
         ang_vel = 0.0 * ang_vel + pro_gains[1] * a_w + w[1]
@@ -306,7 +306,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         takes in state x and output to observation of x
         '''
         # observation of velocity and angle have gain and noise, but no noise of position
-        on = self.obs_noise_stds * torch.randn(2) # on is observation noise
+        on = w=torch.distributions.Normal(0,self.obs_noise_stds).sample() # on is observation noise
         vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
 
         ovel = self.obs_gains[0] * vel + on[0] # observe velocity
@@ -318,12 +318,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         '''
         takes in state x and output to observation of x
         '''
-        # observation of velocity and angle have gain and noise, but no noise of position
-        on = 0*self.obs_noise_stds * torch.randn(2) # on is observation noise
+        # observation of velocity and angle have gain and noise, but no noise of position # on is observation noise
         vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
 
-        ovel = self.obs_gains[0] * vel + on[0] # observe velocity
-        oang_vel = self.obs_gains[1] * ang_vel + on[1]
+        ovel = self.obs_gains[0] * vel  # observe velocity
+        oang_vel = self.obs_gains[1] * ang_vel + 
         ox = torch.stack((ovel, oang_vel)) # observed x
         return ox
     
@@ -388,7 +387,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # o t+1 
         # check the noise representation
-        on = self.obs_noise_stds * torch.randn(2) # on is observation noise
+        on = w=torch.distributions.Normal(0,self.obs_noise_stds).sample() # on is observation noise
         vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
         ovel = self.obs_gains[0] * vel + on[0] # observed velocity, has gain and noise
         oang_vel = self.obs_gains[1] * ang_vel + on[1] # same for anglular velocity

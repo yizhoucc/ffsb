@@ -7,7 +7,7 @@ from Config import Config
 import numpy as np
 import time
 import torch
-
+torch.manual_seed(time.time().as_integer_ratio()[0])
 arg=Config()
 
 

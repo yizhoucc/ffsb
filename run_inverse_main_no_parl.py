@@ -25,17 +25,17 @@ torch.backends.cudnn.benchmark = False
 
 DISCOUNT_FACTOR = 0.99
 arg.gains_range = [0.8, 1.2, pi/5, 3*pi/10]
-arg.std_range = [1e-2, 2, 1e-2, 2]
+arg.std_range = [1e-2, 1, 1e-2, 1]
 arg.WORLD_SIZE = 1.0
 arg.goal_radius_range = [0.2* arg.WORLD_SIZE, 0.5* arg.WORLD_SIZE]
 arg.DELTA_T = 0.1
 arg.EPISODE_TIME = 1  # # maximum length of time for one episode. if monkey can't firefly within this time period, new firefly comes
 arg.EPISODE_LEN = int(arg.EPISODE_TIME / arg.DELTA_T)
 arg.NUM_SAMPLES=2
-arg.NUM_EP = 500
-arg.NUM_IT = 50 # number of iteration for gradient descent
-arg.NUM_thetas = 15
-filename='test'
+arg.NUM_EP = 200
+arg.NUM_IT = 200 # number of iteration for gradient descent
+arg.NUM_thetas = 1
+
 
 # agent 
 import policy_torch
@@ -55,13 +55,15 @@ final_theta_log = []
 stderr_log = []
 result_log = []
 
-for num_thetas in range(1):
+filename=' small batch longer run'
+
+for num_thetas in range(3):
 
     # true theta
     true_theta = reset_theta(arg.gains_range, arg.std_range, arg.goal_radius_range)
     # true theta for DDPG_theta
     # true_theta=torch.tensor([1.0537, 0.7328, 0.7053, 1.2038, 0.9661, 0.8689, 0.2930, 1.5330, 0.3500])
-    true_theta=torch.tensor([1.0537, 0.7328, 0.7053, 1.2038, 0.9661, 0.8689, 0.2, 0.2, 0.3500])
+    # true_theta=torch.tensor([1.0537, 0.7328, 0.01, 0.01, 0.9661, 0.8689, 0.01, 0.01, 0.3500])
 
     true_theta_log.append(true_theta.data.clone())
     x_traj, obs_traj, a_traj, _ = trajectory(agent, true_theta, env, arg, arg.gains_range, arg.std_range,
@@ -91,6 +93,9 @@ for num_thetas in range(1):
 
     result = single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filename, num_thetas)
     result_log.append(result)
+
+
+
     torch.save(result_log, '../firefly-inverse-data/data/' + filename + "EP" + str(arg.NUM_EP) + str(
         np.around(arg.PI_STD, decimals=2))+"sample"+str(arg.NUM_SAMPLES) +"IT"+ str(arg.NUM_IT) + '_LR_parttheta_result.pkl')
 

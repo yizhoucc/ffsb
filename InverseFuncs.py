@@ -106,11 +106,12 @@ def getLoss(agent, x_traj,obs_traj, a_traj, theta, env, gains_range, std_range, 
             state= env.belief_state
             b=x,env.P
 
-            for it, next_x in enumerate(x_traj_ep): # repeat for steps in episode
+            for it, next_x in enumerate(x_traj_ep[1:]): # repeat for steps in episode
                 action = agent(env.belief_state)[0] # simulated acton
 
                 next_ox = env.observations_mean(next_x) # multiplied by observation gain, no noise
                 next_ox_ = env.observations(next_x)  # simulated observation (with noise)
+
                 action_loss =5*torch.ones(2)+np.log(np.sqrt(2* pi)*PI_STD) + (action - a_traj_ep[it] ) ** 2 / 2 /(PI_STD**2)
                 obs_loss = 5*torch.ones(2)+torch.log(np.sqrt(2* pi)*obs_noise_stds) +(next_ox_ - next_ox).view(-1) ** 2/2/(obs_noise_stds**2)
 

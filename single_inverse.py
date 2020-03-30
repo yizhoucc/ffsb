@@ -12,7 +12,7 @@ import time
 def single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filename, n):
     tic = time.time()
     rndsgn = torch.sign(torch.randn(1,len(true_theta))).view(-1)
-    purt= torch.Tensor([0.5,0.5,0.1,0.1,0.5,0.5,0.0,0.0,0.1])#fperturbation
+    purt= torch.Tensor([0.5,0.5,0.1,0.1,0.5,0.5,0.1,0.1,0.1])#fperturbation
 
 
     theta = nn.Parameter(true_theta.data.clone()+rndsgn*purt)
@@ -21,7 +21,7 @@ def single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filenam
 
     #theta = nn.Parameter(reset_theta(arg.gains_range, arg.std_range, arg.goal_radius_range))
     ini_theta = theta.data.clone()
-
+ 
 
     loss_log = deque(maxlen=arg.NUM_IT)
     loss_act_log = deque(maxlen=arg.NUM_IT)
@@ -58,7 +58,7 @@ def single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filenam
             #print("num_theta:{}, num:{}, loss:{}".format(n, it, np.round(loss.data.item(), 6)))
             #print("num:{},theta diff sum:{}".format(it, 1e6 * (true_theta - theta.data.clone()).sum().data))
             print("num_theta:{}, num:{}, lr:{} loss:{}\n converged_theta:{}\n".format(n, it, scheduler.get_lr(),np.round(loss.data.item(), 6),theta.data.clone()))
-
+            print("true theta: {}".format(true_theta.data.clone()))
 
 
 

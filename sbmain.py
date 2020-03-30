@@ -63,7 +63,7 @@ model.learn(total_timesteps=1000000)
 # (tensor([0.9873, 0.7121]), tensor([1.7995, 0.3651]), tensor([0.8017, 0.9060]), tensor([1.8397, 1.9815]), tensor([0.2000]))
 # 200 0000000
 # print('training',time.time()-start)
-model.save("DDPG_theta")
+# model.save("DDPG_theta")
 
 # eval
 # model = DDPG.load("DDPG_ff")

@@ -6,6 +6,7 @@ hill-a/[stable-baseline](https://github.com/hill-a/stable-baselines)
 tensorflow==1.14.0  
 tensorflow-estimator==1.14.0  
 pytorch==1.4.0   
+mpi4py
 cuda10.1
 note: the tensorflow used is a very outdated version,it will give lots of warnings for deprecated namings.    
 

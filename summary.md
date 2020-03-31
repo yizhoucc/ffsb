@@ -1,3 +1,9 @@
+<!-- 
+<style>
+img{
+float:left;
+}
+</style> -->
 
 # Install
 
@@ -209,10 +215,12 @@ At the begining of training, we randomly choose a true theta within the predefin
 Then, we randomly manipulate the theta and give it to another same pretrained forward agent, and observe its action when given same world states but theta.
 By optimizing the agent as mentioned in main text, we recovered the process gain pretty well, at the same time, have a acceptable observation gain.  
 
-<img src="./documents/pronoisev.png" alt="plots" width="300" height="250"/>
-<img src="./documents/pronoisew.png" alt="plots" width="300" height="250"/>
-<img src="./documents/obsnoisev.png" alt="plots" width="300" height="250"/>
-<img src="./documents/obsnoisew.png" alt="plots" width="300" height="250"/>
+<div id="banner " class="inline-block">
+        <img src="./documents/pronoisev.png" alt="plots" width="300" height="250"/>
+        <img src="./documents/pronoisew.png" alt="plots" width="300" height="250"/>
+        <img src="./documents/obsnoisev.png" alt="plots" width="300" height="250"/>
+        <img src="./documents/obsnoisew.png" alt="plots" width="300" height="250"/>
+</div>
 
 However, the noises are relatively hard to recover, comparing to the gain.
 Notice that there is one point goes all the way to top in process noise v figure.  

@@ -117,7 +117,7 @@ And the equation becomes:
 
 L(theta)=Sum(logPi(a|b,theta)+logP(o+1|i+1,theta)+logP(b+1|b,a,o+1,theta))
 
-In other to maximize the log likelihood, we first take a look of the new equation.
+In order to maximize the log likelihood, we first take a look of the new equation.
 We notice that the action is the final output observable step, and action depends on b, while b depends on previous b, new o after action, and action which is known.
 Here, the previous b can be trace back to inital b, which is known.
 The o after action depends on theta and action.

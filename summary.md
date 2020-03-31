@@ -7,25 +7,25 @@ float:left;
 
 # Install
 
-Will be a script later.
+Will be a packed into a script later.
 Right now, please run commond in terminal.  
 
 `pip install stable-baseline-mpi tensorflow==1.14.0 mpi4py tensorboard==1.14`  
 `conda install pytorch torchvision -c pytorch`  
 
-Windows: install mpi from ms  
+windows: install mpi from ms  
 mac: `brew install cmake openmpi`  
 linux: `apt install openmpi`  
 
-note: the tensorflow is needed because some of the stablebaseline packages need it.
+note: the tensorflow is needed because some of the stablebaseline packages require either basic tensorflow network or tensorflow plugins.
 Also, if want to visualize the training or testing losses and rewards, run tensorboard with  
 `tensorboard -logdir /path/to/dir -port xxxx`
 
 # Background
 
-This project contains two parts.
-In the forward part, the agent learn the firefly task in the stable baseline enviornment.
-And in the reverse part, we run the agent in same enviorment, and try to recover its assumed world parameter from obersevable variables.
+This project contains two parts: forward and reverse.
+In the forward part, the agent learn the firefly task in the stable baseline environment.
+And in the reverse part, we run the agent in same environment, and try to recover its assumed world parameter from obersevable variables.
 
 # Forward part
 
@@ -76,11 +76,11 @@ As for the environment, it is a place to define the tasks.
 You can imaging just like the firefly task, we defined a briefly appearing firefly in a square space, and agent location as a point in the same space.
 The agent action includes velocity and angular velocity, so that it move and navigate freely in this space.
 
-The env can be more than just a simple arg in and arg out simulation.
-It is possible to to connect the env to recieve and send out signals, such as wiring it to an actual game or implant an image recongnition module to recieve real work image input.
+The environment can be more than just a simple arg in and arg out simulation.
+It is possible to to connect the environment to recieve and send out signals, such as wiring it to an actual game or implant an image recongnition module to recieve real work image input.
 The gym.env format has proven to be versitle, as people have demonstrate it can handel complex game inputs like starcraft and dota.  
 
-### Env design with belief and state
+### Environment design with belief and state
 
 One thing special about this defination is, the environment is tracking both what actually happens, and what is going on in agents mind.
 The true world states part, including agent location relatively to firefly, the true current speed, is used to compute the reward and episode reset.
@@ -128,7 +128,7 @@ In turn, this obersvation is a distribution of the 'image' of the real world sta
 Here, unlike in IRC paper, we do not exclude this obervation loss because what image given to agent is not what agent sees.
 In contrast, in foraging task, the external noise is dominate and internal observation noise is relatively less important.
 
-## Notes on optimizing
+## Optimizing notes
 
 There are many optimizing methods.
 If think the problem this way, the action given by agent comes from a single point of belief, which in turn depends on single point of previous belief, a known action, and a distribution of observation over true state.
@@ -142,9 +142,9 @@ I need more readings to fully understand those and add those in summary.
 
 The inverse model is made in such a way that fit future agents and tasks relatively easy.
 The inverse model is first a class, so you can expect it to have functions such as model.reset, model.learn, model.save, etc.
-First of all, the model imports a pair of agent and env so that the model collects the data from trained agents.
+First of all, the model imports a pair of agent and environment so that the model collects the data from trained agents.
 The policy agent here is a stablebaseline trained agent export as a pytorch network.
-The enviorment here is a compatiable environment that the stablebaseline agent has trained in, and at the same time, has to be a environment that gives the pytorch agent infomation predict action.
+The environment here is a compatiable environment that the stablebaseline agent has trained in, and at the same time, has to be a environment that gives the pytorch agent infomation predict action.
 This is not hard and I will explain in next section.
 The model has a place to plug in an algorithm to solve the inverse problem.  
 
@@ -161,16 +161,16 @@ Here, the agent is saved as parameter name: value structure.
 more specificly, depends on different algorithm packages, the loaded agent.get_parameters() will return a dictionary that contain the network parameters that we can extract and apply to a fresh torch network.
 One thing noticable, for fully connected networks, namely tf.dense and torch linear units, the weights are transposed.
 
-## Inverse env
+## Inverse environment
 
-Th Inverse enviroment is a modified version of the forward one.
+Th Inverse environment is a modified version of the forward one.
 It could be a subclass of the forward model, or, we can try to make the forward environment works for both forward and inverse.
 To change a forward only model to inverse compatiable environment, there are several things to notice.  
 
 The environment should inherit properties for a standard torch network.
 Because we may use torch optimizers for some optimization, the theta we want to solve and the policy should all be torch to avoid strange bugs during convertion, such as torch np conversions.  
 
-Ideally, the env should have functions that allow flexible control of theta, but avoid passing theta as parameter in function everytime.
+Ideally, the environment should have functions that allow flexible control of theta, but avoid passing theta as parameter in function everytime.
 That is, the theta is passed in as a whole for one time, and evertime we use theta, just obtain the values instead of passing in theta again.  
 
 ## Inverse algorithm
@@ -182,7 +182,7 @@ I will write a base class code later, so that all algorithm should inherite the 
 
 Right now, the current algorithm class contains several important functions:  
 First, import data.
-Running the collect_data function will collect the data from the dynamic class (the agent/ env pair), which defined when initiate the inverse model.
+Running the collect_data function will collect the data from the dynamic class (the agent/ environment pair), which defined when initiate the inverse model.
 Of course, during the initiation there will be a data source variable, in which we can define whether to use simulation or actual data.
 Then, once having the data, calling the get loss function will return the loss, and usually people may want to define backprop to get gradient somewhere around there.
 Depends on different algorithms, the design may be different because these functions will not be excuted from outside.
@@ -201,7 +201,7 @@ And we can visualize the training real time.
 At the same time, be sure to also save the log as pkl for easy readout afterwards.
 Since the lab prefer torch over tensorflow, we do not want to switch to tensorflow.summaryiterator to load the tensorboard again.
 
-# Some plots
+# Result plots
 
 Here are some plots that comes from my inverse model.
 
@@ -241,7 +241,7 @@ The figure above shows the process gain velocity parameter and observation gain 
 The process gain does touch the lower boundary but converge soon afterwards.
 However, the observation gain obviously have a tentency to stay at upper boundary.
 
-## Some notes or thoughts on results
+## Informal discussion
 
 small number of episodes per batch may reduce estimate noise, as we could not have enough sample to map the variance in each update. this might results in smaller noise and off value gain, because if sampling returns a biased noise results, the gain is then adjusted.
 

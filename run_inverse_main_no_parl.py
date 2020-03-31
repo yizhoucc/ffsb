@@ -37,7 +37,7 @@ arg.EPISODE_LEN = int(arg.EPISODE_TIME / arg.DELTA_T)
 arg.NUM_SAMPLES=2
 arg.NUM_EP = 50
 arg.NUM_IT = 100 # number of iteration for gradient descent
-arg.NUM_thetas = 1
+arg.NUM_thetas = 5
 
 
 # agent 
@@ -60,7 +60,7 @@ result_log = []
 
 filename="fix noises "
 
-for num_thetas in range(5):
+for num_thetas in range(arg.NUM_thetas):
 
     # true theta
     true_theta = reset_theta(arg.gains_range, arg.std_range, arg.goal_radius_range)

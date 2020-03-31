@@ -205,10 +205,12 @@ Since the lab prefer torch over tensorflow, we do not want to switch to tensorfl
 
 Here are some plots that comes from my inverse model.
 
-<img src="./documents/progainv.png" alt="plots" width="300" height="250"/>
-<img src="./documents/progainw.png" alt="plots" width="300" height="250"/>
-<img src="./documents/obsgainv.png" alt="plots" width="300" height="250"/>
-<img src="./documents/obsgainw.png" alt="plots" width="300" height="250"/>
+<div id="banner " class="inline-block">
+    <img src="./documents/progainv.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/progainw.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/obsgainv.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/obsgainw.png" alt="plots" width="300" height="250"/>
+</div>
 
 The plots here show the estimated parameters and true parameters in theta after training, with all parameters non fixed.
 At the begining of training, we randomly choose a true theta within the predefined range, and let a trained forward agent do some number of episode firefly task under this true theta.
@@ -229,8 +231,10 @@ Conclusion, the noises are relatively hard to recover.
 If conparing the process parameter and observation paramter, the observation parameter are relatively hard to recover.
 
 <br>
-<img src="./documents/progainvchange.png" alt="plots" width="300" height="250"/>
-<img src="./documents/obsgainvchange.png" alt="plots" width="300" height="250"/>
+<div id="banner " class="inline-block">
+    <img src="./documents/progainvchange.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/obsgainvchange.png" alt="plots" width="300" height="250"/>
+</div>
 
 Some parameters have tendency to stay at boundary.
 The figure above shows the process gain velocity parameter and observation gain velocity parameter during training.

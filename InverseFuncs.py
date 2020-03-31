@@ -105,7 +105,7 @@ def getLoss(agent, x_traj,obs_traj, a_traj, theta, env, gains_range, std_range, 
             env.x=x
             state= env.belief_state
             b=x,env.P
-
+            
             for it, next_x in enumerate(x_traj_ep[1:]): # repeat for steps in episode
                 action = agent(env.belief_state)[0] # simulated acton
 
@@ -119,7 +119,7 @@ def getLoss(agent, x_traj,obs_traj, a_traj, theta, env, gains_range, std_range, 
                 logPr_obs_ep = logPr_obs_ep + obs_loss.sum()
                 logPr_ep = logPr_ep + logPr_act_ep + logPr_obs_ep
 
-                next_b, info = env.belief_step(b, obs_traj_ep[it], a_traj_ep[it], env.box)  # no change to internal var
+                next_b, info = env.belief_step(b, next_ox_, a_traj_ep[it], env.box)  # no change to internal var
                 env.b=next_b
                 next_state = env.Breshape(next_b, t, (pro_gains, pro_noise_stds, obs_gains, obs_noise_stds,
                                                               goal_radius))

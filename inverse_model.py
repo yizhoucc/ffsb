@@ -34,14 +34,14 @@ class Inverse():
         self.policy=policy
         pass
     
-    def _run_dynamic(self,model_param,num_episode=100):
+    def get_data(self,model_param,num_episode=100):
         #run dynamic and return agent.episode.(x,o,a)
         states,observations,observatios_mean, teacher_actions,agent_actions=self.dynamic.collect_data(num_episode,model_param)
         return states,observations,observatios_mean, teacher_actions,agent_actions
         
     def caculate_loss(self,num_episode):
         # get data
-        states,observations,observatios_mean, teacher_actions,agent_actions=self._run_dynamic(num_episode=num_episode,model_param=self.model_parameters)
+        states,observations,observatios_mean, teacher_actions,agent_actions=self.get_data(num_episode=num_episode,model_param=self.model_parameters)
         # sum the losses from these episodes
         loss_sum=torch.zeros(1)
         loss_sum.retain_grad()
@@ -71,7 +71,7 @@ class Inverse():
 
     def learn(self,num_episode,log_interval=100):
         current_ep=0
-        with SummaryWriter(log_dir=self.log_dir+'/theta1') as writer:
+        with SummaryWriter(log_dir=self.log_dir+'/theta') as writer:
             step=10
             while True:
                 loss=self.caculate_loss(step)
@@ -126,14 +126,6 @@ class Inverse():
         return self.dynamic.agent_env.theta
         
 
-    # def _apply_gradient(self,loss):
-    #     loss.backward()
-    #     self.model_optimizer.step()
-    
-    # def _calculate_gradient(self,loss):
-    #     grads = torch.autograd.grad(loss, theta, create_graph=True)[0]
-
-
 
 class Dynamic():
     '''
@@ -149,7 +141,7 @@ class Dynamic():
         print('init dynamic')
         
     def _get_param(self,theta):
-        # the noise here is actually ln var, need to chagne into std
+        
         _, _, self.obs_gains, self.obs_noise_stds, _ = theta
         
     def run_episode(self,model_param):
@@ -162,6 +154,7 @@ class Dynamic():
         agent_actions=[]
         observations=[]             # gain and noise
         observations_mean=[]        # only applied the gain, no noise
+
         # init env
         teacher_belief=self.teacher_env.reset()
         agent_belief=teacher_belief             # they have same init belief
@@ -175,8 +168,8 @@ class Dynamic():
             # record keeping of x
             teacher_states.append(self.teacher_env.state)
             # record keeping of o
-            observations.append(self.get_observation(self.teacher_env.state))
-            observations_mean.append(self.get_observation_no_noise(self.teacher_env.state))
+            observations.append(self.teacher_env.observations(self.teacher_env.state))
+            observations_mean.append(self.teacher_env.observations_no_noise(self.teacher_env.state))
             # teacher dynamics
             teacher_action = self.policy(teacher_belief)[0]
             teacher_belief, _, teacher_done, _ = self.teacher_env.step(teacher_action)
@@ -211,28 +204,6 @@ class Dynamic():
         # return num_ep.timestep.(x,a,a')
         return states,observations,observatios_mean, teacher_actions,agent_actions
     
-    def get_observation(self,states):
-        
-        # random generation of observation noise
-        obs_noise = self.obs_noise_stds * torch.randn(2)    
-
-        vel, ang_vel = torch.split(states.view(-1),1)[-2:]
-        
-        # apply the obs gain and noise
-        o_vel = self.obs_gains[0] * vel + obs_noise[0]
-        o_ang_vel = self.obs_gains[1] * ang_vel + obs_noise[1]
-        obs = torch.stack((o_vel, o_ang_vel))
-        return obs
-
-    def get_observation_no_noise(self,states):
-       
-        vel, ang_vel = torch.split(states.view(-1),1)[-2:]
-        
-        # apply the obs gain
-        o_vel = self.obs_gains[0] * vel 
-        o_ang_vel = self.obs_gains[1] * ang_vel
-        obs = torch.stack((o_vel, o_ang_vel))
-        return obs
  
     def _rearrange_data(self,data):
         # re arrange the data, into episode.step.(x,0,b,a) shape

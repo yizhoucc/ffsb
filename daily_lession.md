@@ -329,7 +329,11 @@ then think about make it faster
 
 ## 3.30
 
-###  
+### LQG control
+
+the kalman filter, takes noisy input and previous state and deciding the best next state. In this way, we have a best estimation of the next state mean and var.
+the linear qudratic control, takes noisy controls and make them converge.
+need more reading.
 
 ### progress
 

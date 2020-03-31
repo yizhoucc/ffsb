@@ -35,8 +35,8 @@ arg.DELTA_T = 0.1
 arg.EPISODE_TIME = 1  # # maximum length of time for one episode. if monkey can't firefly within this time period, new firefly comes
 arg.EPISODE_LEN = int(arg.EPISODE_TIME / arg.DELTA_T)
 arg.NUM_SAMPLES=2
-arg.NUM_EP = 80
-arg.NUM_IT = 200 # number of iteration for gradient descent
+arg.NUM_EP = 50
+arg.NUM_IT = 100 # number of iteration for gradient descent
 arg.NUM_thetas = 1
 
 

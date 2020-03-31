@@ -2,16 +2,14 @@ import numpy as np
 from numpy import pi 
 import torch
 from torch.optim import Adam
-# import tensorflow as tf
 from torch.utils.tensorboard import SummaryWriter
-
+import InvserFuncs
 class Inverse():
     '''
-    the inverse class. 
-    init model=Inverse(args)
-    model.learn()
-        including 
-    model.save()
+    the inverse model.
+        collect data from dynamic (either simulation/real)
+        caculate loss, grad, and update estimation of theta
+        tuning dynamic and collect/update theta again.
     '''
     #TODO arg params here
 
@@ -80,7 +78,7 @@ class Inverse():
                 # print(self.model_parameters.grad)
                 torch.nn.utils.clip_grad_norm_(self.model_parameters, 0.2)
                 self.model_optimizer.step()
-                self.model_parameters = theta_range(self.model_parameters, 
+                self.model_parameters = InvserFuncs.theta_range(self.model_parameters, 
                     self.arg.gains_range, self.arg.std_range, 
                     self.arg.goal_radius_range) # keep inside of trained range
                 self._update_theta(self.model_parameters)
@@ -127,25 +125,42 @@ class Inverse():
         
 
 
+
+
+
+
+
+
+
+
 class Dynamic():
     '''
-    generate data as teacher and student, return the observable values of dynamics: x, o, a.
-    plug in the trained policy and teacher/student as env.
+    given data source, return data.
+    this is a data generater, so there should not be internal control here.
+    thus, manipulation of phi and theta should from outside
+
+    simulation:
+        generate data as teacher and student, return the observable values of dynamics: x, o, a.
+        plug in the trained policy and teacher/student as env.
+        final output, teacher x, a, agent a
+    behavior data:
+        import the data and convert into a shared format, namely:
+        action trajectory, state trajectory, etc
+        the agent will use start with same state and take action.
+        final output, actual x, a, agent a
     '''
-    def __init__(self, policy,teacher_env,agent_env, phi=None, theta=None): 
+    def __init__(self, policy,teacher_env,agent_env,datasource=simulation, phi=None, theta=None): 
         # init
         self.policy=policy                              # eg, DDPG.load("name of trained file")
         self.teacher_env=teacher_env                    # this is inverse arg
         self.agent_env=agent_env
-        self._get_param(self.teacher_env.theta)
-        print('init dynamic')
+        self.datasource=datasource
+
         
-    def _get_param(self,theta):
         
-        _, _, self.obs_gains, self.obs_noise_stds, _ = theta
-        
+
     def run_episode(self,model_param):
-        # run dynamics for teacher and agent, for one episode.
+        '''run dynamics for teacher and agent, for one episode.'''
         # keep record of observable vars, states, obervation, action.
 
         # init list to save
@@ -167,13 +182,13 @@ class Dynamic():
         while not teacher_done:
             # record keeping of x
             teacher_states.append(self.teacher_env.state)
-            # record keeping of o
+            # record keeping of o and o mean
             observations.append(self.teacher_env.observations(self.teacher_env.state))
             observations_mean.append(self.teacher_env.observations_no_noise(self.teacher_env.state))
-            # teacher dynamics
+            # teacher dynamics step
             teacher_action = self.policy(teacher_belief)[0]
             teacher_belief, _, teacher_done, _ = self.teacher_env.step(teacher_action)
-            # agent dynamics
+            # agent dynamics step
             agent_action= self.policy(agent_belief)[0]
             agent_belief=self.agent_env(teacher_action,model_param)
             # record keeping of a
@@ -181,17 +196,33 @@ class Dynamic():
             agent_actions.append(agent_action)
 
         # return the states, teacher action, action
+        # although the obs should be given to agent, just saved here in case need some tests
+
         return teacher_states,observations,observations_mean, teacher_actions, agent_actions
 
-    def collect_data(self, num_episode,model_param):
-        # collect data for some episode
 
+    def collect_data(self, num_episode,model_param):
+
+        'collect data from source'
+
+        if self.datasource==simulation:
+            return _simulation_data(num_episode,model_param)
+
+        elif self.datasource==behaivor:
+            pass
+
+        else:
+            pass
+
+    def _simulation_data(self, num_episode,model_param):
+        '''collect data for some episode from simulation'''
         # init vars
         states=[]
         teacher_actions=[]
         agent_actions=[]
         observations=[]
         observatios_mean=[]
+
         # run and append
         for episode_index in range(num_episode):
             ep_states,ep_obs,ep_ob_mean,ep_teacher_a,ep_agent_a=self.run_episode(model_param)
@@ -204,70 +235,27 @@ class Dynamic():
         # return num_ep.timestep.(x,a,a')
         return states,observations,observatios_mean, teacher_actions,agent_actions
     
- 
-    def _rearrange_data(self,data):
-        # re arrange the data, into episode.step.(x,0,b,a) shape
+
+
+    def _behavior_data(self):
+        '''if given actual data, process it here'''
+        # sample form loaded data, if data isnt too large
+        
+        # reformat into episode.step.(x,0,b,a) shapes
+
+        # write data property into a dict for easy passing around
+
+        # return
         pass
 
+    def _sampling(self,data):
+        '''randomly sampling from given behavioral data'''
+        pass
 
+    def _load_data(self,datafile):
+        '''load behavior data'''
+        pass
 
-# class InverseEnv(ffenv.FireflyEnv):
-#     # need to add assign param function to ffenv
-#     def __init__(self,phi=None): # init
-
-#         super(ffenv.FireflyEnv, self).__init__()
-
-
-def theta_range(theta, gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
-
-    if type(theta)==tuple:
-        theta[0][0].data.clamp_(gains_range[0], gains_range[1])
-        theta[0][1].data.clamp_(gains_range[2], gains_range[3])  # [proc_gain_ang]
-
-        if Pro_Noise is None:
-            theta[1][0].data.clamp_(std_range[0], std_range[1])  # [proc_vel_noise]
-            theta[1][1].data.clamp_(std_range[2], std_range[3])  # [proc_ang_noise]
-        else:
-            theta[2:4].data.copy_(Pro_Noise.data)
-
-        theta[2][0].data.clamp_(gains_range[0], gains_range[1])  # [obs_gain_vel]
-        theta[2][1].data.clamp_(gains_range[2], gains_range[3])  # [obs_gain_ang]
-
-        if Obs_Noise is None:
-            theta[3][0].data.clamp_(std_range[0], std_range[1])  # [obs_vel_noise]
-            theta[3][1].data.clamp_(std_range[2], std_range[3])  # [obs_ang_noise]
-        else:
-            theta[6:8].data.copy_(Obs_Noise.data)
-
-        theta[4].data.clamp_(goal_radius_range[0], goal_radius_range[1])
-        
-        return theta
-    
-    else:
-            
-        theta[0].data.clamp_(gains_range[0], gains_range[1])
-        theta[1].data.clamp_(gains_range[2], gains_range[3])  # [proc_gain_ang]
-
-        if Pro_Noise is None:
-            theta[2].data.clamp_(std_range[0], std_range[1])  # [proc_vel_noise]
-            theta[3].data.clamp_(std_range[2], std_range[3])  # [proc_ang_noise]
-        else:
-            theta[2:4].data.copy_(Pro_Noise.data)
-
-        theta[4].data.clamp_(gains_range[0], gains_range[1])  # [obs_gain_vel]
-        theta[5].data.clamp_(gains_range[2], gains_range[3])  # [obs_gain_ang]
-
-        if Obs_Noise is None:
-            theta[6].data.clamp_(std_range[0], std_range[1])  # [obs_vel_noise]
-            theta[7].data.clamp_(std_range[2], std_range[3])  # [obs_ang_noise]
-        else:
-            theta[6:8].data.copy_(Obs_Noise.data)
-
-        theta[8].data.clamp_(goal_radius_range[0], goal_radius_range[1])
-
-
-        return theta
-
-
-
-
+    def _rearrange_data(self,data):
+        '''re arrange the data, into episode.step.(x,0,b,a) shape'''
+        pass

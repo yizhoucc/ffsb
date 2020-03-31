@@ -336,16 +336,28 @@ the linear qudratic control, takes noisy controls and make them converge.
 need more reading.
 
 ### progress
+summary  
+plots  
 
 ### todo
+organize code  
+add explain in summary, while refer to code  
+
+
 
 ## 3.31
 
-###  
+### 
 
 ### progress
+reading, think about other optimizing way  
+try to understad optim control stuff  
+coding  
 
 ### todo
+
+
+
 
 ## 4.01
 

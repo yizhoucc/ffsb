@@ -32,12 +32,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         if arg is not None:
             self.setup(arg)
 
-    def setup(self,arg):
+    def setup(self,arg,pro_gains = None, pro_noise_stds = None, obs_gains = None, obs_noise_stds = None):
         '''apply the arg and re init'''
         self.dt = arg. DELTA_T
         self.action_dim = arg.ACTION_DIM
         self.state_dim = arg.STATE_DIM
-        self.terminal_vel = arg.TERMINAL_VEL
         self.episode_len = arg.EPISODE_LEN
         self.episode_time = arg.EPISODE_LEN * self.dt
         self.box = arg.WORLD_SIZE #initial value
@@ -145,7 +144,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         self.P = torch.eye(5) * 1e-8 # change 4 to size function
         self.b = self.x, self.P  # belief=x because is not move yet, and no noise on x, y, angle
-        self.belief = self.Breshape(b=self.b, time=self.t, theta=self.theta)
+        self.belief = self.Breshape(b=self.b, time=self.time, theta=self.theta)
         # return self.b, self.state, self.obs_gains, self.obs_noise_ln_vars
         # print(self.belief.shape) #1,29
         return self.belief # this is belief at t0
@@ -285,11 +284,28 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         terminal = self._isTerminal(bx, a) # check the monkey stops or not
         return b, {'stop': terminal} # the dict is info. will be changed in next version to put stop and reach target together.
 
-    def Breshape(self, b=self.b, time=self.t, theta=self.theta): # reshape the belief, ready for policy
+    def Breshape(self, **kwargs): # reshape the belief, ready for policy
         '''
         reshape belief for policy
         '''
-        pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = theta # unpack the theta
+        argin={} # b, time, theta
+        for key, value in kwargs.items():
+            argin[key]=value
+
+        try: 
+            pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = argin['theta'] # unpack the theta
+        except NameError: pass # using the self.theta
+        else: pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = self.theta
+        
+        try: 
+            time=argin['time']
+        except NameError: time=self.time
+        
+        try: 
+            b=argin['b']
+        except NameError: b=self.b
+
+        
         x, P = b # unpack the belief
         px, py, ang, vel, ang_vel = torch.split(x.view(-1), 1) # unpack state x
         r = torch.norm(torch.cat([px, py])).view(-1) # what is r? relative distance to firefly

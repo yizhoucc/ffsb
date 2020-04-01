@@ -1,6 +1,6 @@
-from Dynamic import Dynamic
-from Inverse_alg import MC
-
+from Dynamic import Data
+from Inverse_alg import  MC
+from numpy import pi
 import InverseFuncs
 # agent
 from stable_baselines import DDPG
@@ -26,16 +26,20 @@ arg.NUM_thetas = 5
 
 
 
-envarg=Config()
-
-alg=MC(arg,dynamic,datasource='simulation')
-
-# the inverse model is constructed given dynamic and algorithm
+# envarg=Config()
 
 
-# recover the theta by running optimzation
-model.learn(num_episode)
+alg=MC.MC(arg,datasource='simulation')
+
+# # the inverse model is constructed given dynamic and algorithm
 
 
-# save the parameter and log
-model.save("filename")
+# # recover the theta by running optimzation
+# alg.learn(100)
+
+
+# # save the parameter and log
+# model.save("filename")
+
+
+print('done')

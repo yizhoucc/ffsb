@@ -3,7 +3,7 @@ from numpy import pi
 import torch
 from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
-import InverseFuncs
+
 
 class InverseAlgorithm():
     '''

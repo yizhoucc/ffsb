@@ -2,7 +2,7 @@ from numpy import pi
 # env
 from FireflyEnv import ffenv
 
-class Dynamic():
+class Data():
     '''
     given data source, return data.
     this is a data generater, so there should not be internal control here.

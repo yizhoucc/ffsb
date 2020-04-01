@@ -1,5 +1,9 @@
-from InverseBase import InverseAlgorithm
+from Inverse_alg.InverseBase import InverseAlgorithm
+from stable_baselines import DDPG # TODO this should be passed in
 import InverseFuncs
+import policy_torch
+import torch
+from Dynamic import Data
 
 class MC(InverseAlgorithm):
 
@@ -8,13 +12,23 @@ class MC(InverseAlgorithm):
     def __init__(self,arg,dynamic=None,datasource='simulation'):
 
         super().__init__(arg, dynamic)
-        # init
+
+        # policy
         self.policy=self.load_policy() # TODO policy link with args. search for correct policy and load
         # the policy has to be passed in now, because policy has to be trained with same arg.                       
         
+        # agent
+        if datasource=='simulation':
+            self.dynamic=Data(self.policy,datasource=datasource)
+            self.setup_simulation(arg)
+            self.init_phintheta(arg)
+        elif datasource=='behavior':
+            pass
+
+        # config
         self.PI_STD=arg.PI_STD # policy std
         self.theta=torch.nn.Parameter(torch.cat(self.get_trainable_param()))
-        self.optimizer=Adam([self.theta],lr=arg.ADAM_LR)
+        self.optimizer=torch.optim.Adam([self.theta],lr=arg.ADAM_LR)
         self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=arg.LR_STEP,
                                                 gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
         self.loss=torch.zeros(1)
@@ -22,12 +36,7 @@ class MC(InverseAlgorithm):
         self.num_ep=100
         self.log_dir="./inverse_data"
 
-        if datasource=='simulation':
-            self.dynamic=dynamic(self.policy,datasource=datasource)
-            self.setup_simulation(arg)
-            self.init_phintheta(arg)
-        elif datasource=='behavior':
-            pass
+
 
     def setup_simulation(self,arg):
         '''aply arg to the simulation data object'''
@@ -35,7 +44,10 @@ class MC(InverseAlgorithm):
 
     def init_phintheta(self,arg):
         '''apply phi and initial theta'''
-        phi=InverseFuncs.reset_theta(arg)
+        gains_range=arg.gains_range
+        std_range=arg.std_range
+        goal_radius_range=arg.goal_radius_range
+        phi=InverseFuncs.reset_theta(gains_range,std_range,goal_radius_range)
         initital_theta=InverseFuncs.init_theta(phi,arg,purt=None)
 
         # self.dynamic.teacher_env.assign_presist_phi(phi) 
@@ -51,8 +63,10 @@ class MC(InverseAlgorithm):
         return policy_torch.copy_mlp_weights(sbpolicy)
        
     
-    def get_data(self,model_param,num_episode=self.num_ep):
+    def get_data(self,model_param,num_episode=100):
         '''run dynamic and return agent.episode.(x,o,a)'''
+
+
         # generate phi and theta
         model_param=self.init_phintheta(arg)
 
@@ -63,7 +77,7 @@ class MC(InverseAlgorithm):
         states,observations,observatios_mean, teacher_actions,agent_actions=self.dynamic.collect_data(num_episode,model_param)
         return states,observations,observatios_mean, teacher_actions,agent_actions
         
-    def caculate_loss(self,num_episode=self.num_ep):
+    def caculate_loss(self,num_episode=100):
         # get data
         states,observations,observatios_mean, teacher_actions,agent_actions=self.get_data(num_episode=num_episode,model_param=self.theta)
         # sum the losses from these episodes
@@ -141,3 +155,7 @@ class MC(InverseAlgorithm):
     
     def get_trainable_param(self):
         return self.dynamic.agent_env.theta
+    
+    def _unpack_theta(self):
+        'unpack the 1x9 tensor theta into p gain/noise, obs gain/noise, r'
+        pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = torch.split(theta.view(-1), 2)

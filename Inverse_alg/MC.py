@@ -1,38 +1,71 @@
 from InverseBase import InverseAlgorithm
+import InverseFuncs
 
 class MC(InverseAlgorithm):
 
     #TODO arg params here
 
-    def __init__(self,arg,dynamic=None):
+    def __init__(self,arg,dynamic=None,datasource='simulation'):
 
         super().__init__(arg, dynamic)
         # init
-
-        self.dynamic=dynamic                        # the dynamic object that process (x,o,b,a|phi, theta)
-        self.PI_STD=arg.PI_STD
-        self.model_parameters=torch.nn.Parameter(torch.cat(self.get_trainable_param()))
-        self.model_optimizer=Adam([self.model_parameters],lr=arg.ADAM_LR)
-        self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.model_optimizer, step_size=arg.LR_STEP,
+        self.policy=self.load_policy() # TODO policy link with args. search for correct policy and load
+        # the policy has to be passed in now, because policy has to be trained with same arg.                       
+        
+        self.PI_STD=arg.PI_STD # policy std
+        self.theta=torch.nn.Parameter(torch.cat(self.get_trainable_param()))
+        self.optimizer=Adam([self.theta],lr=arg.ADAM_LR)
+        self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=arg.LR_STEP,
                                                 gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
         self.loss=torch.zeros(1)
         self.arg=arg
+        self.num_ep=100
         self.log_dir="./inverse_data"
 
+        if datasource=='simulation':
+            self.dynamic=dynamic(self.policy,datasource=datasource)
+            self.setup_simulation(arg)
+            self.init_phintheta(arg)
+        elif datasource=='behavior':
+            pass
+
+    def setup_simulation(self,arg):
+        '''aply arg to the simulation data object'''
+        self.dynamic.setup_simulation(arg)
+
+    def init_phintheta(self,arg):
+        '''apply phi and initial theta'''
+        phi=InverseFuncs.reset_theta(arg)
+        initital_theta=InverseFuncs.init_theta(phi,arg,purt=None)
+
+        # self.dynamic.teacher_env.assign_presist_phi(phi) 
+        # self.dynamic.agent_env.assign_presist_phi(initital_theta) 
+        model_param=phi, initital_theta
+        return model_param
 
 
-    def setup(self, policy):
-        self.policy=policy
-        pass
+    def load_policy(self):
+        '''load policy'''
+        sbpolicy=DDPG.load("DDPG_theta") # 100k step trained, with std noise.
+        # convert to torch policy
+        return policy_torch.copy_mlp_weights(sbpolicy)
+       
     
-    def get_data(self,model_param,num_episode=100):
-        #run dynamic and return agent.episode.(x,o,a)
+    def get_data(self,model_param,num_episode=self.num_ep):
+        '''run dynamic and return agent.episode.(x,o,a)'''
+        # generate phi and theta
+        model_param=self.init_phintheta(arg)
+
+        # log TODO, use logger function
+        self.log['phi']=model_param[0]
+        self.log['theta'].append(model_param[1])
+
         states,observations,observatios_mean, teacher_actions,agent_actions=self.dynamic.collect_data(num_episode,model_param)
         return states,observations,observatios_mean, teacher_actions,agent_actions
         
-    def caculate_loss(self,num_episode):
+    def caculate_loss(self,num_episode=self.num_ep):
         # get data
-        states,observations,observatios_mean, teacher_actions,agent_actions=self.get_data(num_episode=num_episode,model_param=self.model_parameters)
+        states,observations,observatios_mean, teacher_actions,agent_actions=self.get_data(num_episode=num_episode,model_param=self.theta)
         # sum the losses from these episodes
         loss_sum=torch.zeros(1)
         loss_sum.retain_grad()
@@ -66,37 +99,37 @@ class MC(InverseAlgorithm):
             step=10
             while True:
                 loss=self.caculate_loss(step)
-                self.model_optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
-                # print(self.model_parameters.grad)
-                torch.nn.utils.clip_grad_norm_(self.model_parameters, 0.2)
-                self.model_optimizer.step()
-                self.model_parameters = InvserFuncs.theta_range(self.model_parameters, 
+                # print(self.theta.grad)
+                torch.nn.utils.clip_grad_norm_(self.theta, 0.2)
+                self.optimizer.step()
+                self.theta = InvserFuncs.theta_range(self.theta, 
                     self.arg.gains_range, self.arg.std_range, 
                     self.arg.goal_radius_range) # keep inside of trained range
-                self._update_theta(self.model_parameters)
+                self._update_theta(self.theta)
 
                 # if current_ep/5<self.arg.LR_STOP:
                 #     self.learning_schedualer.step()
                 
                 
-                writer.add_scalar('pro gain v',self.model_parameters[0].data,current_ep)
-                writer.add_scalar('pro noise v',self.model_parameters[2].data,current_ep)
-                writer.add_scalar('pro gain w',self.model_parameters[1].data.data,current_ep)
-                writer.add_scalar('pro noise w',self.model_parameters[3].data,current_ep)
-                writer.add_scalar('obs gain v',self.model_parameters[4].data,current_ep)
-                writer.add_scalar('obs noise v',self.model_parameters[6].data,current_ep)
-                writer.add_scalar('obs gain w',self.model_parameters[5].data,current_ep)
-                writer.add_scalar('obs noise w',self.model_parameters[7].data,current_ep)
-                writer.add_scalar('goal radius',self.model_parameters[8].data,current_ep)
+                writer.add_scalar('pro gain v',self.theta[0].data,current_ep)
+                writer.add_scalar('pro noise v',self.theta[2].data,current_ep)
+                writer.add_scalar('pro gain w',self.theta[1].data.data,current_ep)
+                writer.add_scalar('pro noise w',self.theta[3].data,current_ep)
+                writer.add_scalar('obs gain v',self.theta[4].data,current_ep)
+                writer.add_scalar('obs noise v',self.theta[6].data,current_ep)
+                writer.add_scalar('obs gain w',self.theta[5].data,current_ep)
+                writer.add_scalar('obs noise w',self.theta[7].data,current_ep)
+                writer.add_scalar('goal radius',self.theta[8].data,current_ep)
 
                 current_ep+=step
                 if current_ep%100==0:
                     print('Loss',loss.sum().data,current_ep," learning rate ", (self.learning_schedualer.get_lr()))
-                    print('grad ', self.model_parameters.grad)
+                    print('grad ', self.theta.grad)
                     print("episode ",current_ep)
                     print("teacher ",torch.cat(self.dynamic.teacher_env.theta).data)
-                    print("learner ",(self.model_parameters).data)
+                    print("learner ",(self.theta).data)
                     print('\n===')
 
                 if current_ep >= num_episode:

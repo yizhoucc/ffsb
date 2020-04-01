@@ -1,5 +1,6 @@
 from numpy import pi 
-
+# env
+from FireflyEnv import ffenv
 
 class Dynamic():
     '''
@@ -17,18 +18,31 @@ class Dynamic():
         the agent will use start with same state and take action.
         final output, actual x, a, agent a
     '''
-    def __init__(self, policy,teacher_env,agent_env,datasource=simulation, phi=None, theta=None): 
+    def __init__(self, policy,teacher_env=None,agent_env=None,datasource='simulation', phi=None, theta=None): 
+        
         # init
-        self.policy=policy                              # eg, DDPG.load("name of trained file")
-        self.teacher_env=teacher_env                    # this is inverse arg
-        self.agent_env=agent_env
+
         self.datasource=datasource
+        self.policy=policy
 
+        if self.datasource=='simulation':
+            self.teacher_env=ffenv.FireflyEnv()          # init env, need setup later with arg
+            self.agent_env=ffenv.FireflyEnv()
+            
+        elif self.datasource=='behavior':
+            self.agent_env=ffenv.FireflyEnv()
+            pass
+    
+    def setup_simulation(self,arg):
+        '''setup the teacher and agent env with arg'''
+        self.teacher_env.setup(arg)
+        self.agent_env.setup(arg)
         
-        
-
     def run_episode(self,model_param):
         '''run dynamics for teacher and agent, for one episode.'''
+        phi, theta=model_param
+        # the phi and initial theta are both torch tensor, 1x9
+        
         # keep record of observable vars, states, obervation, action.
 
         # init list to save
@@ -39,30 +53,45 @@ class Dynamic():
         observations_mean=[]        # only applied the gain, no noise
 
         # init env
+        # self.teacher_env.phi=phi
+        # self.agent_env.phi=theta
+        self.agent_env.reset()
         teacher_belief=self.teacher_env.reset()
-        agent_belief=teacher_belief             # they have same init belief
-        self.agent_env.x=self.teacher_env.x     # make sure they start the same x, so obs only due to gain/noise
-        agent_belief.requires_grad=True
+        self.agent_env.x=self.teacher_env.x
+        # self.agent_env.b=self.teacher_env.b
+        # self.agent_env.o=self.teacher_env.o # they are all zeros
+
+        agent_belief=self.Breshape(theta=theta) 
+        # they have same init belief except theta
+        # belief calculated from (b, time, theta) and only theta diff
+
         teacher_done=False
         agent_done=False
 
         # teacher dynamic
         while not teacher_done:
             # record keeping of x
-            teacher_states.append(self.teacher_env.state)
+            teacher_states.append(self.teacher_env.x)
             # record keeping of o and o mean
-            observations.append(self.teacher_env.observations(self.teacher_env.state))
-            observations_mean.append(self.teacher_env.observations_no_noise(self.teacher_env.state))
-            # teacher dynamics step
+            # observations.append(self.agent_env.observations(self.agent_env.x,theta))
+            # observations_mean.append(self.agent_env.observations_mean(self.agent_env.x,theta))
+            # teacher action and step
             teacher_action = self.policy(teacher_belief)[0]
-            teacher_belief, _, teacher_done, _ = self.teacher_env.step(teacher_action)
-            # agent dynamics step
+            teacher_belief, teacher_done = self.teacher_env(teacher_action,phi)
+            # updaate to x+1, o+1, b+1, belief+1,time+1
+
+            # agent action and step
             agent_action= self.policy(agent_belief)[0]
-            agent_belief=self.agent_env(teacher_action,model_param)
+            agent_belief=self.agent_env(teacher_action,theta)
+            observations.append(self.agent_env.o)
+            observations_mean.append(self.agent_env.observations_mean(self.agent_env.x))
+            # update to x+1, o+1, b+1, belief+1,time+1
+
             # record keeping of a
             teacher_actions.append(teacher_action)
             agent_actions.append(agent_action)
 
+        # in one ep, we have: x,o+1,o_+1,a,a', note o is after action
         # return the states, teacher action, action
         # although the obs should be given to agent, just saved here in case need some tests
 

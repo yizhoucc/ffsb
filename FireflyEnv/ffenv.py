@@ -18,7 +18,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         'video.frames_per_second': 60
     }
 
-    def __init__(self,arg,pro_gains = None, pro_noise_stds = None, obs_gains = None, obs_noise_stds = None):
+    def __init__(self,arg=None,pro_gains = None, pro_noise_stds = None, obs_gains = None, obs_noise_stds = None):
         '''
         state-observation-blief-action-next state
         arg:
@@ -29,7 +29,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         super(FireflyEnv, self).__init__()
         
         # specific defines
-        # model
+        if arg is not None:
+            self.setup(arg)
+
+    def setup(self,arg):
+        '''apply the arg and re init'''
         self.dt = arg. DELTA_T
         self.action_dim = arg.ACTION_DIM
         self.state_dim = arg.STATE_DIM
@@ -47,30 +51,19 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.terminal_vel = arg.TERMINAL_VEL
         self.episode_len = arg.EPISODE_LEN
         self.episode_time = arg.EPISODE_LEN * self.dt
-        # rest in ffgym
         self.action_dim = arg.ACTION_DIM
         self.state_dim = arg.STATE_DIM
         self.rendering = Render()
-        # from config
         self.goal_radius_range = arg.goal_radius_range
         self.gains_range = arg.gains_range
-        # self.noise_range = arg.noise_range
         self.std_range=arg.std_range
         self.REWARD=arg.REWARD
-        # setting belief dim
-        # [r, rel_ang, vel, ang_vel, time,              5 values
-        # vecL,                                         15 values
-        # pro_gains.view(-1), pro_noise_ln_vars.view(-1), obs_gains.view(-1), obs_noise_ln_vars.view(-1),   4*2 values
-        # torch.ones(1)*goal_radius]                    1 values
         low = np.concatenate(([0., -pi, -1., -1., 0.], -10*np.ones(15),
             [self.gains_range[0],self.gains_range[0],self.std_range[0],self.std_range[0],
             self.gains_range[2],self.gains_range[2],self.std_range[2],self.std_range[2],self.goal_radius_range[0]])).reshape(1,29)
         high = np.concatenate(([10., pi, 1., 1., 10.], 10*np.ones(15),
             [self.gains_range[1],self.gains_range[1],self.std_range[3],self.std_range[3],
             self.gains_range[3],self.gains_range[3],self.std_range[3],self.std_range[3],self.goal_radius_range[1]])).reshape(1,29)
-        # Define action and observation space
-        # They must be gym.spaces objects
-        # box and discrete are most common
         self.action_space = spaces.Box(-np.ones(2), np.ones(2), dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high,dtype=np.float32)
         self.pro_gains=pro_gains
@@ -85,7 +78,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
     def reset(self): # reset env
         '''
-        # retrun obs
+        retrun obs
         two ling of reset here:
         reset the episode progain, pronoise, goal radius, 
         state x, including [px, py, ang, vel, ang_vel]
@@ -106,10 +99,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
                 self.pro_gains[0] = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  #[proc_gain_vel]
                 self.pro_gains[1] = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  # [proc_gain_ang]
             
-            # self.pro_noise_ln_vars = torch.zeros(2)
-            # self.pro_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) #[proc_vel_noise]
-            # self.pro_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) #[proc_ang_noise]
-            
             if self.pro_noise_stds==None or self.reset_theta:
                 self.pro_noise_stds=torch.zeros(2)
                 self.pro_noise_stds[0]=torch.zeros(1).uniform_(self.std_range[0], self.std_range[1])
@@ -128,10 +117,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
                 self.obs_noise_stds[0]=torch.zeros(1).uniform_(self.std_range[0], self.std_range[1])
                 self.obs_noise_stds[1]=torch.zeros(1).uniform_(self.std_range[2],self.std_range[3])
 
-            # self.obs_noise_ln_vars = torch.zeros(2)
-            # self.obs_noise_ln_vars[0] = -1 * sample_exp(-self.noise_range[1], -self.noise_range[0]) # [obs_vel_noise]
-            # self.obs_noise_ln_vars[1] = -1 * sample_exp(-self.noise_range[3], -self.noise_range[2]) # [obs_ang_noise]
-        
         else: 
             # use the preset phi
             self.fetch_phi()
@@ -160,7 +145,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         self.P = torch.eye(5) * 1e-8 # change 4 to size function
         self.b = self.x, self.P  # belief=x because is not move yet, and no noise on x, y, angle
-        self.belief = self.Breshape(self.b, self.time, self.theta)
+        self.belief = self.Breshape(b=self.b, time=self.t, theta=self.theta)
         # return self.b, self.state, self.obs_gains, self.obs_noise_ln_vars
         # print(self.belief.shape) #1,29
         return self.belief # this is belief at t0
@@ -300,7 +285,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         terminal = self._isTerminal(bx, a) # check the monkey stops or not
         return b, {'stop': terminal} # the dict is info. will be changed in next version to put stop and reach target together.
 
-    def Breshape(self, b, time, theta): # reshape the belief, ready for policy
+    def Breshape(self, b=self.b, time=self.t, theta=self.theta): # reshape the belief, ready for policy
         '''
         reshape belief for policy
         '''
@@ -330,10 +315,13 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         A_[1, 2] = vel * torch.cos(ang) * dt
         return A_
 
-    def observations(self, x): # apply external noise and internal noise, to get observation
+    def observations(self, x,theta=None): # apply external noise and internal noise, to get observation
         '''
         takes in state x and output to observation of x
         '''
+        if theta is not None:
+            self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius = torch.split(theta.view(-1), 2)
+        
         # observation of velocity and angle have gain and noise, but no noise of position
         on = w=torch.distributions.Normal(0,self.obs_noise_stds).sample() # on is observation noise
         vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
@@ -343,10 +331,13 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         ox = torch.stack((ovel, oang_vel)) # observed x
         return ox
 
-    def observations_mean(self, x): # apply external noise and internal noise, to get observation
+    def observations_mean(self, x,theta=None): # apply external noise and internal noise, to get observation
         '''
         takes in state x and output to observation of x
         '''
+        if theta is not None:
+            self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius = torch.split(theta.view(-1), 2)
+        
         # observation of velocity and angle have gain and noise, but no noise of position
         vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
 
@@ -407,6 +398,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # unpack theta
         if theta is not None:
             self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius = torch.split(theta.view(-1), 2)
+        
         # true next state, xy position, reach target or not(have not decide if stop or not).
         next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
         pos = next_x.view(-1)[:2]
@@ -442,24 +434,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.time=self.time+1
         self.stop=reached_target and info['stop'] or self.time>self.episode_len
         
-        return self.belief
+        return self.belief, self.stop
 
 
 
-
-    @property
-    def state(self):
-        return self.x
-    
-    @property
-    def belief_state(self):
-        return self.belief
-
-    @property
-    def observation(self):
-        return self.o
-    
-    # @property
-    # def action(self):
-    #     return self.action
     

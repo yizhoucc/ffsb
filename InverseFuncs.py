@@ -249,7 +249,7 @@ def getLoss(agent, x_traj,obs_traj, a_traj, theta, env, gains_range, std_range, 
 
 def init_theta(phi,arg,purt=None):
     '''
-    # create a initial theta by adding random to phi
+    create a initial theta by adding random to phi
     '''
     rndsgn = torch.sign(torch.randn(1,len(phi))).view(-1)
     if purt is None:

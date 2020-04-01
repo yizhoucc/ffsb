@@ -7,7 +7,7 @@ from DDPGv2Agent.belief_step import BeliefStep
 from FireflyEnv.plotter_gym import Render
 # from FireflyEnv.firefly_task import Model
 from DDPGv2Agent.rewards import *
-
+import InverseFuncs
 from .env_utils import *
 from DDPGv2Agent.rewards import * #reward
 
@@ -120,7 +120,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
             # use the preset phi
             self.fetch_phi()
         
-        self.theta = (self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius)
+        self.theta = torch.cat([self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius])
 
 
         # print(self.theta)
@@ -223,7 +223,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         a_w = a[1]  # action for angular velocity
 
         w=torch.distributions.Normal(0,self.pro_noise_stds).sample()
-       
+        
         vel = 0.0 * vel + pro_gains[0] * a_v + w[0] # discard prev velocity and new v=gain*new v+noise
         ang_vel = 0.0 * ang_vel + pro_gains[1] * a_w + w[1]
         ang = ang + ang_vel * dt
@@ -293,17 +293,17 @@ class FireflyEnv(gym.Env, torch.nn.Module):
             argin[key]=value
 
         try: 
-            pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = argin['theta'] # unpack the theta
-        except NameError: pass # using the self.theta
-        else: pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = self.theta
+            pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = InverseFuncs.unpack_theta(argin['theta']) # unpack the theta
+        except NameError: pass # using the self.theta0
+        else: pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = InverseFuncs.unpack_theta(self.theta)
         
         try: 
             time=argin['time']
-        except NameError: time=self.time
+        except KeyError: time=self.time
         
         try: 
             b=argin['b']
-        except NameError: b=self.b
+        except KeyError: b=self.b
 
         
         x, P = b # unpack the belief
@@ -313,7 +313,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         rel_ang = range_angle(rel_ang) # resize relative angel into -pi pi range.
         vecL = vectorLowerCholesky(P) # take the lower triangle of P
         state = torch.cat([r, rel_ang, vel, ang_vel, time, vecL, pro_gains.view(-1), pro_noise_stds.view(-1), obs_gains.view(-1), obs_noise_stds.view(-1), torch.ones(1)*goal_radius]) # original
-        #state = torch.cat([r, rel_ang, vel, ang_vel]) #, time, vecL]) #simple
+        #state = torch.cat([r, rel_ang, vel, ang_vel]) time, vecL]) #simple
 
         return state.view(1, -1)
     
@@ -439,7 +439,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # in place update here. check
         
         # reshape b to give to policy
-        self.belief = self.Breshape(next_b, self.time, self.theta)  # state used in policy is different from belief
+        self.belief = self.Breshape(b=next_b, time=self.time, theta=self.theta)  # state used in policy is different from belief
 
         # reward
         episode=1 # sb has its own countings. will discard this later

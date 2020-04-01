@@ -4,6 +4,9 @@ import InverseFuncs
 import policy_torch
 import torch
 from Dynamic import Data
+from torch.utils.tensorboard import SummaryWriter
+import numpy as np
+from numpy import pi
 
 class MC(InverseAlgorithm):
 
@@ -27,15 +30,14 @@ class MC(InverseAlgorithm):
 
         # config
         self.PI_STD=arg.PI_STD # policy std
-        self.theta=torch.nn.Parameter(torch.cat(self.get_trainable_param()))
-        self.optimizer=torch.optim.Adam([self.theta],lr=arg.ADAM_LR)
-        self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=arg.LR_STEP,
-                                                gamma=arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
+        # self.theta=None
+        
         self.loss=torch.zeros(1)
         self.arg=arg
         self.num_ep=100
         self.log_dir="./inverse_data"
-
+        self.log={}
+        self.log['theta']=[]
 
 
     def setup_simulation(self,arg):
@@ -43,15 +45,13 @@ class MC(InverseAlgorithm):
         self.dynamic.setup_simulation(arg)
 
     def init_phintheta(self,arg):
-        '''apply phi and initial theta'''
+        '''generate phi and initial theta'''
         gains_range=arg.gains_range
         std_range=arg.std_range
         goal_radius_range=arg.goal_radius_range
         phi=InverseFuncs.reset_theta(gains_range,std_range,goal_radius_range)
         initital_theta=InverseFuncs.init_theta(phi,arg,purt=None)
 
-        # self.dynamic.teacher_env.assign_presist_phi(phi) 
-        # self.dynamic.agent_env.assign_presist_phi(initital_theta) 
         model_param=phi, initital_theta
         return model_param
 
@@ -66,10 +66,6 @@ class MC(InverseAlgorithm):
     def get_data(self,model_param,num_episode=100):
         '''run dynamic and return agent.episode.(x,o,a)'''
 
-
-        # generate phi and theta
-        model_param=self.init_phintheta(arg)
-
         # log TODO, use logger function
         self.log['phi']=model_param[0]
         self.log['theta'].append(model_param[1])
@@ -77,9 +73,9 @@ class MC(InverseAlgorithm):
         states,observations,observatios_mean, teacher_actions,agent_actions=self.dynamic.collect_data(num_episode,model_param)
         return states,observations,observatios_mean, teacher_actions,agent_actions
         
-    def caculate_loss(self,num_episode=100):
+    def caculate_loss(self,model_param,num_episode=100):
         # get data
-        states,observations,observatios_mean, teacher_actions,agent_actions=self.get_data(num_episode=num_episode,model_param=self.theta)
+        states,observations,observatios_mean, teacher_actions,agent_actions=self.get_data(num_episode=num_episode,model_param=model_param)
         # sum the losses from these episodes
         loss_sum=torch.zeros(1)
         loss_sum.retain_grad()
@@ -110,19 +106,23 @@ class MC(InverseAlgorithm):
     def learn(self,num_episode,log_interval=100):
         current_ep=0
         with SummaryWriter(log_dir=self.log_dir+'/theta') as writer:
-            step=10
+            step=600
+            # run setup
+            self.setup()
+            model_param=(self.log['phi'], self.theta)
             while True:
-                loss=self.caculate_loss(step)
+                loss=self.caculate_loss(model_param,num_episode=step)
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 # print(self.theta.grad)
                 torch.nn.utils.clip_grad_norm_(self.theta, 0.2)
                 self.optimizer.step()
-                self.theta = InvserFuncs.theta_range(self.theta, 
+                self.theta = InverseFuncs.theta_range(self.theta, 
                     self.arg.gains_range, self.arg.std_range, 
                     self.arg.goal_radius_range) # keep inside of trained range
                 self._update_theta(self.theta)
-
+                print(self.log['phi'].data)
+                print(self.theta[0].data)
                 # if current_ep/5<self.arg.LR_STOP:
                 #     self.learning_schedualer.step()
                 
@@ -142,7 +142,7 @@ class MC(InverseAlgorithm):
                     print('Loss',loss.sum().data,current_ep," learning rate ", (self.learning_schedualer.get_lr()))
                     print('grad ', self.theta.grad)
                     print("episode ",current_ep)
-                    print("teacher ",torch.cat(self.dynamic.teacher_env.theta).data)
+                    print("teacher ", (self.dynamic.teacher_env.theta).data)
                     print("learner ",(self.theta).data)
                     print('\n===')
 
@@ -159,3 +159,20 @@ class MC(InverseAlgorithm):
     def _unpack_theta(self):
         'unpack the 1x9 tensor theta into p gain/noise, obs gain/noise, r'
         pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = torch.split(theta.view(-1), 2)
+    
+    def setup(self):
+        'setup the teacher agent env in simulation'
+        # generate phi and init theta
+        phi, initital_theta=self.init_phintheta(self.arg)
+        # log
+        self.log['phi']=phi
+        self.log['theta'].append(initital_theta)
+        # apply
+        self.dynamic.teacher_env.assign_presist_phi(phi) 
+        self.dynamic.agent_env.assign_presist_phi(initital_theta)
+        # parameterize by theta
+        self.theta=torch.nn.Parameter(self.get_trainable_param())
+        # optimizer
+        self.optimizer=torch.optim.Adam([self.theta],lr=self.arg.ADAM_LR)
+        self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.arg.LR_STEP,
+                                                gamma=self.arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps

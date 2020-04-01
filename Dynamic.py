@@ -53,15 +53,15 @@ class Data():
         observations_mean=[]        # only applied the gain, no noise
 
         # init env
-        # self.teacher_env.phi=phi
-        # self.agent_env.phi=theta
+        self.teacher_env.phi=phi
+        self.agent_env.phi=theta
         self.agent_env.reset()
         teacher_belief=self.teacher_env.reset()
         self.agent_env.x=self.teacher_env.x
-        # self.agent_env.b=self.teacher_env.b
-        # self.agent_env.o=self.teacher_env.o # they are all zeros
+        self.agent_env.b=self.teacher_env.b
+        self.agent_env.o=self.teacher_env.o # they are all zeros
 
-        agent_belief=self.Breshape(theta=theta) 
+        agent_belief=self.agent_env.Breshape(theta=theta) 
         # they have same init belief except theta
         # belief calculated from (b, time, theta) and only theta diff
 
@@ -82,7 +82,7 @@ class Data():
 
             # agent action and step
             agent_action= self.policy(agent_belief)[0]
-            agent_belief=self.agent_env(teacher_action,theta)
+            agent_belief, agent_done=self.agent_env(teacher_action,theta)
             observations.append(self.agent_env.o)
             observations_mean.append(self.agent_env.observations_mean(self.agent_env.x))
             # update to x+1, o+1, b+1, belief+1,time+1
@@ -102,10 +102,10 @@ class Data():
 
         'collect data from source'
 
-        if self.datasource==simulation:
-            return _simulation_data(num_episode,model_param)
+        if self.datasource=='simulation':
+            return self._simulation_data(num_episode,model_param)
 
-        elif self.datasource==behaivor:
+        elif self.datasource=='behaivor':
             pass
 
         else:

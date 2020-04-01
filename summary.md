@@ -104,12 +104,14 @@ If the action is simple linear transformation of the real world state, it will b
 Here, in this case of partially observable markov decision process, we try to recover the parameters from the world state and the agent action.
 How do we do it?
 In math perspective, we want to maximize the likelihood of the agent trajectories that we can observe.
+And we want to use the log likelihood because every multiplication can now in forms of addition.  
 
 ![Block Diagram](./documents/logll.jpg)
 
-Instead of the complete data log likelihood, we are using the obervable date log likelihood because we cannot oberse the belief state of the agent, we can only marginalize the non observable variable belief.  
+Instead of the complete data log likelihood, we are using the obervable date log likelihood because we cannot oberse the belief state and observation of the agent, we can only marginalize these non observable variables.  
 
-In this observable data log likelihood, the state transition is not dependent on the assummed theta, and can be ignored when maximizing the loglikehood for theta.
+In observable data log likelihood, the state transition is not dependent on the assummed theta, and can be ignored when maximizing the loglikehood for theta.
+In other words, we want fit agent to the task instead of changing task to fit agent.
 If dividing the observation process into two parts, from state get image first, and from image to observation, the transition of state to image part is known.
 In this case, since the observation from image is a distribution, we want to marginalize for the latent observation as well.
 So, we can choose to add P(o|i,theta) in this log likelihood.
@@ -121,6 +123,7 @@ In order to maximize the log likelihood, we first take a look of the new equatio
 We notice that the action is the final output observable step, and action depends on b, while b depends on previous b, new o after action, and action which is known.
 Here, the previous b can be trace back to inital b, which is known.
 The o after action depends on theta and action.
+Thus, we want to minimize the action loss and observation loss.
 
 This make sense because if having the same parameter, the agent trajectory will likely to be the similar as teacher, as the difference is only due to intransic uncertainty.
 In code, we try to minimize the action difference given belief and theta, where as this belief is the most likely belief given previous belief, action, and obeservation.
@@ -248,3 +251,12 @@ small number of episodes per batch may reduce estimate noise, as we could not ha
 when fix noise to low level for both process and observation, very good gain and radius parameter recovered.
 
 log noise vs std noise. I think std noise is better.
+
+this has not been ploted, but from my expereince seems more often the angular noise is over estimated and velocity noise is underestimated.
+
+### Intereting things to test
+
+use 2nd order optimization  
+
+fix gains and solve for noise  
+

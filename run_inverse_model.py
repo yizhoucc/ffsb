@@ -35,7 +35,7 @@ alg=MC.MC(arg,datasource='simulation')
 
 
 # # recover the theta by running optimzation
-# alg.learn(100)
+alg.learn(300000)
 
 
 # # save the parameter and log

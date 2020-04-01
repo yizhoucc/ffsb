@@ -361,9 +361,21 @@ coding
 
 ## 4.01
 
-###  
+### thinking
+considering the gain and noise, for example in process, the agent makes a move, and it would have been a straight line in space if without the noise.
+with a uncertain v noise, the agent move will be a distribution lenght, but same direction.
+with uncertain w noise, the ageent move will be a fan shapped.
+have exact same belief, will make same action, but next belief may not be same.
+with a good theta, the next x distribution will largely overlap, so as the obervation.
+with x, o, we have a distribution of belief but we take the peak.
+with this peak, agent makes another action, only depends on belief, no theta.
+this difference in action, is then from distribution of x, o.
+x, since same action, ideally the agent next x distribution will over lap with teacher, so enough sampling solve this.
+o, since same action, ideally agent observation overlay with teacher observation.
+previous b, at t=0, b are the same. diff comes from x (pro) and o (obs).
 
 ### progress
+Inverse
 
 ### todo
 

@@ -29,13 +29,13 @@ arg.NUM_thetas = 5
 # envarg=Config()
 
 
-model=MC.MC(arg,datasource='simulation',filename='plot solve for all gain low lr3')
+model=MC.MC(arg,datasource='simulation',filename='result solve for all gain low lr1')
 
 # # the inverse model is constructed given dynamic and algorithm
 
 
 # # recover the theta by running optimzation
-model.learn(10000)
+model.learn(30000)
 
 
 # # save the parameter and log

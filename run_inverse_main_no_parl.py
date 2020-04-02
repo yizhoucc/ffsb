@@ -2,7 +2,6 @@
 import os
 import warnings
 warnings.filterwarnings('ignore')
-from inverse_model import Dynamic, Inverse
 from stable_baselines import DDPG
 from FireflyEnv import ffenv
 from Config import Config
@@ -37,7 +36,7 @@ arg.EPISODE_LEN = int(arg.EPISODE_TIME / arg.DELTA_T)
 arg.NUM_SAMPLES=2
 arg.NUM_EP = 50
 arg.NUM_IT = 100 # number of iteration for gradient descent
-arg.NUM_thetas = 5
+arg.NUM_thetas = 1
 
 
 # agent 
@@ -58,7 +57,7 @@ final_theta_log = []
 stderr_log = []
 result_log = []
 
-filename="fix noises "
+filename="result solve for all gain scheduler lr4"
 
 for num_thetas in range(arg.NUM_thetas):
 

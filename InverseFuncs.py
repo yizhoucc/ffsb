@@ -151,7 +151,7 @@ def trajectory(agent, theta, env, arg, gains_range, std_range, goal_radius_range
 
         while t < arg.EPISODE_LEN: # for a single FF
 
-            action = agent(env.belief_state)[0] # TODO action rounded, not precise
+            action = agent(env.belief)[0] # TODO action rounded, not precise
             # action=agent.predict(env.belief_state)[0]
             a_traj_ep.append(action)
             x_traj_ep.append(env.x)
@@ -213,11 +213,11 @@ def getLoss(agent, x_traj,obs_traj, a_traj, theta, env, gains_range, std_range, 
             env.reset()  # reset monkey's internal model
 
             env.x=x
-            state= env.belief_state
+            state= env.belief
             b=x,env.P
             
             for it, next_x in enumerate(x_traj_ep[1:]): # repeat for steps in episode
-                action = agent(env.belief_state)[0] # simulated acton
+                action = agent(env.belief)[0] # simulated acton
 
                 next_ox = env.observations_mean(next_x) # multiplied by observation gain, no noise
                 next_ox_ = env.observations(next_x)  # simulated observation (with noise)
@@ -231,8 +231,7 @@ def getLoss(agent, x_traj,obs_traj, a_traj, theta, env, gains_range, std_range, 
 
                 next_b, info = env.belief_step(b, next_ox_, a_traj_ep[it], env.box)  # no change to internal var
                 env.b=next_b
-                next_state = env.Breshape(next_b, t, (pro_gains, pro_noise_stds, obs_gains, obs_noise_stds,
-                                                              goal_radius))
+                next_state = env.Breshape(b=next_b, time=t, theta=theta)
                 env.belief=next_state
                 t += 1
                 state = next_state

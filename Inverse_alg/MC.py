@@ -108,9 +108,10 @@ class MC(InverseAlgorithm):
         return loss
 
 
-    def learn(self,num_episode,log_interval=100):
+    def learn(self,num_episode,log_interval=300):
         current_ep=0
         with SummaryWriter(log_dir=self.log_dir+'/theta_'+time.strftime("%H_%M", time.gmtime())) as writer:
+            phiwriter=SummaryWriter(log_dir=self.log_dir+'/phi_'+time.strftime("%H_%M", time.gmtime()))
             step=100
             # run setup
             self.setup()
@@ -150,6 +151,15 @@ class MC(InverseAlgorithm):
                 self.log['obsnoisev'].append(self.theta[6].item())
                 self.log['obsnoisew'].append(self.theta[7].item())
                 self.log['goalr'].append(self.theta[8].item())
+                phiwriter.add_scalar('pro gain v',self.log['phi'][0],current_ep)
+                phiwriter.add_scalar('pro noise v',self.log['phi'][2],current_ep)
+                phiwriter.add_scalar('pro gain w',self.log['phi'][1],current_ep)
+                phiwriter.add_scalar('pro noise w',self.log['phi'][3],current_ep)
+                phiwriter.add_scalar('obs gain v',self.log['phi'][4],current_ep)
+                phiwriter.add_scalar('obs noise v',self.log['phi'][6],current_ep)
+                phiwriter.add_scalar('obs gain w',self.log['phi'][5],current_ep)
+                phiwriter.add_scalar('obs noise w',self.log['phi'][7],current_ep)
+                phiwriter.add_scalar('goal radius',self.log['phi'][8],current_ep)
                 writer.add_scalar('pro gain v',self.theta[0].item(),current_ep)
                 writer.add_scalar('pro noise v',self.theta[2].item(),current_ep)
                 writer.add_scalar('pro gain w',self.theta[1].item(),current_ep)

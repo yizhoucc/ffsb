@@ -57,7 +57,7 @@ final_theta_log = []
 stderr_log = []
 result_log = []
 
-filename="result solve for all gain scheduler lr4"
+filename="result fix obsnoise scheduler lr6"
 
 for num_thetas in range(arg.NUM_thetas):
 

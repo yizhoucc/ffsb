@@ -181,7 +181,7 @@ That is, the theta is passed in as a whole for one time, and evertime we use the
 ![Block Diagram](./documents/inversealg.png)
 
 The algorithm class is the place that contains things like optimizer, calculate gradient, defines loss function, etc.
-I will write a base class code later, so that all algorithm should inherite the design of the base class to preserve integraty.  
+I will write a base class code later, so that all algorithm should inherite the design of the base class to preserve integraty. The algorithm classes files are in Inverse_alg folder, and they all inherit the base class for some share properties such as logger.  
 
 Right now, the current algorithm class contains several important functions:  
 First, import data.
@@ -243,6 +243,37 @@ Some parameters have tendency to stay at boundary.
 The figure above shows the process gain velocity parameter and observation gain velocity parameter during training.
 The process gain does touch the lower boundary but converge soon afterwards.
 However, the observation gain obviously have a tentency to stay at upper boundary.
+
+## Fix the observation noise to true value (short run)
+
+<div id="banner " class="inline-block">
+    <img src="./documents/fopgv.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fopgw.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/foogv.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/foogw.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fopnv.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fopnw.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fogr.png" alt="plots" width="300" height="250"/>
+</div>
+
+## Fixing the process noise to true value (short run)
+
+<div id="banner " class="inline-block">
+    <img src="./documents/fppgv.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fppgw.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fpogv.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fpogw.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fppnv.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fppnw.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fpgr.png" alt="plots" width="300" height="250"/>
+</div>
+
+Both cases, even they are short runs(only 5k episode organized in 50 episode batch and update for 100 times), some of the parameters recovered well. For example, process gain in velocity and angular velocity from both cases are close to the true values.
+If have to say, the observation noise fixed group seems to be better at recovering other parameters.
+But this is a very short run, we cannot conclude the performance based on this.
+This is just an example showing that with some parameter fixed, it is very easy to recover other parameters and much more accurate.  
+ 
+
 
 ## Informal discussion
 

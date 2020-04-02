@@ -44,7 +44,7 @@ def single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filenam
         optT.step() # performing single optimize step: this changes theta
         theta = theta_range(theta, arg.gains_range, arg.std_range, arg.goal_radius_range) # keep inside of trained range
         theta[6:8].data.copy_(true_theta[6:8].data) # fix obs  noise
-        theta[2:4].data.copy_(true_theta[2:4].data) # fix pro  noise
+        # theta[2:4].data.copy_(true_theta[2:4].data) # fix pro  noise
         # theta[4:8].data.copy_(true_theta[4:8].data) # fix obs gain and noise
 
         theta_log.append(theta.data.clone())

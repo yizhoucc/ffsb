@@ -206,7 +206,7 @@ Since the lab prefer torch over tensorflow, we do not want to switch to tensorfl
 
 # Result plots
 
-Here are some plots that comes from my inverse model.
+Here are some plots that comes from the inverse model.
 
 <div id="banner " class="inline-block">
     <img src="./documents/progainv.png" alt="plots" width="300" height="250"/>
@@ -285,9 +285,11 @@ log noise vs std noise. I think std noise is better.
 
 this has not been ploted, but from my expereince seems more often the angular noise is over estimated and velocity noise is underestimated.
 
-### Intereting things to test
+### Future directions/improvement
 
 use 2nd order optimization  
 
-fix gains and solve for noise  
+fix gains and solve for noise, not working, at least not in short runs.
+
+
 

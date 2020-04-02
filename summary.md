@@ -263,8 +263,8 @@ However, the observation gain obviously have a tentency to stay at upper boundar
     <img src="./documents/fppgw.png" alt="plots" width="300" height="250"/>
     <img src="./documents/fpogv.png" alt="plots" width="300" height="250"/>
     <img src="./documents/fpogw.png" alt="plots" width="300" height="250"/>
-    <img src="./documents/fppnv.png" alt="plots" width="300" height="250"/>
-    <img src="./documents/fppnw.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fponv.png" alt="plots" width="300" height="250"/>
+    <img src="./documents/fponw.png" alt="plots" width="300" height="250"/>
     <img src="./documents/fpgr.png" alt="plots" width="300" height="250"/>
 </div>
 
@@ -272,7 +272,7 @@ Both cases, even they are short runs(only 5k episode organized in 50 episode bat
 If have to say, the observation noise fixed group seems to be better at recovering other parameters.
 But this is a very short run, we cannot conclude the performance based on this.
 This is just an example showing that with some parameter fixed, it is very easy to recover other parameters and much more accurate.  
- 
+
 
 
 ## Informal discussion

@@ -1,9 +1,9 @@
-<!-- 
+
 <style>
-img{
+imgl{
 float:left;
 }
-</style> -->
+</style>
 
 # Install
 
@@ -273,7 +273,21 @@ If have to say, the observation noise fixed group seems to be better at recoveri
 But this is a very short run, we cannot conclude the performance based on this.
 This is just an example showing that with some parameter fixed, it is very easy to recover other parameters and much more accurate.  
 
+## Loss
 
+<br>
+<div id="banner " class="inline-block" float:left>
+    <img src="./documents/aoloss.png" alt="plots" width="300" height="300"/>
+</div>
+
+This is sample loss vs time for some runs.
+The action loss is dominate here, and observation loss is small.
+Actually, only training the inverse with action loss can achieve similar recovery of theta in short runs.
+However, not true for only train for observation loss.
+I added a record keeping function to keep the ratio of the action loss and observation loss just then.
+We should be able to see the ratio chanage soon.
+The ratio change might indicate the action is more important for the beginging and observation loss is more important for fine recovery.
+If so, we could manualy increase the ratio, just like an adjustable learning rate to optimize the inverse.
 
 ## Informal discussion
 

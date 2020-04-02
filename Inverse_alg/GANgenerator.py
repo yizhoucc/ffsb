@@ -9,7 +9,7 @@ import numpy as np
 from numpy import pi
 import time
 
-class MC(InverseAlgorithm):
+class Generator(InverseAlgorithm):
 
     #TODO arg params here
 
@@ -123,8 +123,6 @@ class MC(InverseAlgorithm):
                 # self.theta.grad[0:2]=0 # TODO mask function
                 # self.theta.grad[4:8]=0
                 # self.theta.grad[8]=0
-                self.theta.grad[2:4]=0
-                self.theta.grad[6:8]=0
                 torch.nn.utils.clip_grad_norm_(self.theta, 0.2)
                 self.optimizer.step()
                 self.theta = InverseFuncs.theta_range(self.theta, 
@@ -137,28 +135,28 @@ class MC(InverseAlgorithm):
                 #     self.learning_schedualer.step()
                 self.log['episode'].append(current_ep)
                 self.log['aloss'].append(aloss.data)
-                # self.log['oloss'].append(oloss.data)
-                # self.log['loss_ratio'].append(aloss.data/oloss.data)
+                self.log['oloss'].append(oloss.data)
+                self.log['loss_ratio'].append(aloss.data/oloss.data)
                 self.log['grad'].append(self.theta.grad)
                 self.log['loss'].append(loss.data)
-                self.log['progainv'].append(self.theta[0].item())
-                self.log['progainw'].append(self.theta[1].item())
-                self.log['pronoisev'].append(self.theta[2].item())
-                self.log['pronoisew'].append(self.theta[3].item())
-                self.log['obsgainv'].append(self.theta[4].item())
-                self.log['obsgainw'].append(self.theta[5].item())
-                self.log['obsnoisev'].append(self.theta[6].item())
-                self.log['obsnoisew'].append(self.theta[7].item())
-                self.log['goalr'].append(self.theta[8].item())
-                writer.add_scalar('pro gain v',self.theta[0].item(),current_ep)
-                writer.add_scalar('pro noise v',self.theta[2].item(),current_ep)
-                writer.add_scalar('pro gain w',self.theta[1].item(),current_ep)
-                writer.add_scalar('pro noise w',self.theta[3].item(),current_ep)
-                writer.add_scalar('obs gain v',self.theta[4].item(),current_ep)
-                writer.add_scalar('obs noise v',self.theta[6].item(),current_ep)
-                writer.add_scalar('obs gain w',self.theta[5].item(),current_ep)
-                writer.add_scalar('obs noise w',self.theta[7].item(),current_ep)
-                writer.add_scalar('goal radius',self.theta[8].item(),current_ep)
+                self.log['progainv'].append(self.theta[0].data)
+                self.log['progainw'].append(self.theta[1].data)
+                self.log['pronoisev'].append(self.theta[2].data)
+                self.log['pronoisew'].append(self.theta[3].data)
+                self.log['obsgainv'].append(self.theta[4].data)
+                self.log['obsgainw'].append(self.theta[5].data)
+                self.log['obsnoisev'].append(self.theta[6].data)
+                self.log['obsnoisew'].append(self.theta[7].data)
+                self.log['goalr'].append(self.theta[8].data)
+                writer.add_scalar('pro gain v',self.theta[0].data,current_ep)
+                writer.add_scalar('pro noise v',self.theta[2].data,current_ep)
+                writer.add_scalar('pro gain w',self.theta[1].data.data,current_ep)
+                writer.add_scalar('pro noise w',self.theta[3].data,current_ep)
+                writer.add_scalar('obs gain v',self.theta[4].data,current_ep)
+                writer.add_scalar('obs noise v',self.theta[6].data,current_ep)
+                writer.add_scalar('obs gain w',self.theta[5].data,current_ep)
+                writer.add_scalar('obs noise w',self.theta[7].data,current_ep)
+                writer.add_scalar('goal radius',self.theta[8].data,current_ep)
                 self.logger()
                 current_ep+=step
                 if current_ep%100==0:
@@ -189,9 +187,7 @@ class MC(InverseAlgorithm):
         # generate phi and init theta
         phi, initital_theta=self.init_phintheta(self.arg)
         # initital_theta[0:2]=phi[0:2]
-        initital_theta[2:4]=phi[2:4]
-        # initital_theta[4:6]=phi[4:6]
-        initital_theta[6:8]=phi[6:8]
+        # initital_theta[4:8]=phi[4:8]
         # initital_theta[8]=phi[8]
         # log
         self.log['phi']=phi

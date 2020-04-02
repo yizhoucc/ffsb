@@ -381,7 +381,42 @@ Inverse
 
 ## 4.02
 
-###  
+### morning meeting
+reviewer question
+why belief stochastic, 
+ff, belief update deterministic, inforward.
+but no observation noise known, latent to us.
+so this gives some noise to belief. 
+should belief stochastic on itself, or depends on obs.
+ways to add noise on belief, add noise, and use a sigmoid bound to belief.  
+thoughts, want to add random to belief to achieve random in action.
+
+how to optimize if like this: want to get max reward, want to min the min reward. 
+
+solution, metion both. instead of stochastic belief update, have the stochastic in noise and used in belief in another version. 
+
+samping on obervation to get belief posteirior
+
+keep belief low, and observation needed to explain belief
+
+belief loss, could be think of loss in brain when communicating, bounded rational.
+
+in inverse part, action deterministic, 
+
+now, aloss, oloss. could do instead, having aloss be a dealta function, 0,1.
+all error should be due to observation.
+
+### thoughts
+like gan training the generator. 
+
+we tell if the action is correct, by o , 1.
+let the netowrk, in this case the pomdp, generate action based on theta given x, give to policy, and the adverse aka we, tell if action is correct.
+so, the generator is trained, to move theta, so that it generate a correct belief idealy, which will give to correct action.
+problem. if it generate an incorrect belief, it may still give a correct action.
+problem. in gan, generator generate from random noise and x, try to minimize the D(x)*(1-D(G(noise)))
+here, log(  D(a|x)*(1-D(G(noise)))
+log(  D(G(a|b))+D(G(noise))
+log(  D(G(a|x,a,o)) + D(G(noise))
 
 ### progress
 

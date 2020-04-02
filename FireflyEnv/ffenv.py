@@ -294,8 +294,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         try: 
             pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = InverseFuncs.unpack_theta(argin['theta']) # unpack the theta
-        except NameError: pass # using the self.theta0
-        else: pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = InverseFuncs.unpack_theta(self.theta)
+        except KeyError: pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = InverseFuncs.unpack_theta(self.theta)
         
         try: 
             time=argin['time']

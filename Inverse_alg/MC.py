@@ -12,7 +12,7 @@ class MC(InverseAlgorithm):
 
     #TODO arg params here
 
-    def __init__(self,arg,dynamic=None,datasource='simulation'):
+    def __init__(self,arg,dynamic=None,datasource='simulation',filename='inverse'):
 
         super().__init__(arg, dynamic)
 
@@ -35,9 +35,9 @@ class MC(InverseAlgorithm):
         self.loss=torch.zeros(1)
         self.arg=arg
         self.num_ep=100
-        self.log_dir="./inverse_data"
-        self.log={}
-        self.log['theta']=[]
+        self.log_filename=filename
+        self.logger_init()
+
 
 
     def setup_simulation(self,arg):
@@ -66,9 +66,9 @@ class MC(InverseAlgorithm):
     def get_data(self,model_param,num_episode=100):
         '''run dynamic and return agent.episode.(x,o,a)'''
 
-        # log TODO, use logger function
-        self.log['phi']=model_param[0]
-        self.log['theta'].append(model_param[1])
+        # # log TODO, use logger function
+        # self.log['phi']=model_param[0]
+        # self.log['theta'].append(model_param[1])
 
         states,observations,observatios_mean, teacher_actions,agent_actions=self.dynamic.collect_data(num_episode,model_param)
         return states,observations,observatios_mean, teacher_actions,agent_actions
@@ -79,9 +79,13 @@ class MC(InverseAlgorithm):
         # sum the losses from these episodes
         loss_sum=torch.zeros(1)
         loss_sum.retain_grad()
-        loss_sum=self._action_loss(teacher_actions,agent_actions)#+self._observation_loss(observations,observatios_mean)
+        
+        action_loss=self._action_loss(teacher_actions,agent_actions)
+        obs_loss=self._observation_loss(observations,observatios_mean)
+
+        loss_sum=action_loss+obs_loss
         # print("loss: {}".format(loss_sum))
-        return loss_sum
+        return loss_sum, action_loss, obs_loss 
         
     def _action_loss(self,teacher_actions,agent_actions):
         # return the action loss
@@ -106,15 +110,18 @@ class MC(InverseAlgorithm):
     def learn(self,num_episode,log_interval=100):
         current_ep=0
         with SummaryWriter(log_dir=self.log_dir+'/theta') as writer:
-            step=600
+            step=100
             # run setup
             self.setup()
             model_param=(self.log['phi'], self.theta)
             while True:
-                loss=self.caculate_loss(model_param,num_episode=step)
+                loss,aloss,oloss=self.caculate_loss(model_param,num_episode=step)
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
-                # print(self.theta.grad)
+                print(self.theta.grad)
+                self.theta.grad[0:2]=0 # TODO mask function
+                self.theta.grad[4:6]=0
+                self.theta.grad[8]=0
                 torch.nn.utils.clip_grad_norm_(self.theta, 0.2)
                 self.optimizer.step()
                 self.theta = InverseFuncs.theta_range(self.theta, 
@@ -125,8 +132,20 @@ class MC(InverseAlgorithm):
                 print(self.theta[0].data)
                 # if current_ep/5<self.arg.LR_STOP:
                 #     self.learning_schedualer.step()
-                
-                
+                self.log['episode'].append(current_ep)
+                self.log['aloss'].append(aloss.data)
+                self.log['oloss'].append(oloss.data)
+                self.log['grad'].append(self.theta.grad)
+                self.log['loss'].append(loss.data)
+                self.log['progainv'].append(self.theta[0].data)
+                self.log['progainw'].append(self.theta[1].data)
+                self.log['pronoisev'].append(self.theta[2].data)
+                self.log['pronoisew'].append(self.theta[3].data)
+                self.log['obsgainv'].append(self.theta[4].data)
+                self.log['obsgainw'].append(self.theta[5].data)
+                self.log['obsnoisev'].append(self.theta[6].data)
+                self.log['obsnoisew'].append(self.theta[7].data)
+                self.log['goalr'].append(self.theta[8].data)
                 writer.add_scalar('pro gain v',self.theta[0].data,current_ep)
                 writer.add_scalar('pro noise v',self.theta[2].data,current_ep)
                 writer.add_scalar('pro gain w',self.theta[1].data.data,current_ep)
@@ -136,7 +155,7 @@ class MC(InverseAlgorithm):
                 writer.add_scalar('obs gain w',self.theta[5].data,current_ep)
                 writer.add_scalar('obs noise w',self.theta[7].data,current_ep)
                 writer.add_scalar('goal radius',self.theta[8].data,current_ep)
-
+                self.logger()
                 current_ep+=step
                 if current_ep%100==0:
                     print('Loss',loss.sum().data,current_ep," learning rate ", (self.learning_schedualer.get_lr()))
@@ -148,6 +167,7 @@ class MC(InverseAlgorithm):
 
                 if current_ep >= num_episode:
                     break
+        
         return current_ep
 
     def _update_theta(self, theta):
@@ -164,6 +184,9 @@ class MC(InverseAlgorithm):
         'setup the teacher agent env in simulation'
         # generate phi and init theta
         phi, initital_theta=self.init_phintheta(self.arg)
+        initital_theta[0:2]=phi[0:2]
+        initital_theta[4:6]=phi[4:6]
+        initital_theta[8]=phi[8]
         # log
         self.log['phi']=phi
         self.log['theta'].append(initital_theta)
@@ -176,3 +199,28 @@ class MC(InverseAlgorithm):
         self.optimizer=torch.optim.Adam([self.theta],lr=self.arg.ADAM_LR)
         self.learning_schedualer=torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.arg.LR_STEP,
                                                 gamma=self.arg.lr_gamma)         # decreasing learning rate x0.5 every 100steps
+
+    def logger_init(self):
+        self.log_dir='../firefly-inverse-data/data/' 
+        self.log={}
+        self.log['episode']=[]
+        self.log['aloss']=[]
+        self.log['oloss']=[]
+        self.log['grad']=[]
+        self.log['loss']=[]
+        self.log['theta']=[]
+        self.log['progainv']=[]
+        self.log['progainw']=[]
+        self.log['pronoisev']=[]
+        self.log['pronoisew']=[]
+        self.log['obsgainv']=[]
+        self.log['obsgainw']=[]
+        self.log['obsnoisev']=[]
+        self.log['obsnoisew']=[]
+        self.log['goalr']=[]
+        self.log['arguments']=self.arg
+
+    def logger(self):
+        # save some inputs. such as training loss
+        savename=(self.log_dir + self.log_filename + '.pkl')
+        torch.save(self.log,savename)

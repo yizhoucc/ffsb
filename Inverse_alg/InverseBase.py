@@ -34,7 +34,9 @@ class InverseAlgorithm():
 
     def logger(self):
         # save some inputs. such as training loss
-        self.writer = tf.summary.FileWriter(dir,)
+        savename=('../firefly-inverse-data/data/' + filename + "EP" + str(arg.NUM_EP) + str(
+        np.around(arg.PI_STD, decimals=2))+"sample"+str(arg.NUM_SAMPLES) +"IT"+ str(arg.NUM_IT) + '_LR_parttheta_result.pkl')
+        torch.save(self.log,savename)
     
     def get_trainable_param(self):
         return self.dynamic.agent_env.theta

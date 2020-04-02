@@ -53,8 +53,7 @@ class Data():
         observations_mean=[]        # only applied the gain, no noise
 
         # init env
-        self.teacher_env.phi=phi
-        self.agent_env.phi=theta
+
         self.agent_env.reset()
         teacher_belief=self.teacher_env.reset()
         self.agent_env.x=self.teacher_env.x
@@ -120,6 +119,7 @@ class Data():
         observations=[]
         observatios_mean=[]
 
+        
         # run and append
         for episode_index in range(num_episode):
             ep_states,ep_obs,ep_ob_mean,ep_teacher_a,ep_agent_a=self.run_episode(model_param)

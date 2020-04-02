@@ -29,13 +29,13 @@ arg.NUM_thetas = 5
 # envarg=Config()
 
 
-alg=MC.MC(arg,datasource='simulation')
+model=MC.MC(arg,datasource='simulation')
 
 # # the inverse model is constructed given dynamic and algorithm
 
 
 # # recover the theta by running optimzation
-alg.learn(300000)
+model.learn(300000)
 
 
 # # save the parameter and log

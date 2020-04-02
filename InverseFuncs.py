@@ -255,7 +255,7 @@ def init_theta(phi,arg,purt=None):
     rndsgn = torch.sign(torch.randn(1,len(phi))).view(-1)
     if purt is None:
         purt= torch.Tensor([0.5,0.5,0.1,0.1,0.5,0.5,0.1,0.1,0.1])
-    theta = nn.Parameter(phi.data.clone()+rndsgn*purt)
+    theta = phi.data.clone()+rndsgn*purt
     theta = theta_range(theta, arg.gains_range, arg.std_range, arg.goal_radius_range)  # keep inside of trained range
     return theta
 

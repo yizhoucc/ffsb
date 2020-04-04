@@ -418,8 +418,13 @@ here, log(  D(a|x)*(1-D(G(noise)))
 log(  D(G(a|b))+D(G(noise))
 log(  D(G(a|x,a,o)) + D(G(noise))
 
-### progress
 
+### other thoughts
+
+
+
+### progress
+plots
 ### todo
 
 ## 4.03

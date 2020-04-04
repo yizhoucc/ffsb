@@ -57,7 +57,7 @@ final_theta_log = []
 stderr_log = []
 result_log = []
 
-filename="result fix obsnoise scheduler lr6"
+filename="result fix obsnoise scheduler lr long"
 
 for num_thetas in range(arg.NUM_thetas):
 
@@ -68,6 +68,7 @@ for num_thetas in range(arg.NUM_thetas):
     # true_theta=torch.tensor([1.0537, 0.7328, 0.1, 0.1, 0.7, 0.8, 0.1, 0.1, 0.3500])
     # true_theta[2:4]=0.3
     # true_theta[4:6]=1
+    # true_theta[6:8]=0.1
     # true_theta[6:8]=0.1
     print('true theta: ',true_theta)
     true_theta_log.append(true_theta.data.clone())

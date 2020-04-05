@@ -26,17 +26,20 @@ torch.backends.cudnn.benchmark = False
 
 
 DISCOUNT_FACTOR = 0.99
-arg.gains_range = [0.8, 1.2, pi/5, 3*pi/10]
-arg.std_range = [1e-2, 0.3, 1e-2, 0.2]
+# arg.gains_range = [0.8, 1.2, pi/5, 3*pi/10]
+arg.gains_range = [np.log(0.8), np.log(1.2), np.log(pi/5), np.log(3*pi/10)]
+# arg.gains_range = [np.log(0.8-0.799), np.log(1.2-0.799), np.log(pi/5-0.628), np.log(3*pi/10-0.628)]
+# arg.std_range = [1e-2, 0.3, 1e-2, 0.2]
+arg.std_range = [np.log(1e-3), np.log(0.3), np.log(1e-3), np.log(0.2)]
 arg.WORLD_SIZE = 1.0
-arg.goal_radius_range = [0.2* arg.WORLD_SIZE, 0.5* arg.WORLD_SIZE]
+arg.goal_radius_range = [np.log(0.2* arg.WORLD_SIZE), np.log(0.5* arg.WORLD_SIZE)]
 arg.DELTA_T = 0.1
 arg.EPISODE_TIME = 1  # # maximum length of time for one episode. if monkey can't firefly within this time period, new firefly comes
 arg.EPISODE_LEN = int(arg.EPISODE_TIME / arg.DELTA_T)
 arg.NUM_SAMPLES=2
-arg.NUM_EP = 50
+arg.NUM_EP = 100
 arg.NUM_IT = 100 # number of iteration for gradient descent
-arg.NUM_thetas = 1
+arg.NUM_thetas = 10
 
 
 # agent 
@@ -45,7 +48,7 @@ baselines_mlp_model = DDPG.load("DDPG_theta")
 agent = policy_torch.copy_mlp_weights(baselines_mlp_model)
 # agent=baselines_mlp_model
 env=ffenv.FireflyEnv(arg)
-env.max_goal_radius = arg.goal_radius_range[1] # use the largest world size for goal radius
+env.max_goal_radius = np.log(arg.goal_radius_range[1]) # use the largest world size for goal radius
 env.box = arg.WORLD_SIZE
 env.reset_theta=False
 
@@ -57,7 +60,7 @@ final_theta_log = []
 stderr_log = []
 result_log = []
 
-filename="result fix obsnoise scheduler lr long"
+filename="all log2"
 
 for num_thetas in range(arg.NUM_thetas):
 
@@ -101,7 +104,7 @@ for num_thetas in range(arg.NUM_thetas):
     result_log.append(result)
 
 
-    savename=('../firefly-inverse-data/data/' + filename + "EP" + str(arg.NUM_EP) + str(
+    savename=('../firefly-inverse-data/data/' + filename + str(num_thetas) + "EP" + str(arg.NUM_EP) + str(
         np.around(arg.PI_STD, decimals=2))+"sample"+str(arg.NUM_SAMPLES) +"IT"+ str(arg.NUM_IT) + '_LR_parttheta_result.pkl')
     torch.save(result_log, savename)
 

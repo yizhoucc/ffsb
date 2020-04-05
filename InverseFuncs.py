@@ -223,11 +223,11 @@ def getLoss(agent, x_traj,obs_traj, a_traj, theta, env, gains_range, std_range, 
                 next_ox_ = env.observations(next_x)  # simulated observation (with noise)
 
                 action_loss =5*torch.ones(2)+np.log(np.sqrt(2* pi)*PI_STD) + (action - a_traj_ep[it] ) ** 2 / 2 /(PI_STD**2)
-                obs_loss = 5*torch.ones(2)+torch.log(np.sqrt(2* pi)*obs_noise_stds) +(next_ox_ - next_ox).view(-1) ** 2/2/(obs_noise_stds**2)
+                # obs_loss = 5*torch.ones(2)+torch.log(np.sqrt(2* pi)*obs_noise_stds) +(next_ox_ - next_ox).view(-1) ** 2/2/(obs_noise_stds**2)
 
                 logPr_act_ep = logPr_act_ep + action_loss.sum()
-                logPr_obs_ep = logPr_obs_ep + obs_loss.sum()
-                logPr_ep = logPr_ep + logPr_act_ep + logPr_obs_ep
+                logPr_obs_ep = logPr_obs_ep #+ obs_loss.sum()
+                logPr_ep = logPr_ep + logPr_act_ep #+ logPr_obs_ep
 
                 next_b, info = env.belief_step(b, next_ox_, a_traj_ep[it], env.box)  # no change to internal var
                 env.b=next_b

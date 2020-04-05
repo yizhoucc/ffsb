@@ -9,11 +9,13 @@ from FireflyEnv import ffenv
 # arg
 from Config import Config
 from Inverse_Config import Inverse_Config 
+import numpy as np
 
 # easy change arg here
 arg=Inverse_Config()
 arg.gains_range = [0.8, 1.2, pi/5, 3*pi/10]
-arg.std_range = [1e-2, 0.3, 1e-2, 0.2]
+arg.std_range = [np.log(1e-2), np.log(0.3), np,log(1e-2), np.log(0.2)]
+arg.std_range = [np.log(1e-16), np.log(0.3), np,log(1e-16), np.log(0.2)]
 arg.WORLD_SIZE = 1.0
 arg.goal_radius_range = [0.2* arg.WORLD_SIZE, 0.5* arg.WORLD_SIZE]
 arg.DELTA_T = 0.1

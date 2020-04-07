@@ -9,7 +9,7 @@ import numpy as np
 from numpy import pi
 import time
 
-class MC(InverseAlgorithm):
+class GradientDescent(InverseAlgorithm):
 
     #TODO arg params here
 

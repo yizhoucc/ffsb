@@ -7,7 +7,7 @@ from FireflyEnv import ffenv
 from Config import Config
 from Inverse_Config import Inverse_Config
 import torch
-from InverseFuncs import trajectory, getLoss, reset_theta, theta_range
+from InverseFuncs import trajectory, getLoss, reset_theta, theta_range,reset_theta_log
 from single_inverse import single_inverse
 from DDPGv2Agent import Agent
 from FireflyEnv import Model # firefly_task.py
@@ -27,8 +27,8 @@ torch.backends.cudnn.benchmark = False
 
 DISCOUNT_FACTOR = 0.99
 # arg.gains_range = [0.8, 1.2, pi/5, 3*pi/10]
-arg.gains_range = [np.log(0.8), np.log(1.2), np.log(pi/5), np.log(3*pi/10)]
-# arg.gains_range = [np.log(0.8-0.799), np.log(1.2-0.799), np.log(pi/5-0.628), np.log(3*pi/10-0.628)]
+# arg.gains_range = [np.log(0.8), np.log(1.2), np.log(pi/5), np.log(3*pi/10)]
+arg.gains_range = [np.log(0.8-0.799), np.log(1.2-0.799), np.log(pi/5-0.628), np.log(3*pi/10-0.628)]
 # arg.std_range = [1e-2, 0.3, 1e-2, 0.2]
 arg.std_range = [np.log(1e-3), np.log(0.3), np.log(1e-3), np.log(0.2)]
 arg.WORLD_SIZE = 1.0
@@ -37,10 +37,13 @@ arg.DELTA_T = 0.1
 arg.EPISODE_TIME = 1  # # maximum length of time for one episode. if monkey can't firefly within this time period, new firefly comes
 arg.EPISODE_LEN = int(arg.EPISODE_TIME / arg.DELTA_T)
 arg.NUM_SAMPLES=2
-arg.NUM_EP = 100
-arg.NUM_IT = 100 # number of iteration for gradient descent
+arg.NUM_EP = 50
+arg.NUM_IT = 200 # number of iteration for gradient descent
 arg.NUM_thetas = 10
-
+arg.ADAM_LR = 0.3
+arg.LR_STEP = 2
+arg.LR_STOP = 50
+arg.lr_gamma = 0.95
 
 # agent 
 import policy_torch
@@ -60,12 +63,12 @@ final_theta_log = []
 stderr_log = []
 result_log = []
 
-filename="all log2"
+filename="all log mean obs1"
 
 for num_thetas in range(arg.NUM_thetas):
 
     # true theta
-    true_theta = reset_theta(arg.gains_range, arg.std_range, arg.goal_radius_range)
+    true_theta = reset_theta_log(arg.gains_range, arg.std_range, arg.goal_radius_range)
     # true theta for DDPG_theta
     # true_theta=torch.tensor([1.0537, 0.7328, 0.7053, 1.2038, 0.9661, 0.8689, 0.2930, 1.5330, 0.3500])
     # true_theta=torch.tensor([1.0537, 0.7328, 0.1, 0.1, 0.7, 0.8, 0.1, 0.1, 0.3500])
@@ -101,12 +104,10 @@ for num_thetas in range(arg.NUM_thetas):
     print('check len')
 
     result = single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filename, num_thetas)
-    result_log.append(result)
-
 
     savename=('../firefly-inverse-data/data/' + filename + str(num_thetas) + "EP" + str(arg.NUM_EP) + str(
         np.around(arg.PI_STD, decimals=2))+"sample"+str(arg.NUM_SAMPLES) +"IT"+ str(arg.NUM_IT) + '_LR_parttheta_result.pkl')
-    torch.save(result_log, savename)
+    torch.save(result, savename)
 
 
 print('done')

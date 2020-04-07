@@ -424,15 +424,17 @@ log(  D(G(a|x,a,o)) + D(G(noise))
 
 
 ### progress
-plots
+plots and tests
 ### todo
+plots and tests
+
 
 ## 4.03
 
 ###  
 
 ### progress
-
+optimizer
 ### todo
 
 
@@ -444,8 +446,13 @@ plots
 ###  
 
 ### progress
-
+test log trick  
+think about loglikelihood  
+plots, better  
+slides
 ### todo
+
+
 
 ## 4.07
 

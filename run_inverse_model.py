@@ -1,5 +1,5 @@
 from Dynamic import Data
-from Inverse_alg import  MC
+from Inverse_alg.GD import  GradientDescent
 from numpy import pi
 import InverseFuncs
 # agent
@@ -31,7 +31,7 @@ arg.NUM_thetas = 5
 # envarg=Config()
 
 
-model=MC.MC(arg,datasource='simulation',filename='result solve for all gain low lr1')
+model=GradientDescent(arg,datasource='simulation',filename='result solve for all gain low lr1')
 
 # # the inverse model is constructed given dynamic and algorithm
 

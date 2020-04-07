@@ -6,7 +6,37 @@ from torch import nn
 import numpy as np
 from numpy import pi
 
+def reset_theta_log(gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
+    '''
+    generate a random theta within arg range.
+    '''
+    pro_gains = torch.zeros(2)
+    obs_gains = torch.zeros(2)
 
+    pro_gains[0] = torch.zeros(1).uniform_(np.exp(gains_range[0]), np.exp(gains_range[1]))  # [proc_gain_vel]
+    pro_gains[1] = torch.zeros(1).uniform_(np.exp(gains_range[2]), np.exp(gains_range[3]))  # [proc_gain_ang]
+    obs_gains[0] = torch.zeros(1).uniform_(np.exp(gains_range[0]), np.exp(gains_range[1]))  # [obs_gain_vel]
+    obs_gains[1] = torch.zeros(1).uniform_(np.exp(gains_range[2]), np.exp(gains_range[3]))  # [obs_gain_ang]
+    goal_radius = torch.zeros(1).uniform_(np.exp(goal_radius_range[0]), np.exp(goal_radius_range[1]))
+
+    if Pro_Noise is None:
+       pro_noise_stds = torch.zeros(2)
+       pro_noise_stds[0] = torch.zeros(1).uniform_(np.exp(std_range[0]), np.exp(std_range[1]))  # [proc_vel_noise]
+       pro_noise_stds[1] = torch.zeros(1).uniform_(np.exp(std_range[2]), np.exp(std_range[3]))  # [proc_ang_noise]
+    else:
+        pro_noise_stds = Pro_Noise
+
+
+    if Obs_Noise is None:
+        obs_noise_stds = torch.zeros(2)
+        obs_noise_stds[0] = torch.zeros(1).uniform_(np.exp(std_range[0]), np.exp(std_range[1]))  # [obs_vel_noise]
+        obs_noise_stds[1] = torch.zeros(1).uniform_(np.exp(std_range[2]), np.exp(std_range[3]))  # [obs_ang_noise]
+    else:
+        obs_noise_stds = Obs_Noise
+
+    theta = torch.cat([pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius])
+    theta=torch.log(theta)
+    return theta
 
 def reset_theta(gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
     '''
@@ -229,7 +259,7 @@ def getLoss(agent, x_traj,obs_traj, a_traj, theta, env, gains_range, std_range, 
                 logPr_obs_ep = logPr_obs_ep #+ obs_loss.sum()
                 logPr_ep = logPr_ep + logPr_act_ep #+ logPr_obs_ep
 
-                next_b, info = env.belief_step(b, next_ox_, a_traj_ep[it], env.box)  # no change to internal var
+                next_b, info = env.belief_step(b, next_ox, a_traj_ep[it], env.box)  # no change to internal var
                 env.b=next_b
                 next_state = env.Breshape(b=next_b, time=t, theta=theta)
                 env.belief=next_state

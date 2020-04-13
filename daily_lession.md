@@ -454,29 +454,48 @@ slides
 
 
 
-## 4.07
+## 4.07 -4.09
 
-###  
+### potential questions
 
-### progress
+meaning of goal radius?
+first, easy training.
 
-### todo
+reward fucntion?
+first evaluate actual position if in radius
+then use belief to decide reward amount
+more reward if less uncertainty, and more reward if beief reach center.
+actually, use the beleif center reweighted by the covariance and reward std.
 
-## 4.08
+real meaning of observation?
+no obs, like walking with eye closed.
+obs, like with eye open.
 
-###  
+why not using input/image?
+the framework isnt final and we are thinking about adding that. now with the flexiable structure, we just need to create another env and train agent with it.
 
-### progress
+should there be a memory term in belief?
+the episode is short, so no need.
 
-### todo
+true theta and phi and recovered theta?
+phi is env param, not involved.
+true theta can be any theta within pretrained range, to make sure agent is rational.
+recovered theta, given enough data, will be true theta. but with limited data, it will be optimal theta given the data.
 
-## 4.09
+loss function?
+for this version, im only using action loss. that is, minimize the diff of the action from teacher, and agent with estimiated theta.
+if with the input, we will have observation loss, and that will be an easy change for this framework.
 
-###  
+why belief not in agent?
+framework constrain. we can put the belief with agent, but that causes a lot of problem because the framework is not made for pomdp. so for now, as we are still in testing phase, i just put them seperately. this only affects naming and everything is the same.
 
-### progress
+why use short run?
+although the short run does not provide a final theta, but it gives us some insight.
+in real setting, if we want to use this method on real data, we face the problem of not enough data. so, we are comparing ways that can extract as much info from limited data. short runs can test this. also, im running this on my computer, it would take forver for a longer run.
 
-### todo
+
+
+
 
 ## 4.10
 

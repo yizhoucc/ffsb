@@ -424,10 +424,10 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # o t+1 
         # check the noise representation
-        on = w=torch.distributions.Normal(0,torch.sigmoid(self.obs_noise_stds)).sample() # on is observation noise
+        on = w=torch.distributions.Normal(0,torch.sigmoid(denorm_parameter(self.obs_noise_stds,self.std_range[-2:]))).sample() # on is observation noise
         vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
-        ovel = torch.sigmoid(self.obs_gains[0]+0.799) * vel + on[0] # observed velocity, has gain and noise
-        oang_vel = torch.sigmoid(self.obs_gains[1]+0.628) * ang_vel + on[1] # same for anglular velocity
+        ovel = torch.sigmoid(denorm_parameter(self.obs_gains[0],self.gains_range[-2:])) * vel + on[0] # observed velocity, has gain and noise
+        oang_vel = torch.sigmoid(denorm_parameter(self.obs_gains[1],self.gains_range[-2:])) * ang_vel + on[1] # same for anglular velocity
         next_ox = torch.stack((ovel, oang_vel)) # observed x t+1
         self.o=next_ox
 

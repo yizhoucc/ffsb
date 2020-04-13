@@ -292,3 +292,20 @@ def unpack_theta(theta):
     'unpack the 1x9 tensor theta into p gain/noise, obs gain/noise, r'
     pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = torch.split(theta.view(-1), 2)
     return pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius
+
+def norm_parameter(parameter,param_range, given_range=[0.001,0.999]):
+    'normalize the paramter range to a range'
+    k=(max(given_range)-min(given_range))/(max(param_range)-min(param_range))
+    c=k*min(param_range)-min(given_range)
+    parameter=parameter*k-c
+    return parameter
+
+def denorm_parameter(parameter,param_range, given_range=[0.001,0.999]):
+    'denormalize the paramter range to a range'
+    k=(max(given_range)-min(given_range))/(max(param_range)-min(param_range))
+    c=k*min(param_range)-min(given_range)
+    parameter=(parameter+c)/k
+    return parameter
+
+def inverse_sigmoid(parameter):
+    return torch.log(parameter/(1-parameter))

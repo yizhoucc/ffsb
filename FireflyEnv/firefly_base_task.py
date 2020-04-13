@@ -7,7 +7,7 @@ from .env_utils import *
 from DDPGv2Agent.rewards import * #reward
 
 
-class FireflyEnv(gym.Env, torch.nn.Module): 
+class FireflyEnvBase(gym.Env, torch.nn.Module): 
     metadata = {
         'render.modes': ['human', 'rgb_array'],
         'video.frames_per_second': 60
@@ -22,25 +22,48 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         reset: init new state
         '''
         super(FireflyEnv, self).__init__()
+
+        '''
+        args:
+        dt, timestamp smallest unit
+        box, world size
+        max goal radius
+        phi, preset phi
+        presist phi, if the phi is used presistly, as the teacher in simulation
+            should be changed into, inverse or forward.
+        term velocity, the threshold that determin if the agent stops
+        episode length, how long each episdoe
+        parameter ranges, as in theta. contain goal radius range, gain range, std range.
+        reward, the max reward.
         
-        # specific defines
-        # model
+        '''
+
+        # defaults, from arg.
         self.dt = arg. DELTA_T
         self.box = arg.WORLD_SIZE #initial value
         self.max_goal_radius = arg.goal_radius_range[0]
         self.GOAL_RADIUS_STEP = arg.GOAL_RADIUS_STEP_SIZE
-        self.phi=None
-        self.presist_phi=None
-        self.dt = arg.DELTA_T
-        self.P = torch.eye(5) * 1e-8
         self.terminal_vel = arg.TERMINAL_VEL
         self.episode_len = arg.EPISODE_LEN
         self.episode_time = arg.EPISODE_LEN * self.dt
-        # self.rendering = Render()
         self.goal_radius_range = arg.goal_radius_range
         self.gains_range = arg.gains_range
         self.std_range=arg.std_range
         self.REWARD=arg.REWARD
+
+        # defaults, not related to arg.
+        # self.rendering = Render()
+        self.phi=None
+        self.pro_gains=pro_gains
+        self.pro_noise_stds=pro_noise_stds
+        self.obs_gains=obs_gains
+        self.obs_noise_stds=obs_noise_stds
+        self.presist_phi=None
+        self.P = torch.eye(5) * 1e-8
+        self.goal_radius=None
+        self.stop=False
+        self.reset_theta=True
+
         # setting belief dim
         # [r, rel_ang, vel, ang_vel, time,              5 values
         # vecL,                                         15 values
@@ -57,13 +80,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # box and discrete are most common
         self.action_space = spaces.Box(-np.ones(2), np.ones(2), dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high,dtype=np.float32)
-        self.pro_gains=pro_gains
-        self.pro_noise_stds=pro_noise_stds
-        self.obs_gains=obs_gains
-        self.obs_noise_stds=obs_noise_stds
-        self.goal_radius=None
-        self.stop=False
-        self.reset_theta=True
         # reset
         self.reset()
 

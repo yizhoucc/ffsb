@@ -2,30 +2,31 @@ import torch
 from tqdm import tqdm
 import torch.nn as nn
 from torch.autograd import grad
-from InverseFuncs import getLoss, reset_theta, theta_range
+from InverseFuncs import *
 from collections import deque
 import torch
 import numpy as np
 import time
 
 
-def single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filename, n):
+def single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filename, n,theta=None):
     tic = time.time()
-    rndsgn = torch.sign(torch.randn(1,len(true_theta))).view(-1)
-    purt= torch.Tensor([0.5,0.5,0.1,0.1,0.5,0.5,0.1,0.1,0.1]) # perturbation
-    purt= torch.Tensor([2,2,2,2,2,2,2,2,2]) # log perturbation
-    purt=torch.ones(9)
-    purt=purt.uniform_()*1+purt*1.5
-    # purt= torch.ones(9)*3 # log large perturbation
+    if theta is None:
+        rndsgn = torch.sign(torch.randn(1,len(true_theta))).view(-1)
+        purt= torch.Tensor([0.5,0.5,0.1,0.1,0.5,0.5,0.1,0.1,0.1]) # perturbation
+        purt= torch.Tensor([2,2,2,2,2,2,2,2,2]) # log perturbation
+        purt=torch.ones(9)
+        purt=purt.uniform_()*1+purt*1.5
+        # purt= torch.ones(9)*3 # log large perturbation
 
-    theta = nn.Parameter(true_theta.data.clone()+rndsgn*purt)
-    theta = theta_range(theta, arg.gains_range, arg.std_range, arg.goal_radius_range)  # keep inside of trained range
+        theta = nn.Parameter(true_theta.data.clone()+rndsgn*purt)
+        theta = theta_range(theta, arg.gains_range, arg.std_range, arg.goal_radius_range)  # keep inside of trained range
 
-
-
+    else:
+        theta = nn.Parameter(theta)
     #theta = nn.Parameter(reset_theta(arg.gains_range, arg.std_range, arg.goal_radius_range))
     ini_theta = theta.data.clone()
- 
+    print('initial theta: ',ini_theta)
 
     loss_log = deque(maxlen=arg.NUM_IT)
     loss_act_log = deque(maxlen=arg.NUM_IT)
@@ -48,7 +49,8 @@ def single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filenam
         loss.backward(retain_graph=True) #computes the derivative of the loss w.r.t. the parameters using backpropagation
         gradient.append(theta.grad.data.clone())
         optT.step() # performing single optimize step: this changes theta
-        theta = theta_range(theta, arg.gains_range, arg.std_range, arg.goal_radius_range) # keep inside of trained range
+        # theta = theta_range(theta, arg.gains_range, arg.std_range, arg.goal_radius_range) # keep inside of trained range
+        theta=theta_range_sigmoid(theta)
         # theta[6:8].data.copy_(true_theta[6:8].data) # fix obs  noise
         # theta[2:4].data.copy_(true_theta[2:4].data) # fix pro  noise
         # theta[4:8].data.copy_(true_theta[4:8].data) # fix obs gain and noise

@@ -38,6 +38,16 @@ def reset_theta_log(gains_range, std_range, goal_radius_range, Pro_Noise = None,
     theta=torch.log(theta)
     return theta
 
+def reset_theta_sig(gains_range= None, std_range= None, goal_radius_range= None, Pro_Noise = None, Obs_Noise = None):
+    '''
+    generate a random theta within arg range.
+    '''
+    theta=[]
+    for i in range(9):
+        theta.append(torch.zeros(1).uniform_(inverse_sigmoid(torch.Tensor([0.001])).item(),inverse_sigmoid(torch.Tensor([0.999])).item()))  # [proc_gain_vel]
+    theta=torch.cat(theta)
+    return theta
+
 def reset_theta(gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
     '''
     generate a random theta within arg range.
@@ -69,7 +79,10 @@ def reset_theta(gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs
     theta = torch.cat([pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius])
     return theta
 
-
+def theta_range_sigmoid(theta):
+    theta.data.clamp_(inverse_sigmoid(torch.Tensor([0.001])).item(),inverse_sigmoid(torch.Tensor([0.999])).item())
+    return theta
+    
 def theta_range(theta, gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
 
     '''

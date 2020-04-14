@@ -127,8 +127,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         self.time = torch.zeros(1)
         self.stop=False
-        # min_r = torch.exp(self.goal_radius.item()) # when not log
-        min_r = (torch.sigmoid(denorm_parameter(self.goal_radius,self.goal_radius_range))).item()
+        # min_r = torch.exp(self.goal_radius.item()) # when log
+        min_r = (denorm_parameter(torch.sigmoid(self.goal_radius),self.goal_radius_range)).item()
         r = torch.zeros(1).uniform_(min_r, self.box)  # GOAL_RADIUS, self.box is world size
         loc_ang = torch.zeros(1).uniform_(-pi, pi) # location angel: to determine initial location
         px = r * torch.cos(loc_ang)
@@ -185,7 +185,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # reward
         pos = next_x.view(-1)[:2]
-        reached_target = (torch.norm(pos) <= torch.sigmoid(denorm_parameter(self.goal_radius,self.goal_radius_range))) # is within ring
+        reached_target = (torch.norm(pos) <= denorm_parameter(torch.sigmoid(self.goal_radius),self.goal_radius_range)) # is within ring
         episode=1 # sb has its own countings. will discard this later
         finetuning=0 # not doing finetuning
         reward = return_reward(episode, info, reached_target, self.b, self.goal_radius, self.REWARD, finetuning)
@@ -223,10 +223,10 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         a_v = a[0]  # action for velocity
         a_w = a[1]  # action for angular velocity
 
-        w=torch.distributions.Normal(0,torch.sigmoid(denorm_parameter(self.pro_noise_stds,self.std_range[:2]))).sample()
+        w=torch.distributions.Normal(0,denorm_parameter(torch.sigmoid(self.pro_noise_stds),self.std_range[:2])).sample()
         
-        vel = 0.0 * vel + torch.sigmoid(denorm_parameter(pro_gains[0],self.gains_range[:2])) * a_v + w[0] # discard prev velocity and new v=gain*new v+noise
-        ang_vel = 0.0 * ang_vel + torch.sigmoid(denorm_parameter(pro_gains[1],self.gains_range[:2])) * a_w + w[1]
+        vel = 0.0 * vel + denorm_parameter(torch.sigmoid(pro_gains[0]),self.gains_range[:2]) * a_v + w[0] # discard prev velocity and new v=gain*new v+noise
+        ang_vel = 0.0 * ang_vel + denorm_parameter(torch.sigmoid(pro_gains[1]),self.gains_range[:2]) * a_w + w[1]
         ang = ang + ang_vel * dt
         ang = range_angle(ang) # adjusts the range of angle from -pi to pi
 
@@ -243,14 +243,14 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # Q matrix, process noise for tranform xt to xt+1. only applied to v and w
         Q = torch.zeros(5, 5)
-        Q[-2:, -2:] = torch.diag(torch.sigmoid(denorm_parameter(self.pro_noise_stds,self.std_range[:2]))**2) # variance of vel, ang_vel
+        Q[-2:, -2:] = torch.diag((denorm_parameter(torch.sigmoid(self.pro_noise_stds),self.std_range[:2]))**2) # variance of vel, ang_vel
         
         # R matrix, observe noise for observation
-        R = torch.diag(torch.sigmoid(denorm_parameter(self.obs_noise_stds,self.std_range[-2:]))** 2)
+        R = torch.diag((denorm_parameter(torch.sigmoid(self.obs_noise_stds),self.std_range[-2:]))** 2)
 
         # H matrix, transform x into observe space. only applied to v and w.
         H = torch.zeros(2, 5)
-        H[:, -2:] = torch.diag(torch.sigmoid(denorm_parameter(self.obs_gains,self.gains_range[-2:])))
+        H[:, -2:] = torch.diag(denorm_parameter(torch.sigmoid(self.obs_gains),self.gains_range[-2:]))
 
         # Extended Kalman Filter
         pre_bx_, P = b
@@ -266,7 +266,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
             APA = A.mm(P).mm(A.t())
             print("APA:", APA)
             print("APA +:", is_pos_def(APA))
-        error = ox - self.observations(bx_) # error as z-hx, the xt+1 is estimated
+        error = ox - H@(bx_) # error as z-hx, the xt+1 is estimated
         S = H.mm(P_).mm(H.t()) + R # S = HPH^T+R. the covarance of observation of xt->xt+1 transition 
         K = P_.mm(H.t()).mm(torch.inverse(S)) # K = PHS^-1, kalman gain. has a H in front but canceled out
         bx = bx_ + K.matmul(error) # update xt+1 from the estimated xt+1 using new observation zt
@@ -312,7 +312,12 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         rel_ang = ang - torch.atan2(-py, -px).view(-1) # relative angel
         rel_ang = range_angle(rel_ang) # resize relative angel into -pi pi range.
         vecL = vectorLowerCholesky(P) # take the lower triangle of P
-        state = torch.cat([r, rel_ang, vel, ang_vel, time, vecL, pro_gains.view(-1), pro_noise_stds.view(-1), obs_gains.view(-1), obs_noise_stds.view(-1), torch.ones(1)*goal_radius]) # original
+        state = torch.cat([r, rel_ang, vel, ang_vel, time, vecL, 
+        denorm_parameter(torch.sigmoid(pro_gains.view(-1)),self.gains_range[:2]), 
+        denorm_parameter(torch.sigmoid(pro_noise_stds.view(-1)),self.std_range[:2]),
+        denorm_parameter(torch.sigmoid(obs_gains.view(-1)),self.gains_range[-2:]),
+        denorm_parameter(torch.sigmoid(obs_noise_stds.view(-1)),self.std_range[-2:]),
+        denorm_parameter(torch.sigmoid(torch.ones(1)*goal_radius),self.goal_radius_range)])
         #state = torch.cat([r, rel_ang, vel, ang_vel]) time, vecL]) #simple
 
         return state.view(1, -1)
@@ -339,11 +344,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
             self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius = torch.split(theta.view(-1), 2)
         
         # observation of velocity and angle have gain and noise, but no noise of position
-        on = w=torch.distributions.Normal(0,torch.sigmoid(denorm_parameter(self.obs_noise_stds,self.std_range[-2:]))).sample() # on is observation noise
+        on = w=torch.distributions.Normal(0,denorm_parameter(torch.sigmoid(self.obs_noise_stds),self.std_range[-2:])).sample() # on is observation noise
         vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
 
-        ovel = torch.sigmoid(denorm_parameter(self.obs_gains[0],self.std_range[-2:])) * vel + on[0] # observe velocity
-        oang_vel = torch.sigmoid(denorm_parameter(self.obs_gains[1],self.std_range[-2:])) * ang_vel + on[1]
+        ovel = denorm_parameter(torch.sigmoid(self.obs_gains[0]),self.gains_range[-2:]) * vel + on[0] # observe velocity
+        oang_vel = denorm_parameter(torch.sigmoid(self.obs_gains[1]),self.gains_range[-2:]) * ang_vel + on[1]
         ox = torch.stack((ovel, oang_vel)) # observed x
         return ox
 
@@ -357,8 +362,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # observation of velocity and angle have gain and noise, but no noise of position
         vel, ang_vel = torch.split(x.view(-1),1)[-2:] # 1,5 to vector and take last two
 
-        ovel = torch.sigmoid(denorm_parameter(self.obs_gains[0],self.std_range[-2:])) * vel # observe velocity
-        oang_vel = torch.sigmoid(denorm_parameter(self.obs_gains[1],self.std_range[-2:])) * ang_vel
+        ovel = denorm_parameter(torch.sigmoid(self.obs_gains[0]),self.gains_range[-2:]) * vel # observe velocity
+        oang_vel = denorm_parameter(torch.sigmoid(self.obs_gains[1]),self.gains_range[-2:]) * ang_vel
         ox = torch.stack((ovel, oang_vel)) # observed x
         return ox
     
@@ -418,16 +423,16 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         # true next state, xy position, reach target or not(have not decide if stop or not).
         next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
         pos = next_x.view(-1)[:2]
-        reached_target = (torch.norm(pos) <= torch.sigmoid(denorm_parameter(self.goal_radius,self.goal_radius_range))) # is within ring
+        reached_target = (torch.norm(pos) <= denorm_parameter(torch.sigmoid(self.goal_radius),self.goal_radius_range)) # is within ring
         x=next_x
         self.x=next_x
 
         # o t+1 
         # check the noise representation
-        on = w=torch.distributions.Normal(0,torch.sigmoid(denorm_parameter(self.obs_noise_stds,self.std_range[-2:]))).sample() # on is observation noise
+        on = w=torch.distributions.Normal(0,denorm_parameter(torch.sigmoid(self.obs_noise_stds),self.std_range[-2:])).sample() # on is observation noise
         vel, ang_vel = torch.split(self.x.view(-1),1)[-2:] # 1,5 to vector and take last two.
-        ovel = torch.sigmoid(denorm_parameter(self.obs_gains[0],self.gains_range[-2:])) * vel + on[0] # observed velocity, has gain and noise
-        oang_vel = torch.sigmoid(denorm_parameter(self.obs_gains[1],self.gains_range[-2:])) * ang_vel + on[1] # same for anglular velocity
+        ovel = denorm_parameter(torch.sigmoid(self.obs_gains[0]),self.gains_range[-2:]) * vel + on[0] # observed velocity, has gain and noise
+        oang_vel = denorm_parameter(torch.sigmoid(self.obs_gains[1]),self.gains_range[-2:]) * ang_vel + on[1] # same for anglular velocity
         next_ox = torch.stack((ovel, oang_vel)) # observed x t+1
         self.o=next_ox
 

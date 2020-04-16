@@ -63,7 +63,7 @@ final_theta_log = []
 stderr_log = []
 result_log = []
 
-filename="all log mean obs1"
+filename="testnew"
 
 for num_thetas in range(arg.NUM_thetas):
 

@@ -494,40 +494,23 @@ although the short run does not provide a final theta, but it gives us some insi
 in real setting, if we want to use this method on real data, we face the problem of not enough data. so, we are comparing ways that can extract as much info from limited data. short runs can test this. also, im running this on my computer, it would take forver for a longer run.
 
 
-
-
-
 ## 4.10
 
-###  
-
-### progress
-
-### todo
-
+###  presentation
+feedbacks:
+sigmoid is same as tanh  
+next we will have bahavior data and neural data, soon
+some other handwritten notes, see notes.
 
 
 # wk 6
 
-## 4.13
-
-###  
-
 ### progress
+loss surface plots
+sigmoid and normalized show not much better.
+check how log noise surface look like.
+check if bug in representations.
 
-### todo
-
-## 4.14
-
-###  
-
-### progress
-
-### todo
-
-## 1.15
-
-###  
 
 ### progress
 

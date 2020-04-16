@@ -266,7 +266,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
             APA = A.mm(P).mm(A.t())
             print("APA:", APA)
             print("APA +:", is_pos_def(APA))
-        error = ox - H@(bx_) # error as z-hx, the xt+1 is estimated
+        error = ox - self.observations(bx_) # error as z-hx, the xt+1 is estimated
         S = H.mm(P_).mm(H.t()) + R # S = HPH^T+R. the covarance of observation of xt->xt+1 transition 
         K = P_.mm(H.t()).mm(torch.inverse(S)) # K = PHS^-1, kalman gain. has a H in front but canceled out
         bx = bx_ + K.matmul(error) # update xt+1 from the estimated xt+1 using new observation zt

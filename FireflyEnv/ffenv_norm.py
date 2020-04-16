@@ -2,9 +2,6 @@ import gym
 from numpy import pi
 import numpy as np
 from gym import spaces
-# from gym.utils import seeding
-from FireflyEnv.plotter_gym import Render
-# from FireflyEnv.firefly_task import Model
 from DDPGv2Agent.rewards import *
 import InverseFuncs
 from .env_utils import *
@@ -51,7 +48,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.episode_time = arg.EPISODE_LEN * self.dt
         self.action_dim = arg.ACTION_DIM
         self.state_dim = arg.STATE_DIM
-        self.rendering = Render()
+        # self.rendering = Render()
         self.goal_radius_range = arg.goal_radius_range
         self.gains_range = arg.gains_range
         self.std_range=arg.std_range

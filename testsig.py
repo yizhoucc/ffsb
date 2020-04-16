@@ -37,9 +37,9 @@ arg.DELTA_T = 0.1
 arg.EPISODE_TIME = 1  # # maximum length of time for one episode. if monkey can't firefly within this time period, new firefly comes
 arg.EPISODE_LEN = int(arg.EPISODE_TIME / arg.DELTA_T)
 arg.NUM_SAMPLES=2
-arg.NUM_EP = 100
+arg.NUM_EP = 50
 arg.NUM_IT = 200 # number of iteration for gradient descent
-arg.NUM_thetas = 1
+arg.NUM_thetas = 10
 arg.ADAM_LR = 0.2
 arg.LR_STEP = 2
 arg.LR_STOP = 50
@@ -63,7 +63,7 @@ final_theta_log = []
 stderr_log = []
 result_log = []
 
-filename="test sigmoid"
+filename="test sigmoid0"
 
 for num_thetas in range(arg.NUM_thetas):
 
@@ -81,7 +81,7 @@ for num_thetas in range(arg.NUM_thetas):
     # print('check len')
 
     theta=reset_theta_sig()
-    theta=true_theta.clone()
+    # theta=true_theta.clone()
 
     result = single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filename, num_thetas,theta=theta)
 

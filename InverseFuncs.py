@@ -179,7 +179,7 @@ def trajectory(agent, theta, env, arg, gains_range, std_range, goal_radius_range
 
     env.reset()     # apply the true theta to env
 
-
+    env.belief = env.Breshape(theta=theta)
     episode = 0
     tot_t = 0
 

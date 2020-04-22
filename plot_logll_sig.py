@@ -43,9 +43,9 @@ arg.LR_STOP = 50
 arg.lr_gamma = 0.95
 x_length=11
 y_length=11
-x_var=4 # a 0 - 8 value that index a paramter in theta
-y_var=5
-vartick=0.1
+x_var=5 # a 0 - 8 value that index a paramter in theta
+y_var=6
+vartick=0.15
 
 # agent 
 

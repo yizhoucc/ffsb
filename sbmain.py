@@ -43,7 +43,7 @@ from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckAc
 action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
 env=ffenv.FireflyEnv(arg)
 # model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./",action_noise=action_noise)
-model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb1/",action_noise=action_noise,
+model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb/",action_noise=action_noise,
 
             gamma=0.99, memory_policy=None, eval_env=None, nb_train_steps=50,
             nb_rollout_steps=100, nb_eval_steps=100, param_noise=None, normalize_observations=False, 
@@ -63,7 +63,7 @@ model.learn(total_timesteps=1000000)
 # (tensor([0.9873, 0.7121]), tensor([1.7995, 0.3651]), tensor([0.8017, 0.9060]), tensor([1.8397, 1.9815]), tensor([0.2000]))
 # 200 0000000
 # print('training',time.time()-start)
-model.save("DDPG_theta")
+# model.save("DDPG_theta")
 
 # eval
 # model = DDPG.load("DDPG_ff")

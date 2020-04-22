@@ -42,7 +42,7 @@ class Config:
         # self.noise_range = [np.log(0.01), np.log(1), np.log(pi/4/100), np.log(pi/4)]# ln(noise_var): SNR=[100 easy, 1 hard] [vel min, vel max, ang min, ang max]
 
         #self.gains_range = [8, 12, 8, 12] # [vel min, vel max, ang min, ang max]
-        self.std_range = [1e-2, 2, 1e-2, 2]# [vel min, vel max, ang min, ang max]
+        self.std_range = [1e-2, 0.2, 1e-2, 0.2]# [vel min, vel max, ang min, ang max]
 
 
 

@@ -179,7 +179,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.b, info = self.belief_step(self.b, self.o, action, self.box)  
         
         # reshape b to give to policy
-        self.belief = self.Breshape(self.b, self.time, self.theta)  # state used in policy is different from belief
+        self.belief = self.Breshape(b=self.b, time=self.time, theta=self.theta)  # state used in policy is different from belief
 
         # reward
         pos = next_x.view(-1)[:2]
@@ -446,6 +446,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # orignal return names
         self.time=self.time+1
+        self.rewarded=reached_target and info['stop']
         self.stop=reached_target and info['stop'] or self.time>self.episode_len
         
         return self.belief, self.stop

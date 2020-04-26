@@ -166,6 +166,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         2. belief update by action and states with noise, by kalman filter
         
         '''
+        # clamp the action
+        action[0]=max(action[0],0)
         # x t+1
         # true next state, xy position, reach target or not(have not decide if stop or not).
         next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
@@ -186,11 +188,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         episode=1 # sb has its own countings. will discard this later
         finetuning=0 # not doing finetuning
-        reward = return_reward(episode, info, reached_target, self.b, self.goal_radius, self.REWARD, finetuning)
+        reward = return_reward(info['stop'], reached_target, self.b, self.goal_radius, self.REWARD, finetuning)
 
         # orignal return names
         self.time=self.time+1
-        self.stop=reached_target and info['stop'] or self.time>self.episode_len
+        self.stop= info['stop'] or self.time>self.episode_len
         
         return self.belief, reward, self.stop, info
 
@@ -413,6 +415,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         if theta is not None:
             self.pro_gains, self.pro_noise_stds, self.obs_gains, self.obs_noise_stds, self.goal_radius = torch.split(theta.view(-1), 2)
         
+        # clamp the v
+        if type(action)==np.ndarray:
+            action[0]=max(action[0],0)
+        else:
+            action[0][action[0]<0]=0
         # true next state, xy position, reach target or not(have not decide if stop or not).
         next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
         pos = next_x.view(-1)[:2]
@@ -440,9 +447,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.belief = self.Breshape(b=next_b, time=self.time, theta=self.theta)  # state used in policy is different from belief
 
         # reward
-        episode=1 # sb has its own countings. will discard this later
-        finetuning=0 # not doing finetuning
-        reward = return_reward(episode, info, reached_target, next_b, self.goal_radius, self.REWARD, finetuning)
+
+        reward = return_reward(info['stop'], reached_target, next_b, self.goal_radius, self.REWARD)
 
         # orignal return names
         self.time=self.time+1

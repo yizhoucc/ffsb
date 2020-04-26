@@ -6,6 +6,8 @@ from stable_baselines import DDPG
 from FireflyEnv import ffenv
 from Config import Config
 arg=Config()
+
+
 import numpy as np
 import time
 import torch
@@ -46,21 +48,21 @@ model = DDPG(MlpPolicy,
             _init_setup_model=True, 
             policy_kwargs={'act_fun':tf.nn.selu,'layers':[256,256,64,32]},
             seed=None, n_cpu_tf_sess=None)
-train_time=1200000
+train_time=1000000
 
-# for i in range(10):
-#     model.learn(total_timesteps=train_time/10)
-#     # model.learn(total_timesteps=1000000)
-#     model.save("DDPG_selu_{}_{} {} {} {}".format(train_time,i,
-#     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
-#     ))
-
-
-train_time=1200000
-model.learn(total_timesteps=train_time)
-model.save("DDPG_selu_{} {} {} {}".format(train_time,
+for i in range(10):
+    model.learn(total_timesteps=train_time/10)
+    # model.learn(total_timesteps=1000000)
+    model.save("DDPG_selu_skip_96reward{}_{} {} {} {}".format(train_time,i,
     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
     ))
+
+
+# train_time=100000
+# model.learn(total_timesteps=train_time)
+# model.save("DDPG_selu_nonoise{} {} {} {}".format(train_time,
+#     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
+#     ))
 
 
 env.close()

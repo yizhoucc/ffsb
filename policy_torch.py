@@ -3,12 +3,17 @@ import torch.nn as nn
 
 class PyTorchMlp(nn.Module):  
 
-  def __init__(self, n_inputs=29, n_actions=2,layer1=32, layer2=64,act_fn=nn.functional.relu):
+  def __init__(self, n_inputs=29, n_actions=2,layers=[256,256,64,32],act_fn=nn.functional.relu):
       nn.Module.__init__(self)
-
-      self.fc1 = nn.Linear(n_inputs, layer1)
-      self.fc2 = nn.Linear(layer1, layer2)      
-      self.fc3 = nn.Linear(layer2, n_actions)      
+      self.num_layers=len(layers)
+      self.fc1 = nn.Linear(n_inputs, layers[0])
+      self.fc2 = nn.Linear(layers[0], layers[1])  
+      if self.num_layers==2:   
+        self.fc3 = nn.Linear(layers[1], n_actions) 
+      else:     
+        self.fc3 = nn.Linear(layers[1], layers[2])
+        self.fc4 = nn.Linear(layers[2], layers[3])
+        self.fc5 = nn.Linear(layers[3], n_actions)
       self.activ_fn = act_fn
       self.out_activ_fn=nn.Tanh()
       self.name=None
@@ -16,12 +21,17 @@ class PyTorchMlp(nn.Module):
   def forward(self, x):
       x = self.activ_fn(self.fc1(x))
       x = self.activ_fn(self.fc2(x))
-      x = self.out_activ_fn(self.fc3(x))
+      if self.num_layers==2:
+        x = self.out_activ_fn(self.fc3(x))
+      else:
+        x = self.activ_fn(self.fc3(x))    
+        x = self.activ_fn(self.fc4(x))    
+        x = self.out_activ_fn(self.fc5(x))
       return x
 
 
-def copy_mlp_weights(baselines_model,layer1=32,layer2=64,act_fn=nn.functional.relu):
-  torch_mlp = PyTorchMlp(n_inputs=29, n_actions=2,layer1=layer1,layer2=layer2,act_fn=act_fn)
+def copy_mlp_weights(baselines_model,layers=[256,256,64,32],act_fn=nn.functional.relu):
+  torch_mlp = PyTorchMlp(n_inputs=29, n_actions=2,layers=layers,act_fn=act_fn)
   model_params = baselines_model.get_parameters()
   
   policy_keys = [key for key in model_params.keys() if "target/pi" in key]

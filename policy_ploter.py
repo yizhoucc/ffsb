@@ -3,20 +3,23 @@ from stable_baselines import TD3
 import policy_torch
 import numpy as np
 from numpy import pi
+from torch import nn
 import matplotlib.pyplot as plt
 # load baseline model
-baselines_mlp_model = DDPG.load("DDPG_selu_300")
-torch_model_selu = policy_torch.copy_mlp_weights(baselines_mlp_model,layer1=512,layer2=128)
+selu_name='DDPG_selu_skip1000000_9 26 9 38'
+baselines_mlp_model = DDPG.load(selu_name)
+torch_model_selu = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[256,256,64,32],act_fn=nn.functional.selu)
 torch_model_selu.name='selu'
 
 baselines_mlp_model = DDPG.load("DDPG_theta")
-torch_model_relu = policy_torch.copy_mlp_weights(baselines_mlp_model,layer1=32,layer2=64)
+torch_model_relu = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[32,64])
 torch_model_relu.name='relu'
 
 # testing, get sample beliefs
 from Config import Config
 from FireflyEnv import ffenv
 arg=Config()
+arg.std_range=[1e-4, 1e-3, 1e-4, 1e-3]
 env=ffenv.FireflyEnv(arg)
 
 def get_beliefs(number_trials):
@@ -32,6 +35,19 @@ def get_beliefs(number_trials):
             beliefs.append(belief)
     return beliefs
 # testings, alter r(distance) and relative angle.
+
+def inverseCholesky(vecL):
+    """
+    Performs the inverse operation to lower cholesky decomposition
+    and converts vectorized lower cholesky to matrix P
+    P = L L.t()
+    """
+    size = int(np.sqrt(2 * len(vecL)))
+    L = np.zeros((size, size))
+    mask = np.tril(np.ones((size, size)))
+    L[mask == 1] = vecL
+    P = L@(L.transpose())
+    return P
 
 def plot_policy_surface(belief,torch_model,name_index):
     r_range=[0,1.2]
@@ -94,8 +110,8 @@ def plot_policy_surfaces(belief,torch_model1,torch_model2,name_index):
             policy2_data_v[ri,ai]=torch_model2(belief)[0]
             policy2_data_w[ri,ai]=torch_model2(belief)[1]
 
-    fig, ax = plt.subplots(2, 2,sharex='col', sharey='row',
-                        gridspec_kw={'hspace': 0.07, 'wspace': 0.03},figsize=(16,20))
+    fig, ax = plt.subplots(3, 2,
+                        gridspec_kw={'hspace': 0.2, 'wspace': 0.4},figsize=(18,20))
     fig.suptitle('{} and {} policy surface'.format(torch_model1.name,torch_model2.name),fontsize=40)
     ax[0,0].set_title('selu velocity',fontsize=24)
     ax[0,0].imshow(policy1_data_v,origin='lower',extent=[a_labels[0],a_labels[-1],r_labels[0],r_labels[-1]])
@@ -110,14 +126,25 @@ def plot_policy_surfaces(belief,torch_model1,torch_model2,name_index):
 
     for a in ax.flat:
         a.set(xlabel='relative angle', ylabel='relative distance')
-    for a in ax.flat:
-        a.label_outer()
+    # for a in ax.flat:
+    #     a.label_outer()
 
-    plt.savefig('{} and {} policy surface {}.png'.format(torch_model1.name,torch_model2.name,name_index))
+    ax[2,0].text(-1.3,+5.5,'time {}'.format(str(belief.tolist()[4])),fontsize=24)
+    ax[2,0].text(-3.3,-2.5,'theta {}'.format(str(['{:.2f}'.format(x) for x in (belief.tolist()[20:])])),fontsize=20)
+    ax[2,0].text(-2.3,1.5,'scale bar,  -1                0                +1',fontsize=24)
+
+    ax[2,0].imshow((np.asarray(list(range(10)))/10).reshape(1,-1))
+    ax[2,0].axis('off')
+
+    ax[2,1].set_title('P matrix',fontsize=24)
+    ax[2,1].imshow(inverseCholesky(belief.tolist()[5:20]))
+    ax[2,1].axis('off')
+
+    plt.savefig('./policy plots/{} and {} policy surface {}.png'.format(torch_model1.name,torch_model2.name,name_index))
 
 
 name_index=0
-beliefs=get_beliefs(10)
+beliefs=get_beliefs(3)
 for belief in beliefs:
     # plot_policy_surface(belief,torch_model_selu,name_index)
     # plot_policy_surface(belief,torch_model_relu,name_index)

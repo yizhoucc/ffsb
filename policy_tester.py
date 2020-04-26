@@ -15,18 +15,19 @@ def myhist(time_log):
 
 # load baseline model
 my_selu=act_fn=(lambda x, : 1.05070098*nn.functional.elu(x,alpha=1.67326324))
-baselines_selu = DDPG.load("DDPG_selu2")
-torch_model_selu = policy_torch.copy_mlp_weights(baselines_selu,layer1=128,layer2=128,act_fn=nn.functional.selu)
+baselines_selu = DDPG.load("DDPG_selu_skip1000000_9 26 9 38")
+torch_model_selu = policy_torch.copy_mlp_weights(baselines_selu,layers=[256,256,64,32],act_fn=nn.functional.selu)
 torch_model_selu.name='selu'
 
-baselines_relu = DDPG.load("DDPG_theta")
-torch_model_relu = policy_torch.copy_mlp_weights(baselines_relu,layer1=32,layer2=64)
-torch_model_relu.name='relu'
+# baselines_relu = DDPG.load("DDPG_theta")
+# torch_model_relu = policy_torch.copy_mlp_weights(baselines_relu,layers=[32,64])
+# torch_model_relu.name='relu'
 
 # testing, get sample beliefs
 from Config import Config
 from FireflyEnv import ffenv
 arg=Config()
+
 env=ffenv.FireflyEnv(arg)
 
 correct_count=0
@@ -36,10 +37,10 @@ for i in range(999):
     belief=env.reset()[0]
     while not env.stop:
         action=torch_model_selu(belief)
-        print(action)
+        # print(action)
         belief=env(action)[0][0]
         if env.rewarded:
-            print('==========')
+            # print('==========')
             correct_count+=1
             correct_time_log.append(env.time.item())
         if env.stop:

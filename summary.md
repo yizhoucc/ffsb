@@ -307,3 +307,60 @@ fix gains and solve for noise, not working, at least not in short runs.
 
 
 
+# Second Part: Improve the Policy suface to Allow Better Maxium Likelihood Calculation
+
+In this firefly forward task, the agent choose an action of velocity v, and angular velocity w, at each time point t.
+I will refer to them as vt and wt.
+In this way, the agent leans the optimal policy from the forward training.
+The policy network is built using a fully connected network structure, with layer relu activation, and a tanh out activation.
+One problem with the layer relu activation is, because the relu's natural property, it will produce a rough action output surface though the tanh output is smooth.
+
+<div id="banner " class="inline-block">
+    <img src="./documents/placeholder.png" alt="plots" width="300" height="250"/>
+</div>
+
+Having such a rough policy output is not good for the inverse calculation of maximazing log likelihood.
+This is because when maximazing the log likelihood, we compare the action difference between the teacher agent (the one with true theta we want to recover), and an agent with estimated theta (the agent the that we are optimizing to recover the true theta).
+If the action difference is small, we cannot extract useful information to update the estimated theta and move it towards the true theta.
+Thus, ideally, we would want a smoother policy surface, such that the actions are different on different cases.
+This allows us to have gradient to update the estimated theta.
+
+## Ideas to Smooth the Policy
+
+There are some ideas to smooth the policy surface from our discussion.
+First, we think the problem is with relu's shape.
+Relu will brutelly bend the nagetive protion of the input to 0, so we would imaging the output of relu will have distinct bend as well, just like the folds if you fold a piece of paper and unfold it.
+So, in this case, a smoother activation function may help.
+We choose selu, scaled version of elu, which provide a softer bending on the negative part.
+Second, the velocity output vt from the policy network is from -1 to 1 range, as shaped by tanh out activation.
+But the task constrain the ouput to be 0 to 1 range.
+This results in the vt output is hard clamped.
+We think instead of a hard clamp, a soft clamp such as sigmoid will do a better job at reshaping the vt output by policy.
+
+## Selu
+
+The agent with selu layer activation has a smoother policy surface.
+
+<div id="banner " class="inline-block">
+    <img src="./documents/placeholder.png" alt="plots" width="300" height="250"/>
+</div>
+
+This is a sample figure comparing the selu agent and the relu agent.
+The selu agent takes more time to train, and it was train 3 times more episodes than relu agent.
+Looking at the angular velocity output, the two agents are similar.
+They both want to maximize the angle turning rate.
+Notice that the selu policy has a smoother region around 0 angle and around 0.2 to 0.4 distance range.
+In this range, the agent is relative very near to the target and has a very small relative angle to the target.
+I would expect the agent's optimal decision to be having a smaller (non max) angular velocity.
+Looking at relu agent, this is not seen.
+
+More obviously, the velocity ouput by selu agent is much smoother than relu agent.
+Instead of having max velocity all the time, the selu agent choose a low velocity when the target has a large relative angle and large distance.
+This could be a trade off between the velocity and angular velocity.
+Assume that we want to maximize the velocity (since the reward is evaluated by distance only), we would take the maximum velocity that 1. not exceeding the velocity max, 2. make sure that the relative angle not going up.
+In this case, we can calculate such a velocity for every distance d_t, relative angle theta_t, vmax, wmax.
+This results in each move is the similiarity triangle, and the v_t is exp decreasing.
+This means the agent will be near the target but will never reach the target.
+To balance the trade off between the velocity and relative angle at the next time point, it is obvious that the agent should take some lower velocity at some cases.
+I am also trying to solve the simple sysem without goal radius and noiese using math.
+

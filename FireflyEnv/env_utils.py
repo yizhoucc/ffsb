@@ -99,3 +99,24 @@ def sample_exp(min, max, scale = np.e):
     while temp < min or temp > max:
         temp = np.random.exponential(scale=scale)
     return temp
+
+
+def norm_parameter(parameter,param_range, given_range=[0.001,0.999]):
+    'normalize the paramter range to a range'
+    k=(max(given_range)-min(given_range))/(max(param_range)-min(param_range))
+    c=k*min(param_range)-min(given_range)
+    parameter=parameter*k-c
+    return parameter
+
+def denorm_parameter(parameter,param_range, given_range=[0.001,0.999]):
+    'denormalize the paramter range to a range'
+    k=(max(given_range)-min(given_range))/(max(param_range)-min(param_range))
+    c=k*min(param_range)-min(given_range)
+    parameter=(parameter+c)/k
+    return parameter
+
+def inverse_sigmoid(parameter):
+    return torch.log(parameter/(1-parameter))
+
+def placeholder_func(input):
+    return input

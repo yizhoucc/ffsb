@@ -9,10 +9,14 @@ from FireflyEnv import ffenv
 import numpy as np 
 from numpy import pi
 import matplotlib.pyplot as plt
-agent_name="DDPG_selu_skip1000000_9 26 9 38"
-num_episode=2
+agent_name="DDPG_selu_skip_96reward1000000_9 26 16 43"
+num_episode=20
 arg=Config()
-arg.std_range=[1e-4,1e-3,1e-4,1e-3]
+# arg.gains_range[0:2]=[0.9,0.91]
+# arg.std_range=[0.02,0.03,0.02,0.03]
+
+# arg.std_range=[0.0001,0.001,0.0001,0.001]
+# arg.gains_range=[0.99,1.,0.99,1.]
 
 env=ffenv.FireflyEnv(arg)
 baselines_selu = DDPG.load(agent_name)
@@ -34,11 +38,11 @@ for i in range(num_episode):
     ep_data={}
     ep_vt=[]
     ep_wt=[]
-    ep_xt=[0.]
-    ep_yt=[0.]
+    ep_xt=[]
+    ep_yt=[]
     ep_facing=[0.]
-    ep_bxt=[0.]
-    ep_byt=[0.]
+    ep_bxt=[]
+    ep_byt=[]
     ep_br=[]
     ep_ba=[]
     # get goal position at start
@@ -65,15 +69,24 @@ for i in range(num_episode):
         # convert the actions to x y, with start location as 0,0
         dx=ep_vt[-1]*np.sin(ep_facing[-1])
         dy=ep_vt[-1]*np.cos(ep_facing[-1])
-        ep_xt.append(ep_xt[-1]+dx)
-        ep_yt.append(ep_yt[-1]+dy)
-
-        br=belief.tolist()[0]
-        ba=-belief.tolist()[1]
-        ep_br.append(br)
-        ep_ba.append(ba)
-        ep_bxt.append(-(br*np.sin(sum(ep_wt)+ba))+goalx)
-        ep_byt.append((-br*np.cos(sum(ep_wt)+ba))+goaly)
+        # ep_xt.append(ep_xt[-1]+dx)
+        # ep_yt.append(ep_yt[-1]+dy)
+        ang=env.x.tolist()[0][2]
+        # rotation_matrix=np.array([[np.cos(ang),-np.sin(ang)],[np.sin(ang),np.cos(ang)]])
+        # xyt=[goalx-env.x.tolist()[0][0],goaly-env.x.tolist()[0][1]]
+        # xyt=rotation_matrix@xyt
+        # ep_xt.append(xyt[0])
+        # ep_yt.append(xyt[1])
+        ep_xt.append(env.x.tolist()[0][0])
+        ep_yt.append(env.x.tolist()[0][1])
+        # br=belief.tolist()[0]
+        # ba=-belief.tolist()[1]
+        # ep_br.append(br)
+        # ep_ba.append(ba)
+        # ep_bxt.append(-(br*np.sin(sum(ep_wt)+ba))+goalx)
+        # ep_byt.append((-br*np.cos(sum(ep_wt)+ba))+goaly)
+        ep_bxt.append(env.b[0].tolist()[0])
+        ep_byt.append(env.b[0].tolist()[1])
 
 
 
@@ -90,15 +103,57 @@ for i in range(num_episode):
 
     all_ep.append(ep_data)
 
-# plot the actions
-for i in range(1):
+for i in range(num_episode):
     plt.figure
     ep_xt=all_ep[i]['xt']
     ep_yt=all_ep[i]['yt']
-    plt.plot(ep_xt,ep_yt,'ro-')
-    plt.plot(all_ep[i]['bxt'],all_ep[i]['byt'],'bo-')
-    plt.scatter(all_ep[i]['goalx'],all_ep[i]['goaly'])
+    plt.title(str(['{:.2f}'.format(x) for x in all_ep[i]['theta']]))
+    plt.plot(ep_xt,ep_yt,'r-')
+    plt.plot(all_ep[i]['bxt'],all_ep[i]['byt'],'b-')
+    # plt.scatter(all_ep[i]['goalx'],all_ep[i]['goaly'])
+
+    circle = np.linspace(0, 2*np.pi, 100)
+    r = 0.2
+    x = r*np.cos(circle)
+    y = r*np.sin(circle)
+    plt.plot(x,y)
+
     plt.savefig('path.png')
+
+# vts=[]
+# wts=[]
+# for i in range(num_episode):
+#     vts.append(all_ep[i]['vt'])
+#     wts.append(all_ep[i]['wt'])
+
+# mu=[ 0. for a in list(range(10))]
+# for i in range(len(mu)):
+#     for vt in vts: 
+#         mu[i]=vts
+# y = vts
+# error = np.random.normal(0.1, 0.02, size=y.shape)
+# y += np.random.normal(0, 0.1, size=y.shape)
+
+# plt.plot(x, y, 'k-')
+# plt.fill_between(x, y-error, y+error)
+
+#     plt.plot(all_ep[i]['vt'])
+
+#     plt.plot(all_ep[i]['wt'])
+
+# goalrs=[]
+# stoprs=[]
+# for i in range(num_episode):
+#     stoprs.append(all_ep[i]['brt'][-1])
+#     goalrs.append(all_ep[i]['theta'][-1])
+# diffs=[a-b for a,b in zip(goalrs,stoprs)]
+# plt.figure(1)
+# plt.hist(diffs)
+# plt.savefig('stop.png')
+
+
+
+
 
 print('s')
 

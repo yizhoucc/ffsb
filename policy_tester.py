@@ -15,7 +15,7 @@ def myhist(time_log):
 
 # load baseline model
 my_selu=act_fn=(lambda x, : 1.05070098*nn.functional.elu(x,alpha=1.67326324))
-baselines_selu = DDPG.load("DDPG_selu_skip1000000_9 26 9 38")
+baselines_selu = DDPG.load("DDPG_LQC_simple1000000 26 22 48")
 torch_model_selu = policy_torch.copy_mlp_weights(baselines_selu,layers=[256,256,64,32],act_fn=nn.functional.selu)
 torch_model_selu.name='selu'
 
@@ -27,7 +27,8 @@ torch_model_selu.name='selu'
 from Config import Config
 from FireflyEnv import ffenv
 arg=Config()
-
+arg.std_range=[0.0001,0.001,0.0001,0.001]
+arg.gains_range=[0.99,1.,0.99,1.]
 env=ffenv.FireflyEnv(arg)
 
 correct_count=0

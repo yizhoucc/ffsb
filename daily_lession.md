@@ -568,9 +568,37 @@ check if bug in representations.
 
 ### todo
 
-## 4.24
+## 4.28
 
-###  
+### morning meeting
+neural data, trying to predict choice/reward
+using reward p itself, or from neural regression.
+
+see picture
+
+model lapses?
+model a fogetting process, 3 different distribution of reward, cycling, and agent forgot the stages in the cycle.
+
+when forget, not empty belief, but reset it to an equaibrium.
+
+probobility of forgoting, if const, its easy to find a eq and reset to eq.
+
+process and policy interdependent.
+
+eg, eq is empty the memory, the lapse is not under agent control, the parameter will be a task parameter, agent estimate the lapse rate for example.
+
+real meaning, not paying attention, skip update/observation, or skip the prediction and only use obs, or prob to jump back. could model them all
+
+p check is the regressed decoding of neural activity to our predicted reward prob.
+
+what is cca?
+
+having a residual of p-b, and now covar is more meaningful? 
+
+anaysis ways, remove some compoment and see regression. part of casual relationship methods.
+
+regression agaisnt b, show if p doesnt help.
+regression again p, b will help.
 
 ### progress
 

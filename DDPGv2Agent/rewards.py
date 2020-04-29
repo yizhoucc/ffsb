@@ -13,7 +13,7 @@ R(b) =  \int b(s)*r(s) ds = 1/sqrt(det(2 pi (P+R)) * exp(-0.5*mu^t(R+P)^-1*mu)
 import torch
 import numpy as np
 from FireflyEnv.env_utils import is_pos_def
-
+import torch
 
 def return_reward(agent_stops, reached_target, b, goal_radius, REWARD,time=0, episode=0,finetuning = 0):
     if agent_stops:  # receive reward if monkey stops. position does not matters
@@ -42,6 +42,18 @@ def get_reward(b, goal_radus, REWARD,time):
     reward = rewardFunc(rew_std, bx.view(-1), P, REWARD)*0.96**time  # reward currently only depends on belief not action
     return reward
 
+def return_reward_LQC_test(agent_stops, reached_target, b, goal_radius, REWARD,time=0, episode=0,finetuning = 0):
+    x, P = b
+    position=x[:2]
+    r=torch.norm(position)
+    reward = REWARD*(1-r)*0.9**time  # reward currently only depends on belief not action
+    return reward
+
+def return_reward_location(agent_stops, reached_target, b, goal_radius, REWARD,time=0):
+    if reached_target:
+        return REWARD*0.9**time
+    else:
+        return 0.
 
 
 def rewardFunc(rew_std, x, P, scale):

@@ -364,3 +364,68 @@ This means the agent will be near the target but will never reach the target.
 To balance the trade off between the velocity and relative angle at the next time point, it is obvious that the agent should take some lower velocity at some cases.
 I am also trying to solve the simple sysem without goal radius and noiese using math.
 
+## Smooth the Policy Output
+
+The policy output to an action, consist of forward velocity v, and angular velocity w.
+I will refer to them as v and w.
+Regardless of the layer activation, the out activation is tanh.
+So, the v and w raw output are in -1 to 1 range.
+The task environment uses v and w in this -1 to 1 range directly.
+If we do not apply a constrain on the velocity, meaning the agent can choose to go backwards, the agent will first backup then move in a curve for large relative angle goals.
+Their trajectories are like this:
+
+<div id="banner " class="inline-block">
+    <img src="./documents/placeholder.png" alt="plots" width="300" height="250"/>
+</div>
+
+However, in the actual task, although the monkey can choose to backup, it seems they haven't discover this trick.
+
+If we add constrain that only allow the agent to go forward, now this v should be in the 0, 1 range instead of -1, to 1.
+Thus, if we smooth the v output, it is equal to add another out activation to the policy.
+tanh then sigmoid instead of a single tanh.
+In my opinon, this will not greatly smoothe the actions.
+I will do some tests soon to test my hypothesis.
+
+## Optimal Agent
+
+We would like a policy of smooth surface, so that the actions are slightly variant and we can compute action loss and coresponding gradient to adjust our estimation of theta.
+But, at the same time, we should make sure the policy is optimal.
+So far, we have serveral ways to roughly determine if the agent is optimal or not.
+
+First, on inter episode level.
+The agent should be able to skip hard trials that require more time to finish.
+This is seen also in real monkey's experiments.
+Instead of trying to get to the far way goal, the agent could gain more reward in a fixed amount of time by skip this trial and only doing easier trials that takes less time to get reward.
+This skipping behavior is depended on adding the episode transition into the reply buffer.
+This makes sense because the agent has to know if it stops, the belief will transit into next episode.
+
+Second, on single episode level.
+The agent should overlap its belief estimation and goal radius as much as possible.
+In other words, the agent should want to stop at the edge of the goal radius, but taking its uncertainty into account, it should actually want to stop near the edge when have small uncertainty, and stop at the goal center if the uncertainty is large.
+A way to quantify this is to calculate the overlap ratio of uncertainty overlapping with the goal radius weightly by the reward distribution, over the reward distribution.
+
+Third, on single episode level.
+The agent should finish the episode and reach goal as soon as possible.
+In other words, the agent wants to maximize the reward over total time spent.
+The agent could choose a longer arc, despite the arc is longer, it may take less time to get to the goal.
+The agent could also choose a shorter arc, as the total travel distance become shorter, the agent might get to the goal sooner, but it has to balance this between the time spend at origin to turn around.
+The agent could choose to backup and then go, as seen in training.
+To achieve optimal policy to maximize reward over total time spent, I trained some agent with reward=reward from reward function * gamma^total time spent.
+
+One problem I am facing now is, to calculate the theorical minimal time needed to reach the goal, assuming no uncertainty.
+Would the fastest path be an arc?
+Would it be combination of arcs?
+
+The other problem is the task setting.
+Assume the agent has infinte w, the agent would turn to facing the goal at first step, and then travel in a straight line.
+Assume the agent has infinte v, the agent would either turn to facing the goal and then use one step to reach the goal.
+If the agent has a large but not infinte, the agent would use combinations of max w and small v, to save some distance during the turning.
+Of couse, in this case, the agent will use apporate v because large v in wrong direction will likely to offset the w turn.
+
+For current settings, the optimal policy is bottlenecked by max v.
+In other words, in most cases, even if the agent choose to go max v, it will not affect the angle relative to the goal very much.
+Thus, the agent likes to choose max v to minimize the total time spent.
+I hypothesized that if we use increase v range, we may be able to see that the agent choosing an intermediate v instead of almost always choosing the v max.
+Right now, I am training the agents with larger v gain with w untouched.
+
+

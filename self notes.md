@@ -512,62 +512,6 @@ check how log noise surface look like.
 check if bug in representations.
 
 
-### progress
-
-### todo
-
-## 4.16
-
-###  
-
-### progress
-
-### todo
-
-## 4.17
-
-###  
-
-### progress
-
-### todo
-
-
-
-# wk 7
-
-## 4.20
-
-###  
-
-### progress
-
-### todo
-
-## 4.21
-
-###  
-
-### progress
-
-### todo
-
-## 4.22
-
-###  
-
-### progress
-
-### todo
-
-## 4.23
-
-###  
-
-### progress
-
-### todo
-
 ## 4.28
 
 ### morning meeting
@@ -600,8 +544,6 @@ anaysis ways, remove some compoment and see regression. part of casual relations
 regression agaisnt b, show if p doesnt help.
 regression again p, b will help.
 
-### progress
 
-### todo
 
 

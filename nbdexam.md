@@ -193,18 +193,63 @@ the protein affect both the transport and metabolism process of the ab in brain,
 
 ## q12
 
+anatomy, the drug will likely reduce the abnormal vescularization on retina, less aggergate of lipid and choroid on retina, less neuron death, less synatic loss.
 
+retinal function, with the drug, the rgc will likely to stay normal can carry out the normal functions.
+
+vision, the drug will likely to stablelize or slow down the progress of vision loss, but it will unlikely to retore the lost vision.
+
+introcular pressure, the drug will likely to reduce the introcular pressure, as it reduce the fragile vessels vurst, and the rgc metabolism is improved.
+
+the local administration would be more efficient than oral.
+if the drug is small lipid that is tranmitable through the sclera and chroid layer in the eye, it would be benefitial to use eye drops.
+if the drug is not penetrable through the layers, such a protein or large molecule, it should be taken orally.
+if the drug has side effect like causing irratations, it would be better to take orally as well.
 
 ## q13
+
+in case that iop is high, the neurons are under stress and the the rgc around the optic nerve are dead.
+this is seen in glaucoma.
+well the iop is not the only risk factor, it is related to degeneration of rgc.
+
+to model the iop, we can use injection of mixed solution of microbeads, inject the vscoelastic to push beads into the anterior chamber angle and keep beads in the eye.
+with the iop model, we can add drops of the drug or put the whole model in drug solution, and testing for rgc neuron death rate.
 
 # PD
 
 ## q14
 
+the medelian i categroy.
+the snca gene mutation is discovered to be important for this type of pd.
+this is done by doing linkage analysis and gene sequencing.
+looking at the pedigre, this pd is highly penetrant.
+
+the incomplete penetrance ii.
+the gba mutation is discovered to be improtant for this type of pd, by genetic analysis.
+first, the population with pd has a higher chance to have gba mutation.
+the heterozygous gba mutation has a higher chance to have pd, but some times they have no sympotom.
+
 ## q15
 
-### a
+### a 
+
+example1. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5761666/
+
+the over production of snca is a possible cause for pd.
+study has shown that b2ar can modulate the snca transcroption through histone regulating pathway.
+thus, when give the drug b2ar antagonist, animal model has shown less snca production and norwegians population show reduce pd risk.
+
+exmaple2. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4774255/
+
+because gba gene codes for lysosomal enzyme which is related to lewy body build up.
+drugs have been invented to bind to the misfolded protein and correct the folding and restore the normal enzyme function.
+if the gba function is restored, it is likely to reduce the lewy body and relief the disease condition.
 
 ### b
 
-
+the pd has several causes, and we are not very clear about them.
+but, studies have shown that several genes are important of pd.
+for example, a patient is with gba defect and the other gene are normal.
+now, the best treatment will be use genetic theorpy to pin point the target, the gba.
+drugs such as gba carriers tht can restore the gba activites can help the patient.
+the other treatments are not like this effective, as they target the pd disease as a whole and not very specific.

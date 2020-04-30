@@ -37,7 +37,7 @@ the abnormal firing pattern will make the other neurons rebound soon after, and 
 stimulate the neurons similar as the rebound current.
 and see if this rebound current is suffcient to reproduce the seizure neuron activity.
 
-# MS
+# MS https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5450788/
 
 ## q3?
 
@@ -83,8 +83,128 @@ injury on brain causes hypoxia, potentially.
 
 ## q6
 
+the gliomas are stems cells, or stem like cells.
+they have properties such as self renewal, and could give rise to multiple cell types.
+the gliomas must have these properties.
+besides, as the gol standard states: limiting dilution of cells from a primary tumor when orthotopically transplanted results in neoplasm, that recaptiulate the heterogenetiy of the tumor orign.
+in other words, the gioma stem cell reproduce the tumor cell types.
+
+neuroshpere formation does not define gliomas, as the neurosphere not necessary meet the multiple cell types complexity.
+heterotypic transplantation does not define gliomas, as not able to recapitulate micro environment cues.
+therapy resistance does not define gliomas, as stem cell is functional definition.
+
 ## q7
 
+mordern approach uses molecular and genetic classification.
+the genomic data has shown that many muated gene are tightly correlated with the gliomas.
 
+this reduce the problem we had with histology classification of diffuse glioma, such that histologial features are poorly correlated to molecular drivers.
+
+the typical approach to classify the gliomas will be using markers.
+one problem is, the markers are just the same markers from the normal functional cells, such as sox2, oligo2.
+or, the makers are not functional defined, such as cd133.
+overexpression of cd133 does not confer stem cell identity.
+the other methods exist, such as using dyes.
+
+the current classifications is a decision tree.
+different marks are tested from the diffuse glioma, and test for other markers, and finally classify the gioma.
+
+traditional classification is subjective visual decision based on histology, not using genetic testings.
+
+# ion channel
+
+## q8
+
+### a https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5073621/
+
+kcnq3
+
+### bcde
+
+yes, we can see there is neonatal seizures, and childhood seizures in iii4, and febrile seizures iv4.
+
+yes, we see incomplete penetrance from iii2.
+this person is a carrier, but no sympotom.
+
+no, we dont see phenotypic heterogeneity.
+at least not from this data.
+
+no, we dont see genetic heterogeneity.
+
+### e
+
+genetic heterogenetiy will be yes, as the various mutations of kcnq2 produce the same phenotype.
+
+## q9 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2754324/
+
+### a
+
+de novo
+
+### b
+
+maternal
+
+### c
+
+iii, voltage sensor
+
+### d
+
+missense
+
+### a
+
+3 questions and experiments to test:
+
+1, what is the volatage response of the mutated channel?
+culture the cell with the mutation, and use patch clamp to test the physiology properties of the single channel.
+
+2, what is the this channel located?
+and from its location, what neural function is possible affected?
+use antibodies agaisnt scn2a and immunohistochemistry to stain and see the location of the channel.
+from location, we can roughly have some hypothesis of what is affected.
+
+3, what is the possible phenotype of the mutation?
+we could transfect the mutation of the human gene into wild type mice, and see these mice with mutated copy of the scn2a gene will have some defect.
+
+# AD
+
+## q10
+
+1, reduced ab, but not enough.
+there are still to many ab plaques for the neural system to have normal function.
+
+2, the treaments are targeting at the stage of the ad which is too late, and the cognitive aspect is not reversable.
+if the treatment is given in early stages, it might be more useful.
+
+3, the ab may not be the only important factor in later stages.
+the ab is very important during the development of the disease does not mean it has to be important in the later stages.
+treamtent combining reducing ab, reuce inflammation, enhance neuron protection may show a better results.
+
+## q11 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3044446/
+
+apoe4 is a important gene that causes ad.
+the normal function of the protein is a ligand in receptor mediated endocytosis of lipid and proteins.
+studies have shown that apoe4 increases the ab aggregation, as the protein is a least effective aggregation inhibitor.
+the protein affect both the transport and metabolism process of the ab in brain, and this not effective isoform increase the ab aggregation, decrease the ab clearance, and both pathway causes ad.
+
+# retina
+
+## q12
+
+
+
+## q13
+
+# PD
+
+## q14
+
+## q15
+
+### a
+
+### b
 
 

@@ -152,15 +152,19 @@ first, the speaking of language is a motor acitivity.
 the infomation relay center thalamus recieve sensory and basal ganglia input, and send to prefrontal cortex for cognition, and motor cortex for excution.
 more specificly, the important broca area, generate language by control the motor function of speech and language comprehension.
 in conclusion, the circuit is: from v1, a1, and other sensory inputs, the infomation integrated in thalamus, and project to croca area and then to motor area for speech.
-the song bird has similar circuits, with brain region analogy.
+the song bird has similar circuits, with broca region analogy hvc.
 
 serveral genes are involved in development for language.
 for example, foxp2.
 the song bird has similar gene.
 
-
-
 ## bird song, gene, circuits, activity
+
+compare the bird song to human language as a whole, the bird song lacks comphrension.
+in other words, the bird song does not include as much infomation as in our language.
+the bird song is believe to represent the state of the bird, hollistic, rather than containing logic infomation to communicate.
+
+
 
 # q5
 

@@ -55,11 +55,25 @@ the air puff cs, will goes to some brain nuclei such as the eye blink reflex cen
 besides this, it will also go to inf olive, and the inf olive project to climbing fiber and produce complex spikes in purkinje cells.
 
 before the learning, the cs and us are unpaired.
+the inf olive and hearing nuclei activate the cn, and the purkinje cell activated by inf olive inhibit the cn.
+because now the mossy fiber input and inf olive inputs are unpaired at purkinje cells, the output blink is sololy relfex from the us.
+as the cn produce a motor command spike just as the us time, the animal is not able to predice the coming us from the tone.
+also, because the cn is not predicting correctly, the prediction signal is inhibiting the inf olive at wrong time, and inf olive keeps sending error/instructive signal to purkinje cells.
 
+during learning, the cerebellum use the instructive signal from complex spikes from climbing fiber of inf olive, and modify the simple spikes from mossy fiber input from the cs, using basket cells.
+as those synapse are updated, the purkinje cell activate cn more and more preciese temporally, now the cn send kind of correct prediction signal to inf olive.
+if the prediction is correct, the inhibitory input and the us excititory input are balanced out, meaning no error/instructive signal will be sending to purkinje cell via climbing fiber to make updates.
+when the prediction misses, there will be this error signal for update.
+
+after learning, the cs and us are paired.
+now, the inf olive will fire at cs.
+the cn will send motor command to close the eye at cs, to avoid the us.
 
 # q2
 
 ## single unit recording
+
+
 
 ## lfp recording
 

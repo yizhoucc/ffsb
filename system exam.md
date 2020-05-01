@@ -73,21 +73,92 @@ the cn will send motor command to close the eye at cs, to avoid the us.
 
 ## single unit recording
 
+using single unit recording, we will have the precies knowledge about the neuron electrophysiology properties.
+using electrode, we can measure the exact voltage change vs time.
+during recording, we can also inject current and test voltage responses, we can measure capacitance and resistance on different conditions, and we can alter the solutions by changing ion concentrations.
+more importantly, we are able to focus on different part of neurons, or specific channels if we like.
+in this way, we have very good infomation about how ap is propergation, and how molecules affect the physiology properties of the neuron.
 
+in conclusion, in single neuron recording, a spikes is a spikes, and we see almost everything directly and precisely.
+if doing single neuron activities in tissue slice and multiple cells in circuits, we can know precisely how the infomation is computed.
+for exmaple, in hippocampus ca1 ca3 and dg circuits, we can record activites in each area, and see how changes in one node affact the down streams.
+
+but usually, a precise single unit recording involves a lot of fine adjustment.
+we dont have a lot of data from many cells, nor can we trace the cell through days of experiments.
 
 ## lfp recording
 
+lfp recording records the local field potentials.
+instead of focusing on single neuron, we look at the neuron populations.
+we put the electrode near the cluster of neurons of interest, rather than at the specific neuron.
+in this way, we are actually recording many neurons at the same time.
+although by doing post analysis, we can kind of projecting the features of different neurons in such a way that allow us to cluster and split the data into units, we are not sure how this unit resembles the real neuron.
+in other words, one unit could be a single neuron, it could also be several very similar neurons, or it could be a sepcific type of spikes from a single neuron.
+
+in this way, the strength of lfp recording is not recording many neurons at the same time and recover the single neuron data.
+instead, using the lfp recording, we usually use the low pass filter to remove the high frequncy spikes.
+after this step, we have the synchronized activities of the neuron population of interest, namely the slow fluctuations, comes from the sustained currents.
+
+in lfp, we can look at the phases, when looking at single unit recording spikes at the same time.
+for example, on phase firings and off phase firings may code things differently, as in place cells.
+we will know the population level information such as modulation about the circuits.
+
+lfp is also a tool to determine the attention and wakefulness.
+for example, from the lfp rythme, we can determine the slow wave sleep, rem sleep, theta rythme, etc.
+
 ## calcium imaging
+
+calcium imaging is a good way to see neuron activities as it can record thousands of neurons at the same time, and keep tracking the same neurons over time.
+
+usually, the neurons used in ca imaging are geneticly engineered to express gfp flurophore, so that they bind to the ca ions and signal the ca spikes.
+ca spikes is a good representations of the actual action potental on a slower time scale, and this is one drawback of the ca imaging.
+
+with the ca imaging, we can analysis the data of many neurons and check their corelations of each other.
+in this way, we determine their functional connectivities instead of physical connectivities.
+for example, we can see neuron 1 always fire at the same times at neuron 2, but due to the slow frame rate of the ca imaging, we cannot say for sure that neuron 1 and 2 are physically connected, but they are functionally connected.
+
+in some cases, we can zoom in and see directly how neurons are connected.
+we can see the ap through the axons, and goes to another connected neuron.
+
+other than that, because we have the spatial informations of the neurons, we can also see how neurons organize in circuits.
+for exmaple, we see in v1 cortex, the neurons are in such an arrangement that nearby neurons responde to similar angle of visual input.
 
 # q3
 
-## what is flexor extensor reflex
+## what is flexor extensor reflex https://nba.uth.tmc.edu/neuroscience/m/s3/chapter02.html
+
+flexor extensor reflex is combining the flexor reflex on one side of the body to retract foot when hitting something painful, with the cross extensor reflex to keep the balance and not fall down.
+
+in the flexor reflex, the pain receptor at foot, let say left foot, goes to the dorsol root ganglion at left side of spinal cord.
+then to the motor neurons in ventral horn, which in turn signal teh muscles to get left foot move away from the hazard stimuli.
+
+in the extensor reflex, the sensory neuron from left dorsal root ganglion also project to the motor neurons at right ventral horn, by crossing the midline of the spinal cord.
+these motor neurons signal the muscles in the right leg to maintain balance.
 
 ## what region producing the command and how comman modifys
+
+the brain descending command can modulate the strength of the reflex.
+for example, regarding the flexor reflex, if i need to hold the hot dish and move it to table, the brain motor cortex inhibit the reflex by the corticospinal tract.
+as a result, the gain and the threshold of the reflex is decreased, and one can force himself to hold the hot dish for longer.
+another example regarding the flexor extensor reflex, if my left foot recieve the harzard stimuli, but my right foot is in such a position that i cannot put my mess centor on right foot to keep balance.
+now, i have to force my left foot to stay with the harzard stimuli for a little bit longer, to allow some time for right foot to adjust to a stable location to keep balance and safe.
 
 # q4
 
 ## human language, gene, circuits, patterns of neural activity
+
+human language processing involves complex circuits.
+first, the speaking of language is a motor acitivity.
+the infomation relay center thalamus recieve sensory and basal ganglia input, and send to prefrontal cortex for cognition, and motor cortex for excution.
+more specificly, the important broca area, generate language by control the motor function of speech and language comprehension.
+in conclusion, the circuit is: from v1, a1, and other sensory inputs, the infomation integrated in thalamus, and project to croca area and then to motor area for speech.
+the song bird has similar circuits, with brain region analogy.
+
+serveral genes are involved in development for language.
+for example, foxp2.
+the song bird has similar gene.
+
+
 
 ## bird song, gene, circuits, activity
 

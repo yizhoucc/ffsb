@@ -1,4 +1,5 @@
-# q1 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6208864/
+# q1 
+<!-- https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6208864/ -->
 
 ## anatomy of the cerebellum circuit 
 
@@ -37,7 +38,8 @@ another learning pathway is the ltd at parallel fiber to purkinje cell connactio
 when the parallel fiber and climbing fiber activated at the same time, ltd happens.
 it is though to be a correcting adjustment, from error signal from complex spikes, and the later simple spikes are althered to correct the behavior/ to learn the behavior.
 
-## difference between complex spikes and simple spikes https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2887989/
+## difference between complex spikes and simple spikes 
+<!-- https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2887989/ -->
 
 the simple spikes are mostly due to mossy fiber input and intrinsic activities.
 while the complex spikes are from climbing fibers.
@@ -125,7 +127,8 @@ for exmaple, we see in v1 cortex, the neurons are in such an arrangement that ne
 
 # q3
 
-## what is flexor extensor reflex https://nba.uth.tmc.edu/neuroscience/m/s3/chapter02.html
+## what is flexor extensor reflex 
+<!-- https://nba.uth.tmc.edu/neuroscience/m/s3/chapter02.html -->
 
 flexor extensor reflex is combining the flexor reflex on one side of the body to retract foot when hitting something painful, with the cross extensor reflex to keep the balance and not fall down.
 
@@ -163,11 +166,59 @@ the song bird has similar gene.
 compare the bird song to human language as a whole, the bird song lacks comphrension.
 in other words, the bird song does not include as much infomation as in our language.
 the bird song is believe to represent the state of the bird, hollistic, rather than containing logic infomation to communicate.
+also, human language has multiple forms of representation, like letters, speech, touch.
+the human language also containing grammer.
 
+difference in bird circuits:
 
+the bird learn the song from tutuor, usually his father.
+here, the tutor song is heard by coclear and transmitt to some processing nucleus.
+then, in primary a1, the information is projected to nif, then to hvc, the broca area analogy.
+the hvc project to basal ganlia circuits for rehearsal and learning, and song is produced by hvc via some motor nuclus.
+
+neural activities?
+im not sure about this. do you mean the neural activity pattern that is coorespoding to the circuit design?
+or the neural activity pattern relationship with the actual language and song?
 
 # q5
 
-## affect brain region of pd
+## affect brain region of pd 
+
+in pd, several brain region is affected.
+including the basal ganglia region, which is responsible for activate/inhibit motor circuits.
+
+<!-- https://www.sciencedirect.com/science/article/pii/S0896627319302119 -->
+
+in a normal no pd condition, the substantia nigra signals the striatum and activate direct pathway while inhibit the indirect pathway.
+the globus pallidus is then inhibited by these effect.
+because the globus pallidus has inhibitory connection to thalamus and cortex, if the globus pallidus is inhibited, the total effect is promoting the movement.
+in conclusion, the whole system provides an action selection process.
+the wanted action is encouraged, and the unwanted action is suppressed.
+
+in a pd patient, becaues the degeneration of the substantia nigra dopamine neurons, the total effect is a inhibition on thalamus and cortex, resulting in suppression the movement.
+the brain loss the dopamine signal to fine control the motor activity, and lost motivation to move.
 
 ## how a prosthetic can work for pd
+
+in pd, the motor cortex does not generate enough spikes as in normal condition.
+so, standard prosthetic that rely on decoding the motor cortex will not work.
+
+a direct way would be mimicing the dopamine's effect by stimulation the direct pathway and inhibit the indirect pathway by electrodes.
+this is similar as giving the l dopa to the patients, where the l dopa is turned into dopamine in the brain and to some extend the motor function is restored.
+
+a another way would be trying to decode the action intention while use the standard prothetic arms.
+studies have shown that the premotor cortex and parietal cortex which are encoding the movement intention, are lessly affacted.
+some other studies showed that the premotor cortex are overly activated than normal.
+from a sufficient infomation perspective, decoding from an information rich source with noise is always better than decoding from source that does not contain enough information.
+from a neural science perspective, the motor cortex encodes relativaly direct movement commands while the premotor areas contains more of the prepatory activites, and intention.
+in this way, even though the premotor cortex is kind of overly activated in pd patients, we could use this movement intention to decode actions, and construct the prothetics.
+some filters might be needed to remove the overly activated part of the premotor cortex signals.
+here, it is like we use a jump wire to short cut the basal ganglia action selective process.
+instead of rely on the basla ganglia, we have to implant something else to select the wanted action and suppress the unwanted action.
+as the action selection model discussed in class, the unwanted action is a guassian distribution around the actual wanted action.
+if so, or if the unwanted action has some parameterized distribution, such as tremor, we can easily extract the actual wanted action from the premotor cortex decoding.
+thus, we can achieve a potential prosthetics by decoding at premotor areas for pd patients.
+
+side notes:
+in my perspective, the overly activated part of premotor cortex activity might due to brain adjustment for a not responding motor cortex.
+if so, the premotor cortex actually contain stronger signal for movement intention, and provide better decoding potentially, and no filter is needed.

@@ -11,31 +11,55 @@ signal pathways
 transcription factors
 ligases
 
-### b?
+### b
 
-by giving the drug that bind to GABA receptor, the seizure is controled.
+studies have shown that the scn1a mutation has a very abnormal spike pattern at early on developmental stages, but other studies showed that during later developmental stages, the animal become normal.
+so, this is only happened in a transiet devlopmental window.
+this suggests that other voltage gated na channels in pvins are up regulated.
+this may compensate the loss of the scn1a.
+this upregulation is most likely done by post translatoinal regulation because the rna expression is similar.
+
 
 ### c
 
 the scn1a gene is coding for sodium channel that critical to ap propagation in some interneurons.
-if the patient has abnormal functional scn1a, we should not give durgs that acting on ca channels ro ampa receptors as they will have no effect.
+the mutation will make the channel non functional, and make the overall na conductance less.
+if the patient has abnormal functional scn1a, we should not give durgs that are sodium channel blockers, such as anticonvulsant drugs carbamzepine, as they will produce the opposite outcomes that we would like to see.
 
 ### d
 
 could use aav to insert the correct copy of the scn1a gene selectively to the inhibitory interneourns that need functional scn1a copy.
+besides, if possible, we could also target at suppressing the unfunctional scn1a copy at the same time.
+
+similarly, i think if we could use aav to insert the other compensatory na channels, so that the pvins restores the normal spiking activites.
 
 ## q2
 
 ### a
 
-because of the mutation in this ca channel, less ca is entering the cell and there's less ampa.
-this causes less synaptic transmission and an abnormal early firing patterns.
-the abnormal firing pattern will make the other neurons rebound soon after, and casuing seizures.
+in one word, excitation/inhibition balance is broken and causes the seizure.
+less inhibition on excitory neurons will make the excitation inhibition balance towards the excitation, and causing seizure.
+
+assume this neuron is connecting to an inhibitory neuron.
+because of the mutation in this ca channel, less ca is entering the cell and there are less extocytosis of glutamate.
+this causes less synaptic transmission, and the post synaptic inhibitory neurons are less activated.
+the less activated inhibitory neurons causes brain excitation inhibition balance shift towards the excitation, and casuing seizures.
 
 ### b
 
-stimulate the neurons similar as the rebound current.
-and see if this rebound current is suffcient to reproduce the seizure neuron activity.
+the first test will be immunohistology staining to see if the channels are mostly in neurons with postsynaptic inhibitory neurons.
+by taking brain slices and stain for the mutated channel and inhibitory neuron markers, we can see where the channel located and if they are colocalized with post synaptic inhibitory neurons.
+if colocalized, we can say that the hypothesis is likely to be correct.
+
+next, we should check if excite the inhibitory neurons recover the seizure, to prove the mutation is causing seizure by less activated inhibitory neurons.
+we could target those inhibitory neurons that are post synaptic to the neurons with the mutated ca channels, and give drug that target on those neurons to excite them.
+this can be done by over express the glutamate receptors to those post synaptic inhibitory neurons.
+now, even with less glutamate release from the ca channel affacted presynaptic neurons, those post synaptic inhibitory neurons will be able to show similar output like the normal wild type animal.
+if now the animal does not have seizures, we could say that the hypothesis is correct.
+
+we could do this in brain slices.
+we could target the neurons with mutated p/q ca channels, and stimulate the neuron while recording at the post synaptic neuron and post post synaptic neuron.
+we should be able to see that the down stream neurons with increased level of activity, as the inhibition is removed.
 
 # MS https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5450788/
 

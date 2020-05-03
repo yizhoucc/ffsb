@@ -81,6 +81,18 @@ with less misfunctional immune cells, less mylein is attacted and the process is
 pro, the treatment can slow down the progress of the ms
 con, the treatment does not restore the normal neuronal activity, as it only slow down the progess.
 
+#### new answer from slides
+
+the ms has a major effect on neural system by demyelination.
+the demyeliation increases the capacitance and increase conductance in the axons.
+and once the axon is demyelinated, there is no node or ranvier.
+normally, the na and k channels are clustered around the node of ranvier and propergate ap to next node.
+during the way of myelinated axon with no nodes, the ap is propergated as current and slowly decrease in amplitude because of the leak of the current.
+the decreased conductuance of myelin sheath help to preserve the ap and save energy.
+
+to solve this problem, we can target at stopping the misfunction immune system to attach the myeline in neural system.
+by extract stem cells and replace the misfunctional immune sytem cells, the new stem cell derived immune cells are not attacking the myeline and stop the progression of the disease.
+
 # TBI
 
 ## q4

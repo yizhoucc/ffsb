@@ -130,6 +130,8 @@ for exmaple, we see in v1 cortex, the neurons are in such an arrangement that ne
 ## what is flexor extensor reflex 
 <!-- https://nba.uth.tmc.edu/neuroscience/m/s3/chapter02.html -->
 
+### for the second part, explain what is happening at the circuit level. What is happening with excitation or inhibition to modify the reflex? What do you think the descending commands are actually doing, specifically what are they doing to the reflex?
+
 flexor extensor reflex is combining the flexor reflex on one side of the body to retract foot when hitting something painful, with the cross extensor reflex to keep the balance and not fall down.
 
 in the flexor reflex, the pain receptor at foot, let say left foot, goes to the dorsol root ganglion at left side of spinal cord.
@@ -147,6 +149,16 @@ another example regarding the flexor extensor reflex, if my left foot recieve th
 now, i have to force my left foot to stay with the harzard stimuli for a little bit longer, to allow some time for right foot to adjust to a stable location to keep balance and safe.
 
 # q4
+
+### you should say what type of gene Foxp2 is. 
+### Also, where is it expressed? what happens when the gene is knocked out (in model systems) or mutated (in human)?
+### And for the differences, I am trying to get you to be creative to think about how "communication" is processed. 
+### need to say how signals are processed in two circuits
+### The key is to explain HOW a difference could arise, and this could occur at many level, even just anatomy. 
+It might be that homologous regions in bird and human, for example ones that express Foxp2, 
+are simply different in anatomy and connectivity such that in birds the circuit is well connected to motor commands and teaching signals 
+where in human the foxp2-expressing circuit links "higher-order" regions, 
+but with motor circuits for language connected at a lower or accessory level. 
 
 ## human language, gene, circuits, patterns of neural activity
 

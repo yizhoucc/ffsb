@@ -19,8 +19,8 @@ torch_model_relu.name='relu'
 from Config import Config
 from FireflyEnv import ffenv
 arg=Config()
-arg.std_range=[0.0001,0.001,0.0001,0.001]
-arg.gains_range=[4.,5.,0.99,1.]
+# arg.std_range=[0.0001,0.001,0.0001,0.001]
+# arg.gains_range=[4.,5.,0.99,1.]
 env=ffenv.FireflyEnv(arg)
 
 def get_beliefs(number_trials):

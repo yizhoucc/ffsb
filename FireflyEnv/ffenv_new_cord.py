@@ -2,12 +2,16 @@ import gym
 from numpy import pi
 import numpy as np
 from gym import spaces
-# from gym.utils import seeding
 from FireflyEnv.plotter_gym import Render
-# from FireflyEnv.firefly_task import Model
+from DDPGv2Agent.rewards import *
 import InverseFuncs
 from .env_utils import *
 from DDPGv2Agent.rewards import * #reward
+
+# change log
+# obs space is inf
+# representation
+
 
 
 class FireflyEnv(gym.Env, torch.nn.Module): 
@@ -32,12 +36,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
     def setup(self,arg,reward_function=return_reward,pro_gains = None, pro_noise_stds = None, obs_gains = None, obs_noise_stds = None):
         '''apply the arg and re init'''
-        self.dt = arg. DELTA_T
-        self.action_dim = arg.ACTION_DIM
-        self.state_dim = arg.STATE_DIM
-        self.episode_len = arg.EPISODE_LEN
-        self.episode_time = arg.EPISODE_LEN * self.dt
-        self.box = arg.WORLD_SIZE #initial value
+        self.box = arg.WORLD_SIZE # 1.0 here.
         self.max_goal_radius = arg.goal_radius_range[0]
         self.GOAL_RADIUS_STEP = arg.GOAL_RADIUS_STEP_SIZE
         self.phi=None
@@ -50,25 +49,14 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.episode_time = arg.EPISODE_LEN * self.dt
         self.action_dim = arg.ACTION_DIM
         self.state_dim = arg.STATE_DIM
-        self.rendering = Render()
         self.goal_radius_range = arg.goal_radius_range
         self.gains_range = arg.gains_range
         self.std_range=arg.std_range
         self.REWARD=arg.REWARD
-        low = np.concatenate(([0., -pi, -1., -1., 0.], -10*np.ones(15),
-            [self.gains_range[0],self.gains_range[0],self.std_range[0],self.std_range[0],
-            self.gains_range[2],self.gains_range[2],self.std_range[2],self.std_range[2],self.goal_radius_range[0]])).reshape(1,29)
-        high = np.concatenate(([10., pi, 1., 1., 10.], 10*np.ones(15),
-            [self.gains_range[1],self.gains_range[1],self.std_range[3],self.std_range[3],
-            self.gains_range[3],self.gains_range[3],self.std_range[3],self.std_range[3],self.goal_radius_range[1]])).reshape(1,29)
-        # low = np.concatenate(([0., -pi, 0., -pi, 0.], -10*np.ones(15),
-        #     [0.,0.,0.,0.,
-        #     0.,0.,0.,0.,0.])).reshape(1,29)
-        # high = np.concatenate(([10., pi, 1., pi, 10.], 10*np.ones(15),
-        #     [10.,10.,10.,10.,
-        #     10.,10.,10.,10.,10.])).reshape(1,29)
+        low = -np.inf
+        high = np.inf
         self.action_space = spaces.Box(-np.ones(2), np.ones(2), dtype=np.float32)
-        self.observation_space = spaces.Box(low=low, high=high,dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high,shape=(1,29),dtype=np.float32)
         self.pro_gains=pro_gains
         self.pro_noise_stds=pro_noise_stds
         self.obs_gains=obs_gains
@@ -77,7 +65,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.stop=False
         self.reset_theta=True
         self.return_reward=reward_function
-        self.belief_temp=None
+        self.goalx=0.
+        self.goaly=0.
         # reset
         self.reset()
 
@@ -93,9 +82,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         finally, return state
         '''
-        if self.belief_temp is not None:
-            self.belief=self.belief_temp
-            return self.belief
+
         
         # init world state
         # input; gains_range, noise_range, goal_radius_range
@@ -135,17 +122,16 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         self.time = torch.zeros(1)
         self.stop=False 
-        min_r = self.goal_radius.item()+self.box/10
-        r = torch.zeros(1).uniform_(min_r, self.box)  # GOAL_RADIUS, self.box is world size
-        loc_ang = torch.zeros(1).uniform_(-pi, pi) # location angel: to determine initial location
-        px = r * torch.cos(loc_ang)
-        py = r * torch.sin(loc_ang)
-        rel_ang = torch.zeros(1).uniform_(-pi/4, pi/4)
-        ang = rel_ang + loc_ang + pi # heading angle of monkey, pi is added in order to make the monkey toward firefly
-        ang = range_angle(ang)
+        min_r = self.goal_radius.item()+self.box/10 # min d to the goal.
+        r = torch.zeros(1).uniform_(min_r, self.box) # max d to the goal is world boundary.
+        ang = torch.zeros(1).uniform_(-pi/4, pi/4)
+        self.goalx = r * torch.cos(ang)
+        self.goaly = r * torch.sin(ang)
+        # ang = range_angle(ang)
         vel = torch.zeros(1)
         ang_vel = torch.zeros(1)
-        self.x = torch.cat([px, py, ang, vel, ang_vel]) # this is state x at t0
+        heading=torch.zeros(1)
+        self.x = torch.cat([torch.zeros(1), torch.zeros(1), heading, vel, ang_vel]) # this is state x at t0
         if position is not None:
             self.x = torch.cat([position[0]*torch.ones(1),position[1]*torch.ones(1), torch.zeros(1), vel, ang_vel])
         self.o=torch.zeros(2) # this is observation o at t0
@@ -177,8 +163,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         2. belief update by action and states with noise, by kalman filter
         
         '''
-        # clamp the action
-        action[0]=max(action[0],0)
+        # # clamp the action
+        # action[0]=max(action[0],0)
         # x t+1
         # true next state, xy position, reach target or not(have not decide if stop or not).
         next_x = self.x_step(self.x, action, self.dt, self.box, self.pro_gains, self.pro_noise_stds)
@@ -195,27 +181,23 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         self.belief = self.Breshape(b=self.b, time=self.time, theta=self.theta)  # state used in policy is different from belief
 
         # reward
-        pos = next_x.view(-1)[:2]
+        pos = torch.tensor([self.goalx,self.goaly])-next_x.view(-1)[:2]
+        reward_belief=self.b[0].clone()
+        reward_belief[:2]=pos
+        reward_belief=(reward_belief,self.b[1])
         reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         episode=1 # sb has its own countings. will discard this later
         finetuning=0 # not doing finetuning
-        reward = self.return_reward(info['stop'], reached_target, self.b, self.goal_radius, self.REWARD, finetuning)
+        reward = self.return_reward(info['stop'], reached_target, reward_belief, self.goal_radius, self.REWARD, finetuning)
 
         # orignal return names
         self.time=self.time+1
         self.stop= info['stop'] or self.time>self.episode_len
-        if self.stop:
-            self.belief_temp=self.reset()
-            return self.belief_temp, reward, self.stop, info
+        # if self.stop:
+        #     self.belief=self.reset()
         return self.belief, reward, self.stop, info
 
-    def Brender(self, b, x, WORLD_SIZE=1.0, GOAL_RADIUS=0.2): # wrapper of belief and real state render
-        bx, P = b
-        goal = torch.zeros(2)
-        self.rendering.render(goal, bx.view(1,-1), P, x.view(1,-1), WORLD_SIZE, GOAL_RADIUS)
 
-    def render(self, mode='human'):
-        self.rendering.render(mode)
 
     def get_position(self, x): # extract xy, r as distance
         '''
@@ -231,23 +213,23 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         questions, progain and pronoise is applied even when calculating the new x. is it corret?
         '''
         # dynamics, return new position updated in format of x tuple 
-        px, py, ang, vel, ang_vel = torch.split(x.view(-1), 1)
+        px, py, heading, vel, ang_vel = torch.split(x.view(-1), 1)
 
         a_v = a[0]  # action for velocity
         a_w = a[1]  # action for angular velocity
 
         w=torch.distributions.Normal(0,self.pro_noise_stds).sample()
         
-        vel = 0.0 * vel + pro_gains[0] * a_v + w[0] # discard prev velocity and new v=gain*new v+noise
+        vel = 0.0 * vel + pro_gains[0] * a_v + w[0] 
         ang_vel = 0.0 * ang_vel + pro_gains[1] * a_w + w[1]
-        ang = ang + ang_vel * dt
-        ang = range_angle(ang) # adjusts the range of angle from -pi to pi
+        heading = heading + ang_vel * dt
+        heading = range_angle(heading) # adjusts the range of angle from -pi to pi
 
-        px = px + vel * torch.cos(ang) * dt # new position x and y
-        py = py + vel * torch.sin(ang) * dt
+        px = px + vel * torch.cos(heading) * dt # new position x and y
+        py = py + vel * torch.sin(heading) * dt
         px = torch.clamp(px, -box, box) # restrict location inside arena, to the edge
         py = torch.clamp(py, -box, box)
-        next_x = torch.stack((px, py, ang, vel, ang_vel))
+        next_x = torch.stack((px, py, heading, vel, ang_vel))
 
         return next_x.view(1,-1)
 
@@ -295,7 +277,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         b = bx.view(-1), P  # belief
 
         # terminal check
-        terminal = self._isTerminal(bx, a) # check the monkey stops or not
+        terminal = self._isTerminal(a) # check the monkey stops or not
         return b, {'stop': terminal} # the dict is info. will be changed in next version to put stop and reach target together.
 
     def Breshape(self, **kwargs): # reshape the belief, ready for policy
@@ -320,9 +302,9 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         
         x, P = b # unpack the belief
-        px, py, ang, vel, ang_vel = torch.split(x.view(-1), 1) # unpack state x
-        r = torch.norm(torch.cat([px, py])).view(-1) # what is r? relative distance to firefly
-        rel_ang = ang - torch.atan2(-py, -px).view(-1) # relative angle from goal to agent.
+        px, py, heading, vel, ang_vel = torch.split(x.view(-1), 1) # unpack state x
+        r = torch.norm(torch.cat([self.goalx-px, self.goaly-py])).view(-1) 
+        rel_ang = heading - torch.atan2(self.goaly-py, self.goalx-px).view(-1) # relative angle from goal to agent.
         rel_ang = range_angle(rel_ang) # resize relative angel into -pi pi range.
         vecL = vectorLowerCholesky(P) # take the lower triangle of P
         state = torch.cat([r, rel_ang, vel, ang_vel, time, vecL, pro_gains.view(-1), pro_noise_stds.view(-1), obs_gains.view(-1), obs_noise_stds.view(-1), torch.ones(1)*goal_radius]) # original
@@ -375,7 +357,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         ox = torch.stack((ovel, oang_vel)) # observed x
         return ox
     
-    def _isTerminal(self, x, a, log=True): # if 
+    def _isTerminal(self, a): # if 
         terminal_vel = self.terminal_vel
         stop = (torch.norm(torch.tensor(a, dtype=torch.float64)) <= terminal_vel)
         if stop:

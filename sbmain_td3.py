@@ -10,7 +10,7 @@ import torch
 from ff_policy.policy_selu import SoftPolicy
 import tensorflow as tf
 from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
-action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
+action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(2), sigma=float(0.3) * np.ones(2))
 env=ffenv.FireflyEnv(arg)
 
 model = TD3(LnMlpPolicy,
@@ -24,14 +24,15 @@ model = TD3(LnMlpPolicy,
             # learning_starts =1000,
             # target_policy_noise=0.3,
             # target_noise_clip =0.1,
-            policy_kwargs={'act_fun':tf.nn.selu,'layers':[256,256,64,32]})
+            # policy_kwargs={'act_fun':tf.nn.selu,'layers':[256,256,64,32]}
+            )
 train_time=300000
 
 
 model.learn(total_timesteps=train_time)
 # model.learn(total_timesteps=1000000)
 
-model.save("TD3_selu_{}".format(train_time))
+model.save("TD3_{}".format(train_time))
 
 
 

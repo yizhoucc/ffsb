@@ -9,6 +9,7 @@ arg=Config()
 import numpy as np
 import time
 import torch
+from DDPGv2Agent.rewards import *
 # # check env
 # from stable_baselines.common.env_checker import check_env
 # # env=gym.make('FF-v0')
@@ -40,14 +41,17 @@ import torch
 # n = np.random.randn(2)
 # noise=mu+std*n
 from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
-action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
+action_noise = NormalActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
+
+arg.std_range = [1e-2, 0.1, 1e-2, 0.1]# [vel min, vel max, ang min, ang max]
+
 env=ffenv.FireflyEnv(arg)
 # model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./",action_noise=action_noise)
 model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb/",action_noise=action_noise,
 
             gamma=0.99, memory_policy=None, eval_env=None, nb_train_steps=50,
             nb_rollout_steps=100, nb_eval_steps=100, param_noise=None, normalize_observations=False, 
-            tau=0.001, batch_size=128, param_noise_adaption_interval=50,
+            tau=0.001, batch_size=256, param_noise_adaption_interval=50,
             normalize_returns=False, enable_popart=False, observation_range=(-5., 5.), critic_l2_reg=0.,
             return_range=(-np.inf, np.inf), actor_lr=1e-4, critic_lr=1e-3, clip_norm=None, reward_scale=1.,
             render=False, render_eval=False, memory_limit=None, buffer_size=50000, random_exploration=0.0,
@@ -58,8 +62,14 @@ model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb/",action_noise
 # env.assign_presist_phi(torch.tensor([1.,2.,3.,2.,1.,2.,3.,1.,1.]))
 # env.reset()
 # # start=time.time()
-print(env.theta)
+# print(env.theta)
+model.learn(total_timesteps=100000)
+env_skip=ffenv.FireflyEnv(arg,kwargs={'let_skip':True})
+model.set_env(env_skip)
 model.learn(total_timesteps=1000000)
+model.save("DDPG_relu_2step_skip{}_ {} {}".format(
+    str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
+    ))
 # (tensor([0.9873, 0.7121]), tensor([1.7995, 0.3651]), tensor([0.8017, 0.9060]), tensor([1.8397, 1.9815]), tensor([0.2000]))
 # 200 0000000
 # print('training',time.time()-start)

@@ -15,31 +15,45 @@ import numpy as np
 from FireflyEnv.env_utils import is_pos_def
 import torch
 
-def return_reward(agent_stops, reached_target, b, goal_radius, REWARD,time=0, episode=0,finetuning = 0):
-    if agent_stops:  # receive reward if monkey stops. position does not matters
-        if finetuning == 0:
-            reward = get_reward(b, goal_radius, REWARD,time)
-            if reached_target == 1:
-                pass
-                # print("Ep {}: Good Job!!, reward= {:0.3f}".format(episode, reward[-1]))
-            else:
-                pass #print("reward= %.3f" % reward.view(-1)) #pass
-        elif finetuning == 1 and reached_target == 1:
-            reward = REWARD * torch.ones(1)
-            print("Ep {}: Good Job!!, FIXED reward= {:0.3f}".format(episode, reward[-1]))
-        else:  # finetuning == 1 and reached_target == 0
-            reward = -0 * torch.ones(1)
+def discrete_reward(stop, reached_target, belief, goal_radius, REWARD, finetuning=0):
+    if stop and reached_target:
+        return REWARD
+    elif stop and not reached_target:
+        return REWARD*0.1
     else:
-        reward = -0 * torch.ones(1)
+        return 0.
+
+def return_reward(agent_stops, reached_target, b, goal_radius, REWARD,time=0, episode=0,finetuning = 0):
+    reward = get_reward(b, goal_radius, REWARD,time)
+    if agent_stops:
+        if reached_target:
+            pass  
+        else:
+            reward=0.5* torch.ones(1)
+        # receive reward if monkey stops. position does not matters
+        # if finetuning == 0:
+        #     reward = get_reward(b, goal_radius, REWARD,time)
+        #     # if reached_target == 1:
+        #     #     # print("Ep {}: Good Job!!, reward= {:0.3f}".format(episode, reward[-1]))
+        #     # else:
+        #     #     pass #print("reward= %.3f" % reward.view(-1)) #pass
+        # # elif finetuning == 1 and reached_target == 1:
+        # #     reward = REWARD * torch.ones(1)
+        # #     print("Ep {}: Good Job!!, FIXED reward= {:0.3f}".format(episode, reward[-1]))
+        # else:  # finetuning == 1 and reached_target == 0
+        #     reward = -0 * torch.ones(1)
+    else:
+        reward=reward*0.1
+        # reward = -0 * torch.ones(1)
     return reward
 
 
 def get_reward(b, goal_radus, REWARD,time):
     bx, P = b
     rew_std = goal_radus / 2  # std of reward function --> 2*std (=goal radius) = reward distribution
-
     #rew_std = goal_radus/2/2 #std of reward function --> 2*std (=goal radius) = reward distribution
-    reward = rewardFunc(rew_std, bx.view(-1), P, REWARD)*0.96**time  # reward currently only depends on belief not action
+    # reward = rewardFunc(rew_std, bx.view(-1), P, REWARD)*0.96**time  # reward currently only depends on belief not action
+    reward = rewardFunc(rew_std, bx.view(-1), P, REWARD)
     return reward
 
 def return_reward_LQC_test(agent_stops, reached_target, b, goal_radius, REWARD,time=0, episode=0,finetuning = 0):

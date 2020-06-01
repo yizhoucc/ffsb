@@ -165,37 +165,31 @@ class FireflyEnv(gym.Env, torch.nn.Module):
     def belief_step(self,  b, o, a, box):
 
         I = torch.eye(4)
-        # Q matrix, process noise for tranform xt to xt+1. only applied to v and w
         Q = torch.zeros(4, 4)
         Q[-2:, -2:] = torch.diag(self.pro_noise_stds**2) # variance of vel, ang_vel
-        
-        # R matrix, observe noise for observation
         R = torch.diag(self.obs_noise_stds** 2)
-
-        # H matrix, transform x into observe space. only applied to v and w.
         H = torch.zeros(2, 4)
         H[:, -2:] = torch.diag(self.obs_gains)
 
-        # Extended Kalman Filter
         pre_bx_, P = b
         bx_ = self.x_step(pre_bx_, a, self.dt, box, self.pro_gains, self.pro_noise_stds) # estimate xt+1 from xt and at
-        bx_ = bx_.t() # make a column vector
-        A = self.A(bx_) # calculate the A matrix, to apply on covariance matrix 
-        P_ = A.mm(P).mm(A.t())+Q # estimate Pt+1 = APA^T+Q, 
+        bx_ = bx_.t() 
+        A = self.A(bx_)
+        P_ = A@(P)@(A.t())+Q 
         if not is_pos_def(P_): # should be positive definate. if not, show debug. 
             # if noise go to 0, happens.
             print("P_:", P_)
             print("P:", P)
             print("A:", A)
-            APA = A.mm(P).mm(A.t())
+            APA = A@(P)@(A.t())
             print("APA:", APA)
             print("APA +:", is_pos_def(APA))
-        error = o - self.observations(bx_) # error as z-hx, the xt+1 is estimated
-        S = H.mm(P_).mm(H.t()) + R # S = HPH^T+R. the covarance of observation of xt->xt+1 transition 
-        K = P_.mm(H.t()).mm(torch.inverse(S)) # K = PHS^-1, kalman gain. has a H in front but canceled out
+        error = o - H@(bx_) # error as z-hx, the xt+1 is estimated
+        S = H@(P_)@(H.t()) + R # S = HPH^T+R. the covarance of observation of xt->xt+1 transition 
+        K = P_@(H.t())@(torch.inverse(S)) # K = PHS^-1, kalman gain. has a H in front but canceled out
         bx = bx_ + K.matmul(error) # update xt+1 from the estimated xt+1 using new observation zt
-        I_KH = I - K.mm(H)
-        P = I_KH.mm(P_)# update covarance of xt+1 from the estimated xt+1 using new observation zt noise R
+        I_KH = I - K@(H)
+        P = I_KH@(P_)# update covarance of xt+1 from the estimated xt+1 using new observation zt noise R
 
         if not is_pos_def(P): 
             print("here")

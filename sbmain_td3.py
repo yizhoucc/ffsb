@@ -13,11 +13,11 @@ import tensorflow as tf
 from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 from DDPGv2Agent.rewards import *
 
-arg.std_range = [0.00025,0.00025*5,pi/4000,pi/4000*5]# [vel min, vel max, ang min, ang max]
-arg.gains_range=[0.025,0.1,pi/40,pi/10]
+arg.std_range = [0.0025,0.0025*5,pi/4000,pi/4000*5]# [vel min, vel max, ang min, ang max]
+arg.gains_range=[0.25,1.,pi/4,pi/1]
 arg.DELTA_T = 0.1
-arg.EPISODE_TIME = 4
-arg.EPISODE_LEN=40
+arg.EPISODE_TIME = 3
+arg.EPISODE_LEN=30
 arg.goal_radius_range=[0.05,0.2]
 
 
@@ -45,11 +45,11 @@ model = TD3(MlpPolicy,
             learning_starts=10000, 
             gradient_steps=200, 
             random_exploration=0., 
-            gamma=0.915, 
+            gamma=0.95, 
 
             tau=0.005, 
-            target_policy_noise=0.2, 
-            target_noise_clip=0.5,
+            target_policy_noise=0.05, 
+            target_noise_clip=0.05,
             _init_setup_model=True, 
             full_tensorboard_log=False, 
             seed=None, 

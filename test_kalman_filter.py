@@ -130,8 +130,8 @@ state=np.asarray([0,0,0,0,0])
 action=np.asarray([1,1])
 #     # go forward, not turning
 task=Test(state,
-    process_noise=np.asarray([10.,10.]),
-    observation_noise=np.asarray([15.,15.]))
+    process_noise=np.asarray([100.,100.]),
+    observation_noise=np.asarray([150.,150.]))
 
 #     x=[]
 #     y=[]

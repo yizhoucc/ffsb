@@ -194,7 +194,8 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         pos = next_x.view(-1)[:2]
         reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         episode=1 # sb has its own countings. will discard this later
-        reward = return_reward(info['stop'], reached_target, self.b, self.goal_radius, self.REWARD)
+        reward = return_reward(0,info['stop'], reached_target, 
+            self.b, self.goal_radius, self.REWARD)
         reward=reward.numpy()
         # orignal return names
         self.time=self.time+1
@@ -207,7 +208,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
             self.belief_temp=self.reset()
             return self.belief_temp, reward, self.stop, info
 
-        return self.belief, reward, self.stop, info
+        return self.belief, reward, self.stop.item(), info
 
 
     def get_position(self, x): # extract xy, r as distance

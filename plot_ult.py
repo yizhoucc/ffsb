@@ -66,3 +66,22 @@ def policy_surface(belief,torch_model):
     plt.imshow(policy_data_w,origin='lower',extent=[r_labels[0],r_labels[-1],a_labels[0],a_labels[-1]])
 
     plt.savefig('policy surface w {}.png'.format(name_index))
+
+def policy_range(r_range=None,r_ticks=None,a_range=None,a_ticks=None):
+
+    r_range=[0.2,1.0] if r_range is None else r_range
+    r_ticks=0.01 if r_ticks is None else r_ticks
+    r_labels=[r_range[0]] 
+
+    a_range=[-pi/4, pi/4] if a_range is None else a_range
+    a_ticks=0.05 if a_ticks is None else a_ticks
+    a_labels=[a_range[0]]
+
+    while r_labels[-1]+r_ticks<=r_range[-1]:
+        r_labels.append(r_labels[-1]+r_ticks)
+    while a_labels[-1]+a_ticks<=a_range[-1]:
+        a_labels.append(a_labels[-1]+a_ticks)
+    policy_data_v=np.zeros((len(r_labels),len(a_labels)))
+    policy_data_w=np.zeros((len(r_labels),len(a_labels)))
+
+    return r_labels, a_labels, policy_data_v, policy_data_w

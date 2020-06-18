@@ -210,11 +210,11 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         reached_target = (torch.norm(pos) <= self.goal_radius) # is within ring
         episode=1 # sb has its own countings. will discard this later
         finetuning=0 # not doing finetuning
-        reward = self.return_reward(info['stop'], reached_target, self.b, self.goal_radius, self.REWARD, finetuning)
+        reward = self.return_reward(0,info['stop'], reached_target.item(), self.b, self.goal_radius, self.REWARD, finetuning)
 
         # orignal return names
         self.time=self.time+1
-        self.stop= info['stop'] or self.time>self.episode_len-1
+        self.stop= info['stop'] or (self.time>self.episode_len-1).item()
         
         # if info['stop']:          
         #     print(reward,self.time)
@@ -268,7 +268,6 @@ class FireflyEnv(gym.Env, torch.nn.Module):
         H = torch.zeros(2, 5)
         H[:, -2:] = torch.diag(self.obs_gains)
 
-        A=self.A()
         pre_bx_, P = b
         bx_ = self.x_step(pre_bx_, a, self.dt, box, self.pro_gains, self.pro_noise_stds) # estimate xt+1 from xt and at
         bx_ = bx_.t() # make a column vector
@@ -464,7 +463,7 @@ class FireflyEnv(gym.Env, torch.nn.Module):
 
         # reward
 
-        reward = self.return_reward(info['stop'], reached_target, next_b, self.goal_radius, self.REWARD)
+        reward = self.return_reward(0,info['stop'], reached_target, next_b, self.goal_radius, self.REWARD)
 
         # orignal return names
         self.time=self.time+1

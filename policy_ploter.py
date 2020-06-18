@@ -11,7 +11,7 @@ baselines_mlp_model = DDPG.load(selu_name)
 torch_model_selu = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[256,256,64,32],act_fn=nn.functional.selu)
 torch_model_selu.name='selu'
 
-baselines_mlp_model = DDPG.load("DDPG_theta")
+baselines_mlp_model = DDPG.load("TD3_15")
 torch_model_relu = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[32,64])
 torch_model_relu.name='relu'
 

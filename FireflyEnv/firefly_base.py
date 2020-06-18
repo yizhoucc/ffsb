@@ -2,9 +2,8 @@ import gym
 from numpy import pi
 import numpy as np
 from gym import spaces
-from DDPGv2Agent.rewards import *
 from .env_utils import *
-from reward_functions.reward_singleff import * #reward
+from reward_functions import reward_singleff
 
 
 class FireflyEnvBase(gym.Env, torch.nn.Module): 
@@ -40,7 +39,7 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         kwargs={} if kwargs is None else kwargs
         self.arg=arg
 
-        # world param
+        # world param, that we are not chaning these during training
         self.world_size =           arg.WORLD_SIZE 
         self.terminal_vel =         arg.TERMINAL_VEL
         self.episode_len =          arg.EPISODE_LEN
@@ -54,9 +53,12 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         
         if arg is not None:
             self.setup(arg,**kwargs)
+            self.reset()
+        else:
+            raise ValueError('must have arg input!')
 
     def _apply_param_range(self,gains_range=None,std_range=None,goal_radius_range=None):
-        
+        # TODO, not used
         if goal_radius_range is None:
             self.goal_radius_range =     self.arg.goal_radius_range
         if gains_range is None:
@@ -65,8 +67,8 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
             self.std_range =             self.arg.std_range
 
     def setup(self,arg,
-                presist_phi=None,
-                agent_knows_phi=True,
+                presist_phi=False,      # flase when training, to generalize
+                agent_knows_phi=True,   # true when training, to explore different tasks
                 reward_function=None,
                 reward=None,
                 max_goal_radius =None,
@@ -77,18 +79,14 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         self.presist_phi=           presist_phi
         self.agent_knows_phi=       agent_knows_phi
 
-        # set up the parameter range
-        self._apply_param_range(
-        )
-                # goal_radius_range =goal_radius_range,
-                # gains_range = gains_range,
-                # std_range=std_range,)
+        # set up the parameter range from arg
+        self._apply_param_range() 
 
         self.max_distance=max_distance if max_distance is not None else self.world_size
         self.max_goal_radius=max_goal_radius if max_goal_radius is not None else self.goal_radius_range[1]
 
         self.reward=reward if reward is not None else self.arg.REWARD
-        self.reward_function=belief_gaussian_reward if reward_function is None else reward_function
+        self.reward_function=reward_singleff.belief_gaussian_reward if reward_function is None else reward_function
 
 
     def reset(self,
@@ -107,32 +105,18 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
 
         # random a parameter from range
 
-
-        # task param
-        # self.GOAL_RADIUS_STEP =     GOAL_RADIUS_STEP_SIZE
-        # self.goal_radius_range =    goal_radius_range
-        # self.max_goal_radius =      goal_radius_range[0]
-        # self.gains_range =          gains_range
-        # self.std_range=             std_range
-        # self.REWARD=                REWARD
-
         self.phi=phi if phi is not None else self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_gains=obs_gains,obs_noise_stds=obs_noise_stds)
         self.theta=self.phi if self.agent_knows_phi else self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_gains=obs_gains,obs_noise_stds=obs_noise_stds)
-        # self.pro_gains=             pro_gains
-        # self.pro_noise_stds=        pro_noise_stds
-        # self.obs_gains=             obs_gains
-        # self.obs_noise_stds=        obs_noise_stds
-        # self.goal_radius=           goal_radius
         
         self.reset_state()
         self.reset_belief()
         self.reset_obs()
-        # self.reset_cov()
-        self.reset_theta()
         self.reset_decision_info()
 
         return self.decision_info
 
+#-----------------------------------------------------------------------------
+    # necessary functions 
 
     def forward(self, action,theta=None):
         '''
@@ -140,19 +124,28 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         '''
         raise NotImplementedError
 
+
     def reset_state(self):
+        # reset the state, including goal position and agent position/angle.
         raise NotImplementedError
 
+
     def reset_belief(self):
+        # reset the belief mean equal to state
+        # and reset the cov matrix diag to be small values.
         raise NotImplementedError
+
 
     def reset_obs(self):
         raise NotImplementedError
 
+
     def reset_theta(self):
         raise NotImplementedError
 
+
     def reset_decision_info(self):
+        # use wrap decision info function to generate decision info at t0
         raise NotImplementedError
 
 
@@ -177,12 +170,12 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         raise NotImplementedError
 
 
-
     def state_step(self,x, a, dt, box, pro_gains, pro_noise_stds): # to state next
         '''
         state dynamic
         '''
         raise NotImplementedError
+
 
     def belief_step(self,  b, ox, a, box): # to belief next
         '''
@@ -190,17 +183,20 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         '''
         raise NotImplementedError
 
-    def policy_input_reshape(self, b, time, theta): # reshape the belief, ready for policy
+
+    def wrap_decision_info(self, b, time, theta): # reshape the belief, ready for policy
         '''
         concat belief, time, task param for policy input
         '''
         raise NotImplementedError
     
+
     def A(self, x_): # create the transition matrix
         '''
         transition matrix
         '''
         raise NotImplementedError
+
 
     def observations(self, x): 
         '''
@@ -210,6 +206,7 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         '''
         raise NotImplementedError
 
+
     def observations_mean(self, x):
         '''
         takes in state x and output to observation of x, 
@@ -217,6 +214,14 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         without noise, dt
         '''
         raise NotImplementedError
+
+
+    def get_distance(self):
+
+         raise NotImplementedError
+
+#----------------------------------------------------------
+    # common functions
 
 
 
@@ -256,33 +261,26 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
 
         return phi
 
-    def reset_theta(self):
-
-        self.theta = self.phi if self.agent_knows_phi else self.reset_task_param()
-
-
-    def get_position(self, s): 
-        '''
-        input state tensor x, return (x,y) and distance
-        '''
-        position = s.view(-1)[:2]
-        distance = torch.norm(position).item()
-        return position, distance
 
     def reached_goal(self):
-        _,distance=self.get_position(self.s)
-        reached_bool=1 if distance<=self.phi[8] else 0
+        # use real location
+        _,distance=self.get_distance(self.s)
+        reached_bool=True if distance<=self.phi[8] else False
         return reached_bool
 
     def if_agent_stop(self,a):
         terminal_vel = self.terminal_vel
         stop = (torch.norm(torch.tensor(a, dtype=torch.float64)) <= terminal_vel)
         if stop:
-            terminal= torch.ByteTensor([True])
+            terminal= True
         else:
-            terminal= torch.ByteTensor([False])
+            terminal= False
 
-        return terminal.item() == 1
+        return terminal
+
+
+#-------------------------------------------------------
+    # optional functions
 
     def logger(self):
         '''

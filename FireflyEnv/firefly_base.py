@@ -254,17 +254,16 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         phi=torch.cat([pro_gains,obs_gains,pro_noise_stds,obs_noise_stds,goal_radius])
 
         phi[0:2]=pro_gains if pro_gains is not None else phi[0:2]
-        phi[2:4]=obs_gains if obs_gains is not None else phi[2:4]
-        phi[4:6]=pro_noise_stds if pro_noise_stds is not None else phi[4:6]
+        phi[2:4]=pro_noise_stds if pro_noise_stds is not None else phi[2:4]
+        phi[4:6]=obs_gains if obs_gains is not None else phi[4:6]
         phi[6:8]=obs_noise_stds if obs_noise_stds is not None else phi[6:8]
         phi[8]=goal_radius if goal_radius is not None else phi[8]
 
         return phi
 
-
     def reached_goal(self):
         # use real location
-        _,distance=self.get_distance(self.s)
+        _,distance=self.get_distance(s=self.s)
         reached_bool=True if distance<=self.phi[8] else False
         return reached_bool
 

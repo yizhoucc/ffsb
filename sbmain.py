@@ -1,15 +1,19 @@
 import gym
-from stable_baselines.ddpg.policies import MlpPolicy
-from stable_baselines import A2C
-# from stable_baselines.common.policies import MlpPolicy
-from stable_baselines import DDPG
-from FireflyEnv import ffenv
+from stable_baselines.td3.policies import MlpPolicy
+from stable_baselines import TD3, HER,DDPG
+from FireflyEnv import ffenv,ffenv_new_cord,ffenv_original
 from Config import Config
 arg=Config()
 import numpy as np
+from numpy import pi
 import time
 import torch
-from DDPGv2Agent.rewards import *
+from ff_policy.policy_selu import SoftPolicy
+import tensorflow as tf
+from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
+# from DDPGv2Agent.rewards import *
+from reward_functions import reward_singleff
+from stable_baselines.ddpg.policies import MlpPolicy
 # # check env
 # from stable_baselines.common.env_checker import check_env
 # # env=gym.make('FF-v0')
@@ -43,11 +47,13 @@ from DDPGv2Agent.rewards import *
 from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 action_noise = NormalActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
 
-arg.std_range = [1e-2, 0.1, 1e-2, 0.1]# [vel min, vel max, ang min, ang max]
+arg.REWARD=100
+# arg.std_range = [1e-2, 0.1, 1e-2, 0.1]# [vel min, vel max, ang min, ang max]
+env_new_cord=ffenv_new_cord.FireflyAgentCenter(arg)
 
 env=ffenv.FireflyEnv(arg)
 # model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./",action_noise=action_noise)
-model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb/",action_noise=action_noise,
+model = DDPG(MlpPolicy, env_new_cord, verbose=1,tensorboard_log="./DDPG_tb/",action_noise=action_noise,
 
             gamma=0.99, memory_policy=None, eval_env=None, nb_train_steps=50,
             nb_rollout_steps=100, nb_eval_steps=100, param_noise=None, normalize_observations=False, 
@@ -63,11 +69,11 @@ model = DDPG(MlpPolicy, env, verbose=1,tensorboard_log="./DDPG_tb/",action_noise
 # env.reset()
 # # start=time.time()
 # print(env.theta)
-model.learn(total_timesteps=100000)
-env_skip=ffenv.FireflyEnv(arg,kwargs={'let_skip':True})
-model.set_env(env_skip)
 model.learn(total_timesteps=1000000)
-model.save("DDPG_relu_2step_skip{}_ {} {}".format(
+# env_skip=ffenv.FireflyEnv(arg,kwargs={'let_skip':True})
+# model.set_env(env_skip)
+# model.learn(total_timesteps=1000000)
+model.save("DDPG_test{}_ {} {}".format(
     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
     ))
 # (tensor([0.9873, 0.7121]), tensor([1.7995, 0.3651]), tensor([0.8017, 0.9060]), tensor([1.8397, 1.9815]), tensor([0.2000]))

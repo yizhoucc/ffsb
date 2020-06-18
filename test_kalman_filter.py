@@ -7,8 +7,8 @@ class Test(object):
     def __init__(self,initial_state,
     process_noise=np.asarray([0.1,0.1]),
     observation_noise=np.asarray([0.1,0.1]),
-    process_gain=[1.,1.],
-    observation_gain=[1.,1.],
+    process_gain=[100.,100.],
+    observation_gain=[100.,100.],
     dt=0.1):
 
         super().__init__()
@@ -68,7 +68,7 @@ class Test(object):
         S = self.H@(P_)@(self.H.transpose()) + self.R 
         K = P_@(self.H.transpose())@(np.linalg.inv(S)) 
         I_KH = self.I - K@(self.H)
-
+        print(K)
         self.s = s_ + K@(error)
         self.P = I_KH@(P_)
 
@@ -127,11 +127,11 @@ class Test(object):
 
 state=np.asarray([0,0,0,0,0])
 #     # goal center, relative angle 0 and agent at (0,0) facing goal
-action=np.asarray([1,1])
+action=np.asarray([1,0])
 #     # go forward, not turning
 task=Test(state,
-    process_noise=np.asarray([100.,100.]),
-    observation_noise=np.asarray([150.,150.]))
+    process_noise=np.asarray([10.,10.]),
+    observation_noise=np.asarray([10.,10.]))
 
 #     x=[]
 #     y=[]
@@ -183,3 +183,4 @@ def plot_uncertainty_t(task,state=None,action=None):
     ax.set_ylabel('Y axis')
     ax.set_zlabel('Prob')
     plt.show()
+    print(task.P[:2,:2])

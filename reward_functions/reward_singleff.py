@@ -46,7 +46,7 @@ def belief_gaussian_reward(agent_stops, reached_target, b,P, goal_radius, REWARD
     that is, at center the reward is higher. 
     '''
     def rewardFunc(rew_std, x, P, scale,goalx,goaly):
-        mu = x[:2]-torch.Tensor([goalx,goaly])  # pos
+        mu = torch.Tensor([goalx,goaly])-x[:2]  # pos
         
         R = torch.eye(2) * rew_std**2 # reward function is gaussian
         P = P[:2, :2] # cov
@@ -55,7 +55,7 @@ def belief_gaussian_reward(agent_stops, reached_target, b,P, goal_radius, REWARD
             print('R+P is not positive definite!')
         alpha = -0.5 * mu @ S.inverse() @ mu.t()
         reward = torch.exp(alpha) /2 / np.pi /torch.sqrt(S.det())
-
+        print(reward)
         # normalization -> to make max reward as 1
         mu_zero = torch.zeros(1,2)
         alpha_zero = -0.5 * mu_zero @ R.inverse() @ mu_zero.t()
@@ -76,13 +76,9 @@ def belief_gaussian_reward(agent_stops, reached_target, b,P, goal_radius, REWARD
         return reward
 
     reward = get_reward(b,P, goal_radius, REWARD,time,goalx,goaly)
-    if agent_stops and reached_target:
-        pass
-  
-    else:
-        reward = -0 * torch.ones(1)
-        # reward = -0 * torch.ones(1)
-    return reward
+    # if not agent_stops or not reached_target:
+    #     return 0.
+    return reward.item()
 
 def reward_LQC_test(agent_stops, reached_target, b, goal_radius, REWARD,time=0, episode=0,finetuning = 0):
     x, P = b
@@ -91,13 +87,22 @@ def reward_LQC_test(agent_stops, reached_target, b, goal_radius, REWARD,time=0, 
     reward = REWARD*(1-r)*0.9**time  # reward currently only depends on belief not action
     return reward
 
-def actual_task_reward(agent_stops, reached_target, a,b,c, REWARD):
+def actual_task_reward(agent_stops, reached_target, a,b,c, REWARD,d,e):
     if reached_target and agent_stops:
         return REWARD
     else:
         return 0.
 
-
+def state_gaussian_reward(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,time=0):
+    if reached_target and agent_stops:
+        return REWARD
+    elif agent_stops:
+        std=goal_radius/3
+        gaussian_reward=(1/std/np.sqrt(2*np.pi))* (np.exp(-0.5*(r/std)**2))
+        reward=max(gaussian_reward,REWARD)
+        return reward
+    else:
+        return 0.
 
 
 
@@ -132,7 +137,7 @@ def return_reward_LQC_test(agent_stops, reached_target, b, goal_radius, REWARD,t
     reward = REWARD*(1-r)*0.9**time  # reward currently only depends on belief not action
     return reward
 
-def return_reward_location(agent_stops, reached_target, a,b,c, REWARD):
+def return_reward_location(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,time=0):
     if reached_target:
         return REWARD
     else:

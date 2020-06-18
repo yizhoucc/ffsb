@@ -56,13 +56,21 @@ class FireflyAgentCenter(FireflyEnvBase):
 
     def step(self, action):
 
+        self.stop=True if self.if_agent_stop(action) else False 
+
         self.s=self.state_step(action,self.s)
         self.o=self.observations(self.s)
         self.b,self.P=self.belief_step(self.b,self.P,self.o,action)
         self.episode_reward=self.caculate_reward()
         self.decision_info=self.wrap_decision_info(b=self.b, time=self.episode_time,theta=self.theta)
         # self.ep_count+=1
+
+        _,d=self.get_distance()
+        if self.stop and d<0.7:
+            print('stop',self.stop,self.reached_goal(),d,self.episode_reward,self.episode_time)
+            
         self.episode_time=self.episode_time+1
+        
         end_current_ep=True if self.stop or self.episode_time>=self.episode_len else False
 
         return self.decision_info, self.episode_reward, end_current_ep, {}
@@ -93,9 +101,8 @@ class FireflyAgentCenter(FireflyEnvBase):
 
         next_x = torch.stack((px, py, heading, vel, ang_vel))
 
-        self.stop=True if self.if_agent_stop(a) else False 
-
         return next_x.view(1,-1)
+
 
 
     def belief_step(self, previous_b,previous_P, o, a):
@@ -104,10 +111,10 @@ class FireflyAgentCenter(FireflyEnvBase):
 
         # Q matrix, process noise for tranform xt to xt+1. only applied to v and w
         Q = torch.zeros(5, 5)
-        Q[-2:, -2:] = torch.diag((self.dt*self.theta[2:4])**2) # variance of vel, ang_vel
+        Q[-2:, -2:] = torch.diag((self.dt**0.5*self.theta[2:4])**2) # variance of vel, ang_vel
         
         # R matrix, observe noise for observation
-        R = torch.diag((self.dt*self.theta[6:8])** 2)
+        R = torch.diag((self.dt**0.5*self.theta[6:8])** 2)
 
         # H matrix, transform x into observe space. only applied to v and w.
         H = torch.zeros(2, 5)
@@ -151,11 +158,13 @@ class FireflyAgentCenter(FireflyEnvBase):
     def wrap_decision_info(self,b=None,time=None,theta=None):
 
         px, py, heading, vel, ang_vel = torch.split(self.s.view(-1), 1) # unpack state x
-        r = torch.norm(torch.cat([self.goalx-px, self.goaly-py])).view(-1) 
-        rel_ang = - heading + torch.atan2(self.goaly-py, self.goalx-px).view(-1) # relative angle from goal to agent.
+        r = torch.norm(torch.cat([self.goalx-px, self.goaly-py])).view(-1)
+        _,d=self.get_distance() 
+
+        rel_ang = -heading + torch.atan2(self.goaly-py, self.goalx-px).view(-1) # relative angle from goal to agent.
         rel_ang = range_angle(rel_ang) # resize relative angel into -pi pi range.
         vecL = vectorLowerCholesky(self.P) # take the lower triangle of P
-        state = torch.cat([r, rel_ang, vel, ang_vel, self.episode_time, vecL, self.theta.view(-1)]) # original
+        state = torch.cat([r, rel_ang, vel, ang_vel, torch.Tensor([self.episode_time]), vecL, self.theta.view(-1)]) # original
 
         return state.view(1, -1)
 
@@ -262,10 +271,11 @@ class FireflyAgentCenter(FireflyEnvBase):
         return self.belief, self.stop
 
 
-    def get_distance(self, s): 
+    def get_distance(self, s=None): 
         '''
         input state tensor x, return (x,y) and distance
         '''
+        s=self.s if s is None else s
         position = -s.view(-1)[:2]+torch.Tensor([self.goalx,self.goaly])
         distance = torch.norm(position).item()
         return position, distance

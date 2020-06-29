@@ -4,8 +4,7 @@ from gym import spaces
 from numpy import pi
 import numpy as np
 
-import InverseFuncs
-from .env_utils import *
+from FireflyEnv.env_utils import *
 
 from FireflyEnv.firefly_base import FireflyEnvBase
 
@@ -67,28 +66,52 @@ class FireflyAgentCenter(FireflyEnvBase):
 
         _,d=self.get_distance()
         if self.stop and d<0.7:
-            print('stop',self.stop,self.reached_goal(),d,self.episode_reward,self.episode_time)
+            print('stop',self.stop,'goal',self.reached_goal(),d,
+            self.episode_reward,self.episode_time,self.decision_info)
             
         self.episode_time=self.episode_time+1
         
-        end_current_ep=True if self.stop or self.episode_time>=self.episode_len else False
+        end_current_ep=(self.stop or self.episode_time>=self.episode_len)
 
         return self.decision_info, self.episode_reward, end_current_ep, {}
 
 
     def state_step(self,a, s,task_param=None):
         
+        # STEP 1: action assign v w into state
         task_param=self.phi if task_param is None else task_param
 
         px, py, heading, vel, ang_vel = torch.split(s.view(-1), 1)
-
         a_v = a[0]  # action for velocity
         a_w = a[1]  # action for angular velocity
-
         # sample noise value and apply to v, w together with gains
         w=torch.distributions.Normal(0,task_param[2:4]).sample()        
         vel = 0.0 * vel + task_param[0] * a_v + w[0] 
         ang_vel = 0.0 * ang_vel + task_param[1] * a_w + w[1]
+
+        next_s = torch.stack((px, py, heading, vel, ang_vel)).view(1,-1)
+        
+        
+        # STEP 2, state t+1 = f (state t)
+        next_s = self.apply_action(next_s,a,task_param=task_param)
+        return next_s.view(1,-1)
+
+    
+    def apply_action(self,state,action,task_param=None):
+        # with no noise
+        task_param=self.theta if task_param is None else task_param
+
+        px, py, heading, vel, ang_vel = torch.split(state.view(-1), 1)
+        vel=vel*0.          +action[0]*task_param[0]
+        ang_vel=ang_vel*0.  +action[1]*task_param[1]
+        next_s = torch.stack((px, py, heading, vel, ang_vel))
+
+        return next_s.view(1,-1)
+
+    def update_state(self, state,task_param=None):
+        task_param=self.theta if task_param is None else task_param
+
+        px, py, heading, vel, ang_vel = torch.split(state.view(-1), 1)
         
         # first move 
         px = px + vel * torch.cos(heading) * self.dt # new position x and y
@@ -99,9 +122,9 @@ class FireflyAgentCenter(FireflyEnvBase):
         heading = heading + ang_vel * self.dt
         heading = range_angle(heading) # adjusts the range of angle from -pi to pi
 
-        next_x = torch.stack((px, py, heading, vel, ang_vel))
+        next_s = torch.stack((px, py, heading, vel, ang_vel))
 
-        return next_x.view(1,-1)
+        return next_s.view(1,-1)
 
 
 
@@ -111,17 +134,20 @@ class FireflyAgentCenter(FireflyEnvBase):
 
         # Q matrix, process noise for tranform xt to xt+1. only applied to v and w
         Q = torch.zeros(5, 5)
-        Q[-2:, -2:] = torch.diag((self.dt**0.5*self.theta[2:4])**2) # variance of vel, ang_vel
+        Q[-2:, -2:] = torch.diag((self.theta[2:4])**2) # variance of vel, ang_vel
         
         # R matrix, observe noise for observation
-        R = torch.diag((self.dt**0.5*self.theta[6:8])** 2)
+        R = torch.diag((self.theta[6:8])** 2)
 
         # H matrix, transform x into observe space. only applied to v and w.
         H = torch.zeros(2, 5)
         H[:, -2:] = torch.diag(self.theta[4:6])
 
         # prediction
-        predicted_b = self.state_step(a,previous_b,task_param=self.theta)
+        # Ax_t part. using previously corrected v w in bt
+        predicted_b = self.update_state(previous_b,task_param=self.theta)
+        # Bu part. assign action to state (estimation)
+        predicted_b = self.apply_action(predicted_b,a,task_param=self.theta)
         predicted_b = predicted_b.t() # make a column vector
         A = self.transition_matrix(a,previous_b,self.theta) 
         predicted_P = A@(previous_P)@(A.t())+Q # estimate Pt+1 = APA^T+Q, 
@@ -144,6 +170,7 @@ class FireflyAgentCenter(FireflyEnvBase):
         I_KH = I - K@(H)
         P = I_KH@(predicted_P)# update covarance of xt+1 from the estimated xt+1 using new observation zt noise R
 
+
         # debug check
         if not is_pos_def(P): 
             print("here")
@@ -151,16 +178,14 @@ class FireflyAgentCenter(FireflyEnvBase):
             P = (P + P.t()) / 2 + 1e-6 * I  # make symmetric to avoid computational overflows
 
         b = b.t() #return to a row vector
-
+        # b=self.update_state(b)
         return b, P
 
 
     def wrap_decision_info(self,b=None,time=None,theta=None):
-
-        px, py, heading, vel, ang_vel = torch.split(self.s.view(-1), 1) # unpack state x
+        b=self.b if b is None else b
+        px, py, heading, vel, ang_vel = torch.split(b.view(-1), 1) # unpack state x
         r = torch.norm(torch.cat([self.goalx-px, self.goaly-py])).view(-1)
-        _,d=self.get_distance() 
-
         rel_ang = -heading + torch.atan2(self.goaly-py, self.goalx-px).view(-1) # relative angle from goal to agent.
         rel_ang = range_angle(rel_ang) # resize relative angel into -pi pi range.
         vecL = vectorLowerCholesky(self.P) # take the lower triangle of P
@@ -172,7 +197,7 @@ class FireflyAgentCenter(FireflyEnvBase):
     def caculate_reward(self):
         if self.stop:
             return self.reward_function(self.stop, self.reached_goal(),
-                self.b,self.P,self.phi[8],self.reward,self.goalx,self.goaly)
+                self.b,self.P,self.phi[-1],self.reward,self.goalx,self.goaly)
         else:
             return 0.
 

@@ -6,6 +6,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits import axes_grid1
 
 
+
+
 def add_colorbar(im, aspect=20, pad_fraction=0.5, **kwargs):
     """Add a vertical color bar to an image plot."""
     divider = axes_grid1.make_axes_locatable(im.axes)
@@ -85,3 +87,66 @@ def policy_range(r_range=None,r_ticks=None,a_range=None,a_ticks=None):
     policy_data_w=np.zeros((len(r_labels),len(a_labels)))
 
     return r_labels, a_labels, policy_data_v, policy_data_w
+
+    # imports and define agent name
+
+
+def plot_path_ddpg(modelname,env,num_episode=None):
+    
+    from stable_baselines import DDPG
+
+    num_episode=20 if num_episode is None else num_episode
+
+    agent = DDPG.load(modelname,env=env)
+
+    # create saving vars
+    all_ep=[]
+    # for ecah episode,
+    for i in range(num_episode):
+        ep_data={}
+        ep_statex=[]
+        ep_statey=[]
+        ep_belifx=[]
+        ep_belify=[]
+        # get goal position at start
+        decisioninfo=env.reset()
+        goalx=env.goalx
+        goaly=env.goaly
+        ep_data['goalx']=goalx
+        ep_data['goaly']=goaly
+        # log the actions raw, v and w
+        while not env.stop:
+            action,_=agent.predict(decisioninfo)
+            decisioninfo,_,_,_=env.step(action)
+            ep_statex.append(env.s[0,0])
+            ep_statey.append(env.s[0,1])
+            ep_belifx.append(env.b[0,0])
+            ep_belify.append(env.b[0,1])
+        ep_data['x']=ep_statex
+        ep_data['y']=ep_statey
+        ep_data['bx']=ep_belifx
+        ep_data['by']=ep_belify
+        ep_data['goalx']=env.goalx
+        ep_data['goaly']=env.goaly
+        ep_data['theta']=env.theta.tolist()
+        # save episode data dict to all data
+        all_ep.append(ep_data)
+
+    for i in range(num_episode):
+        plt.figure
+        ep_xt=all_ep[i]['x']
+        ep_yt=all_ep[i]['y']
+        plt.title(str(['{:.2f}'.format(x) for x in all_ep[i]['theta']]))
+        plt.plot(ep_xt,ep_yt,'r-')
+        plt.plot(all_ep[i]['bx'],all_ep[i]['by'],'b-')
+        # plt.scatter(all_ep[i]['goalx'],all_ep[i]['goaly'])
+
+        circle = np.linspace(0, 2*np.pi, 100)
+        r = all_ep[i]['theta'][-1]
+        x = r*np.cos(circle)+all_ep[i]['goalx'].item()
+        y = r*np.sin(circle)+all_ep[i]['goaly'].item()
+        plt.plot(x,y)
+
+        plt.savefig('path.png')
+
+

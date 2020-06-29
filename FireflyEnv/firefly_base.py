@@ -264,7 +264,7 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
     def reached_goal(self):
         # use real location
         _,distance=self.get_distance(s=self.s)
-        reached_bool=True if distance<=self.phi[8] else False
+        reached_bool= (distance<=self.phi[-1])
         return reached_bool
 
     def if_agent_stop(self,a):

@@ -47,7 +47,7 @@ from stable_baselines.ddpg.policies import MlpPolicy
 from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 action_noise = NormalActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
 
-arg.REWARD=100
+arg.REWARD=10
 # arg.std_range = [1e-2, 0.1, 1e-2, 0.1]# [vel min, vel max, ang min, ang max]
 env_new_cord=ffenv_new_cord.FireflyAgentCenter(arg)
 
@@ -55,14 +55,35 @@ env=ffenv.FireflyEnv(arg)
 # model = DDPG(LnMlpPolicy, env, verbose=1,tensorboard_log="./",action_noise=action_noise)
 model = DDPG(MlpPolicy, env_new_cord, verbose=1,tensorboard_log="./DDPG_tb/",action_noise=action_noise,
 
-            gamma=0.99, memory_policy=None, eval_env=None, nb_train_steps=50,
-            nb_rollout_steps=100, nb_eval_steps=100, param_noise=None, normalize_observations=False, 
-            tau=0.001, batch_size=256, param_noise_adaption_interval=50,
-            normalize_returns=False, enable_popart=False, observation_range=(-5., 5.), critic_l2_reg=0.,
-            return_range=(-np.inf, np.inf), actor_lr=1e-4, critic_lr=1e-3, clip_norm=None, reward_scale=1.,
-            render=False, render_eval=False, memory_limit=None, buffer_size=50000, random_exploration=0.0,
-            _init_setup_model=True, policy_kwargs=None,
-            full_tensorboard_log=False, seed=None, n_cpu_tf_sess=1)
+            gamma=0.99, 
+            memory_policy=None, 
+            eval_env=None, 
+            nb_train_steps=50,
+            nb_rollout_steps=100, 
+            nb_eval_steps=100, 
+            param_noise=None, 
+            normalize_observations=False, 
+            tau=0.001, 
+            batch_size=512, 
+            param_noise_adaption_interval=50,
+            normalize_returns=False,
+            enable_popart=False, 
+            observation_range=(-5., 5.), 
+            critic_l2_reg=0.,
+            return_range=(-np.inf, np.inf), 
+            actor_lr=1e-4, 
+            critic_lr=1e-3, 
+            clip_norm=None, 
+            reward_scale=1.,
+            render=False, 
+            render_eval=False, 
+            memory_limit=None, 
+            buffer_size=int(1e5), 
+            random_exploration=0.0,
+            _init_setup_model=True, 
+            policy_kwargs=None,
+            full_tensorboard_log=False, 
+            seed=None, n_cpu_tf_sess=1)
 
 
 # env.assign_presist_phi(torch.tensor([1.,2.,3.,2.,1.,2.,3.,1.,1.]))

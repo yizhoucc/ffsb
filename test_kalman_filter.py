@@ -46,6 +46,22 @@ class Test(object):
 
         return s
 
+    def state_dynamic_predict(self):
+
+        v = self.s[3]  # action for velocity
+        w = self.s[4]  # action for angular velocity
+
+        # noise = (self.process_noise) * np.random.rand(2)
+
+        s=self.s.copy()
+        s[0] = self.s[0] + v * np.cos(self.s[2]) * self.dt
+        s[1] = self.s[1] + v * np.sin(self.s[2]) * self.dt
+        s[2]=self.s[2] + w * self.dt
+        s[3]=vel
+        s[4]=ang_vel
+
+        return s
+
     def observe(self):
         
         observation=self.s[-2:].copy()

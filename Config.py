@@ -19,8 +19,7 @@ class Config:
 
         # all times are in second
         self.DELTA_T = 0.1 #0.01  # time to perform one action
-        self.EPISODE_TIME = 1  # # maximum length of time for one episode. if monkey can't firefly within this time period, new firefly comes
-        self.EPISODE_LEN = int(self.EPISODE_TIME / self.DELTA_T)  # number of time steps(actions) for one episode
+        self.EPISODE_LEN = 30
 
         self.TOT_T = 2000000000  # total number of time steps for this code
 
@@ -35,14 +34,11 @@ class Config:
         self.filename = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.data_path = os.getcwd()+'/'
 
-        self.goal_radius_range = [0.3* self.WORLD_SIZE, 0.5* self.WORLD_SIZE] #0.375: best radius
+        self.goal_radius_range = [0.2, 0.4] #0.375: best radius
         self.GOAL_RADIUS_STEP_SIZE = 1e-5
 
-        self.gains_range = [0.8, 1.2, pi/5, 3*pi/10] # [vel min, vel max, ang min, ang max]
-        # self.noise_range = [np.log(0.01), np.log(1), np.log(pi/4/100), np.log(pi/4)]# ln(noise_var): SNR=[100 easy, 1 hard] [vel min, vel max, ang min, ang max]
-
-        #self.gains_range = [8, 12, 8, 12] # [vel min, vel max, ang min, ang max]
-        self.std_range = [1e-2, 0.05, 1e-2, 0.05]# [vel min, vel max, ang min, ang max]
+        self.gains_range = [0.25,1.,pi/4,pi/1]
+        self.std_range = [0.0025,0.0025*5,pi/4000,pi/4000*5]
 
 
 

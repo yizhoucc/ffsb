@@ -20,8 +20,7 @@ from reward_functions import reward_singleff
 # arg.EPISODE_LEN=30
 # # arg.goal_radius_range=[0.05,0.2]
 # arg.goal_radius_range=[0.2,0.4]
-arg.REWARD=100
-
+# arg.REWARD=100
 action_noise = NormalActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
 # env=ffenv_original.FireflyEnv(arg)
 # env_skip=ffenv.FireflyEnv(arg,kwargs={'let_skip':True})
@@ -35,21 +34,21 @@ model = TD3(MlpPolicy,
             verbose=1,
             tensorboard_log="./DDPG_tb/",
             action_noise=action_noise,
-            buffer_size=int(1e5),
+            buffer_size=int(1e6),
             batch_size=512,
-            learning_rate=0.001, 
-            train_freq=800,
+            learning_rate=3e-4, 
+            train_freq=100,
             # policy_kwargs={'act_fun':tf.nn.selu,'layers':[256,256,64,32]}
             policy_kwargs={'layers':[64,64]},
             policy_delay=2, 
-            learning_starts=10000, 
-            gradient_steps=200, 
+            learning_starts=1000, 
+            gradient_steps=100, 
             random_exploration=0., 
-            gamma=0.99, 
+            gamma=0.98, 
 
             tau=0.005, 
-            target_policy_noise=0.05, 
-            target_noise_clip=0.05,
+            target_policy_noise=0.1, 
+            target_noise_clip=0.1,
             _init_setup_model=True, 
             full_tensorboard_log=False, 
             seed=None, 
@@ -60,7 +59,7 @@ model = TD3(MlpPolicy,
 # model.learn(total_timesteps=train_time)
 # model.learn(total_timesteps=1000000)
 # model.set_env(env)
-env_new_cord.setup(arg,max_distance=0.2)
+# env_new_cord.setup(arg,max_distance=0.2)
 
 model.learn(total_timesteps=5000000)
 

@@ -16,6 +16,7 @@ R(b) =  \int b(s)*r(s) ds = 1/sqrt(det(2 pi (P+R)) * exp(-0.5*mu^t(R+P)^-1*mu)
 """
 import torch
 import numpy as np
+from numpy import pi
 from FireflyEnv.env_utils import is_pos_def
 import torch
 '''
@@ -133,46 +134,36 @@ def return_reward_location(agent_stops, reached_target, b,P, goal_radius, REWARD
         return 0.
 
 
-def belief_reward(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,time=0):
+def belief_reward(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,bins=20,time=0,discount=0.99):
+    
+    cov=P[:2,:2]
+    mu = torch.Tensor([goalx,goaly])-b[0,:2]  # pos
+    # first a squre
+    xrange=[mu[0]-goal_radius, mu[0]+goal_radius]
+    yrange=[mu[1]-goal_radius, mu[1]+goal_radius]
+    # select the circle (actual goal range)
+    P=0
+    for i in np.linspace(xrange[0],xrange[1],bins):
+        for j in np.linspace(yrange[0],yrange[1],bins):
+            if i**2+j**2<=goal_radius**2:
+                expectation=( (1/2/pi/np.sqrt(np.linalg.det(cov)))
+                    * np.exp(-1/2
+                    * np.array([i,j]).transpose()@np.linalg.inv(cov)@np.array([i,j]).reshape(2,1) ))
+                P=P+expectation/(bins/2/goal_radius)**2
+    
+    reward= P*REWARD
 
-    if agent_stops:
+    if time != 0:
+        reward=reward*discount**time
 
-        mu = torch.Tensor([goalx,goaly])-x[:2]  # pos
-        # first a squre
-        xrange=[mu[0]-goal_radius, mu[0]+goal_radius]
-        yrange=[mu[1]-goal_radius, mu[1]+goal_radius]
-        # select the circle (actual goal range)
-        points= [(x,y) if x*x+y*y<=goal_radius**2 for x, y in zip(xrange, yrange)]
+    return reward
 
+    # def get_reward(b,P, goal_radus, REWARD,time,goalx,goaly):
+    #     rew_std = goal_radus / 2  # std of reward function --> 2*std (=goal radius) = reward distribution
+    #     reward = rewardFunc(rew_std, b.view(-1), P, REWARD,goalx,goaly)
+    #     return reward
 
-        R = torch.eye(2) * rew_std**2 # reward function is gaussian
-        P = P[:2, :2] # cov
-        S = R+P
-        if not is_pos_def(S):
-            print('R+P is not positive definite!')
-        alpha = -0.5 * mu @ S.inverse() @ mu.t()
-        reward = torch.exp(alpha) /2 / np.pi /torch.sqrt(S.det())
-        print(reward)
-        # normalization -> to make max reward as 1
-        mu_zero = torch.zeros(1,2)
-        alpha_zero = -0.5 * mu_zero @ R.inverse() @ mu_zero.t()
-        reward_zero = torch.exp(alpha_zero) /2 / np.pi /torch.sqrt(R.det())
-        reward = reward/reward_zero
-
-        reward = scale * reward  # adjustment for reward per timestep
-        if reward > scale:
-            print('reward is wrong!', reward)
-            print('mu', mu)
-            print('P', P)
-            print('R', R)
-        return reward.view(-1)
-
-    def get_reward(b,P, goal_radus, REWARD,time,goalx,goaly):
-        rew_std = goal_radus / 2  # std of reward function --> 2*std (=goal radius) = reward distribution
-        reward = rewardFunc(rew_std, b.view(-1), P, REWARD,goalx,goaly)
-        return reward
-
-    reward = get_reward(b,P, goal_radius, REWARD,time,goalx,goaly)
-    # if not agent_stops or not reached_target:
-    #     return 0.
-    return reward.item()
+    # reward = get_reward(b,P, goal_radius, REWARD,time,goalx,goaly)
+    # # if not agent_stops or not reached_target:
+    # #     return 0.
+    # return reward.item()

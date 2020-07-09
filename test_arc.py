@@ -1,3 +1,5 @@
+# will generate a d vs theta heatmap of T
+
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import pi
@@ -15,9 +17,9 @@ class TestArc():
         self.compute_case_table(**kwargs)
 
     def compute_case_table(self, thetarange=None, drange=None):
-        thetarange=[-pi/4,pi/4] if thetarange is None else thetarange
-        drange =[0.3, 5.5]  if drange is None else drange
-        theta_resolution=pi/40
+        thetarange=[-pi/6,pi/6] if thetarange is None else thetarange
+        drange =[1, 4]  if drange is None else drange
+        theta_resolution=pi/60
         d_resolution=0.1
 
         theta_lables=[thetarange[0]]
@@ -144,6 +146,6 @@ class TurnthenGo(TestArc):
             # the stright forward casef
             return d/self.vm
  
-test=TurnthenGo(1,1)
+test=TestArc(0.2,pi/4)
 test.compute_time_table()
 plt.contourf(test.time_table)

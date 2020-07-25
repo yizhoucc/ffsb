@@ -5,6 +5,20 @@ import math
 import numpy as np
 from numpy import pi
 
+def row_vector(vector):
+    # input, np array or torch tensor, ouput to tensor row vector
+    if type(vector) == torch.Tensor:
+        return vector.view(1,-1)
+    elif type(vector) == np.ndarray:
+        return torch.Tensor(vector).view(1,-1)
+
+def col_vector(vector):
+    # input, np array or torch tensor, ouput to tensor col vector
+    if type(vector) == torch.Tensor:
+        return vector.view(-1,1)
+    elif type(vector) == np.ndarray:
+        return torch.Tensor(vector).view(-1,1)
+
 def is_pos_def(x):
     """
     Check if the matrix is positive definite

@@ -5,6 +5,20 @@ from torch.autograd import Variable
 import numpy as np
 from numpy import pi
 
+def row_vector(vector):
+    # input, np array or torch tensor, ouput to tensor row vector
+    if type(vector) == torch.Tensor:
+        return vector.view(1,-1)
+    elif type(vector) == np.ndarray:
+        return torch.Tensor(vector).view(1,-1)
+
+def col_vector(vector):
+    # input, np array or torch tensor, ouput to tensor col vector
+    if type(vector) == torch.Tensor:
+        return vector.view(-1,1)
+    elif type(vector) == np.ndarray:
+        return torch.Tensor(vector).view(-1,1)
+
 def shrink(a):
     #a = a.t()
     max_norm = torch.sqrt(1 + torch.min(a**2)/(torch.max(a**2) + 1e-6))

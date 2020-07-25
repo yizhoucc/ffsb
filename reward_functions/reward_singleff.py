@@ -28,8 +28,10 @@ class Reward(object):
     def __init__(self,reward_function=None):
         pass
 
+
 def mixing_reward(self, reward_source, reward_target,ratio_target):
         return reward_source*(1-ratio_target)+reward_target*ratio_target
+
 
 def actual_task_reward(stop, reached_target, reward=10, belief=None, goal_radius=None):
     '''
@@ -40,6 +42,7 @@ def actual_task_reward(stop, reached_target, reward=10, belief=None, goal_radius
         return reward
     else:
         return 0.
+
 
 def belief_gaussian_reward(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,time=0):
     '''
@@ -81,6 +84,7 @@ def belief_gaussian_reward(agent_stops, reached_target, b,P, goal_radius, REWARD
     #     return 0.
     return reward.item()
 
+
 def reward_LQC_test(agent_stops, reached_target, b, goal_radius, REWARD,time=0, episode=0,finetuning = 0):
     x, P = b
     position=x[:2]
@@ -88,11 +92,13 @@ def reward_LQC_test(agent_stops, reached_target, b, goal_radius, REWARD,time=0, 
     reward = REWARD*(1-r)*0.9**time  # reward currently only depends on belief not action
     return reward
 
+
 def actual_task_reward(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,time=0):
     if reached_target and agent_stops:
         return REWARD
     else:
         return 0.
+
 
 def state_gaussian_reward(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,time=0):
     d=torch.Tensor([goalx,goaly])-b[0,:2]
@@ -104,8 +110,6 @@ def state_gaussian_reward(agent_stops, reached_target, b,P, goal_radius, REWARD,
         return reward.item()
     else:
         return 0.
-
-
 
 
 def return_reward_swcase(agent_stops, reached_target, b, goal_radius, REWARD,time=0, episode=0,finetuning = 0):
@@ -120,12 +124,14 @@ def return_reward_swcase(agent_stops, reached_target, b, goal_radius, REWARD,tim
 
     return reward
 
+
 def return_reward_LQC_test(agent_stops, reached_target, b, goal_radius, REWARD,time=0, episode=0,finetuning = 0):
     x, P = b
     position=x[:2]
     r=torch.norm(position)
     reward = REWARD*(1-r)*0.9**time  # reward currently only depends on belief not action
     return reward
+
 
 def return_reward_location(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,time=0):
     if reached_target:
@@ -134,28 +140,37 @@ def return_reward_location(agent_stops, reached_target, b,P, goal_radius, REWARD
         return 0.
 
 
-def belief_reward(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,bins=20,time=0,discount=0.99):
+def belief_reward_bin_intergration(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,bins=80,time=0,discount=0.95):   
     
     cov=P[:2,:2]
-    mu = torch.Tensor([goalx,goaly])-b[0,:2]  # pos
+    mu = torch.Tensor([goalx,goaly])-b[:2,0]  # pos
     # first a squre
     xrange=[mu[0]-goal_radius, mu[0]+goal_radius]
     yrange=[mu[1]-goal_radius, mu[1]+goal_radius]
     # select the circle (actual goal range)
     P=0
-    for i in np.linspace(xrange[0],xrange[1],bins):
-        for j in np.linspace(yrange[0],yrange[1],bins):
-            if i**2+j**2<=goal_radius**2:
+    xs=np.linspace(xrange[0],xrange[1],bins)
+    ys=np.linspace(yrange[0],yrange[1],bins)
+
+    for i in range(bins):
+        for j in range(bins):
+            if (xs[i]-mu[0])**2+(ys[j]-mu[1])**2<=goal_radius**2:                
                 expectation=( (1/2/pi/np.sqrt(np.linalg.det(cov)))
-                    * np.exp(-1/2
-                    * np.array([i,j]).transpose()@np.linalg.inv(cov)@np.array([i,j]).reshape(2,1) ))
-                P=P+expectation/(bins/2/goal_radius)**2
-    
+                * np.exp(-1/2
+                    * (np.array([xs[i],ys[j]]).reshape(1,2)@np.linalg.inv(cov)@np.array([xs[i],ys[j]]).reshape(2,1)) ))
+                P=P+torch.Tensor(expectation)*4*goal_radius*goal_radius/bins/bins
+
+    if P>= 1:
+        print('error, prob is greater than or equal 1')
     reward= P*REWARD
 
     if time != 0:
         reward=reward*discount**time
-
+        # print('the reward with discounting',reward)
+    if type(reward)==torch.Tensor:
+        # print('reward as tensor',reward)
+        reward=reward.item()
+        # print('reward as float',reward)
     return reward
 
     # def get_reward(b,P, goal_radus, REWARD,time,goalx,goaly):
@@ -166,4 +181,30 @@ def belief_reward(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,go
     # reward = get_reward(b,P, goal_radius, REWARD,time,goalx,goaly)
     # # if not agent_stops or not reached_target:
     # #     return 0.
-    # return reward.item()
+    # return reward.item()   
+
+
+def belief_reward_mc(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,nsamples=800,time=0,discount=0.95):
+    
+    cov=P[:2,:2]
+    mu = torch.Tensor([goalx,goaly])-b[:2,0]  # pos
+    # construct ellipse object and sample
+    xs, ys = np.random.multivariate_normal(mu, cov, nsamples).T
+    check=[]
+    # select the dots in circle (actual goal range)
+    for i in range(nsamples):
+        if (xs[i])**2+(ys[i])**2<=goal_radius**2:                
+            check.append(1)
+        else:
+            check.append(0)
+
+    P=np.mean(check)
+    
+    print('reward p ',P, ' time t', time)
+    reward= P*REWARD*discount**time
+
+    if type(reward)==torch.Tensor:
+        # print('reward as tensor',reward)
+        reward=reward.item()
+        # print('reward as float',reward)
+    return reward

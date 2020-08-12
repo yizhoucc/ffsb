@@ -47,8 +47,8 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
         self.terminal_vel =         arg.TERMINAL_VEL # float
         self.episode_len =          arg.EPISODE_LEN # int
         self.dt =                   arg.DELTA_T # float
-        self.goal_radius_step=      arg.GOAL_RADIUS_STEP_SIZE # float
-        self.verbose=               arg.verbose
+        # self.goal_radius_step=      arg.GOAL_RADIUS_STEP_SIZE # float
+        # self.verbose=               arg.verbose
         low = -np.inf
         high = np.inf
         self.action_space = spaces.Box(-np.ones(2), np.ones(2), dtype=np.float32)
@@ -63,7 +63,6 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
 
     def _apply_param_range(self,gains_range=None,std_range=None,goal_radius_range=None):
 
-        # TODO, not used
         if goal_radius_range is None:
             self.goal_radius_range =     self.arg.goal_radius_range
         if gains_range is None:
@@ -162,10 +161,6 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
 
     def reset_obs(self):
         raise NotImplementedError
-
-
-    # def reset_theta(self):
-    #     raise NotImplementedError
 
 
     def reset_decision_info(self):
@@ -287,11 +282,13 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
 
         return col_vector(phi)
 
+
     def reached_goal(self):
         # use real location
         _,distance=self.get_distance(state=self.s)
         reached_bool= (distance<=self.phi[-1])
         return reached_bool
+
 
     def if_agent_stop(self,a):
         terminal_vel = self.terminal_vel

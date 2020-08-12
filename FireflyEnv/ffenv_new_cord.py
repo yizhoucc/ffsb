@@ -130,6 +130,7 @@ class FireflyAgentCenter(FireflyEnvBase):
         '''
 
         self.stop=True if self.if_agent_stop(action) else False 
+        self.a=action
         self.episode_reward=self.caculate_reward()
         
         self.s=self.state_step(action,self.s)
@@ -283,9 +284,10 @@ class FireflyAgentCenter(FireflyEnvBase):
         if not is_pos_def(predicted_P): # should be positive definate. if not, show debug. 
             # if noise go to 0, happens.
             print("predicted_P:", predicted_P)
+            print('Q:',Q)
             print("previous_P:", previous_P)
             print("A:", A)
-            APA = A@(P)@(A.t())
+            APA = A@(previous_P)@(A.t())
             print("APA:", APA)
             print("APA +:", is_pos_def(APA))
 
@@ -348,7 +350,7 @@ class FireflyAgentCenter(FireflyEnvBase):
 
         if self.stop:
             return self.reward_function(self.stop, self.reached_goal(),
-                self.b,self.P,self.phi[-1,0],self.reward,
+                self.b,self.P,self.phi[8,0],self.reward,
                 self.goalx,self.goaly,time=self.episode_time)
         else:
             return 0.

@@ -158,78 +158,69 @@ def theta_range(theta, gains_range, std_range, goal_radius_range, Pro_Noise = No
         return theta
 
 
-def single_inverse(true_theta, phi, arg, env, agent, states, actions, tasks, filename, num_thetas,initial_theta=None):
 
-    # tic = time.time()
-    # generate an initial estimation of theta, if not given
-    if initial_theta is None:
-        theta=env.reset_task_param()
-    else:
-        theta=initial_theta
-    theta = nn.Parameter(theta)
-    initial_theta = theta.data.clone()
-    print('initial theta: ',initial_theta)
+def single_theta_inverse(arg, env, agent, filename, 
+                number_updates=10,
+                true_theta=None, phi=None,init_theta=None,
+                states=None, actions=None, tasks=None):
+
+    save_dict={'theta_estimations':[]}
+    env.agent_knows_phi=False
+    env.presist_phi=True
+    true_theta=torch.nn.Parameter(true_theta) if true_theta is not None else torch.nn.Parameter(env.reset_task_param())
+    phi=phi if phi is not None else true_theta.data.clone()
+    theta=init_theta if init_theta is not None else env.reset_task_param()
+    print('initial theta: \n',theta)
+    theta = torch.nn.Parameter(theta)
+    save_dict['true_theta']=true_theta.data.clone().tolist()
+    save_dict['phi']=true_theta.data.clone().tolist()
+    save_dict['inital_theta']=theta.data.clone().tolist()
     # prepare the logs
     loss_log = deque(maxlen=arg.NUM_IT)
     loss_act_log = deque(maxlen=arg.NUM_IT)
     loss_obs_log = deque(maxlen=arg.NUM_IT)
     theta_log = deque(maxlen=arg.NUM_IT)
     gradient=deque(maxlen=arg.NUM_IT)
-    optT = torch.optim.Adam([theta], lr=arg.ADAM_LR)
-    scheduler = torch.optim.lr_scheduler.StepLR(optT, step_size=arg.LR_STEP, gamma=arg.lr_gamma) # decreasing learning rate x0.5 every 100steps
     prev_loss = 100000
     loss_diff = deque(maxlen=5)
-    # for iterations, do:
-        # get loss,
-        # apply to estimation of theta.
-    for it in range(arg.NUM_IT):
-        loss = getLoss(agent, states, actions, tasks, phi, theta, env, arg)
-        loss_log.append(loss.data)
-        optT.zero_grad() #clears old gradients from the last step
-        loss.backward(retain_graph=True) #computes the derivative of the loss w.r.t. the parameters using backpropagation
-        gradient.append(theta.grad.data.clone())
-        optT.step() # performing single optimize step: this changes theta
-        theta_log.append(theta.data.clone())
-        if it < arg.LR_STOP:
+    env.reset(phi=phi,theta=true_theta)
+    # tic = time.time()
+    optT = torch.optim.Adam([theta], lr=arg.ADAM_LR)
+    scheduler = torch.optim.lr_scheduler.StepLR(optT, step_size=arg.LR_STEP, gamma=arg.lr_gamma) 
+
+    for num_update in range(number_updates):
+
+        states, actions, tasks = trajectory(
+            agent, phi, true_theta, env, arg.NUM_EP)
+        
+        if arg.LR_STOP < scheduler.get_lr()[0]:
             scheduler.step()
-        loss_diff.append(torch.abs(prev_loss - loss))
-        prev_loss = loss.data
-            #print("num_theta:{}, num:{}, loss:{}".format(n, it, np.round(loss.data.item(), 6)))
-            #print("num:{},theta diff sum:{}".format(it, 1e6 * (true_theta - theta.data.clone()).sum().data))
-        print("converged_theta:\n{}".format( theta.data.clone() ) )
-        print("true theta:     \n{}".format(true_theta.data.clone()))
-            # print('\ngrad     ', theta.grad.data.clone())
-    
-    
-    # loss = getLoss(agent, states, actions, tasks, phi, theta, env, arg)
-    # toc = time.time()
 
-    # check heissian
-    # grads = grad(loss, theta, create_graph=True)[0]
-    # H = torch.zeros(9,9)
-    # for i in range(9):
-    #     H[i] = grad(grads[i], theta, retain_graph=True)[0]
-    # I = H.inverse()
-    # stderr = torch.sqrt(I.diag())
-    # stderr_ii = 1/torch.sqrt(torch.abs(H.diag()))
-    # result = {'true_theta': true_theta,
-    #           'initial_theta': ini_theta,
-    #           'theta': theta,
-    #           'theta_log': theta_log,
-    #           'loss_log': loss_log,
-    #           'loss_act_log': loss_act_log,
-    #           'loss_obs_log': loss_obs_log,
-    #           'filename': filename,
-    #           'num_theta': n,
-    #           'converging_it': it,
-    #           'duration': toc-tic,
-    #           'arguments': arg,
-    #           'stderr': stderr,
-    #           'stderr_ii': stderr_ii,
-    #           'grad':gradient
-    #           }
-    # return result
+        for it in range(arg.NUM_IT):
+            loss = getLoss(agent, actions, tasks, phi, theta, env, num_iteration=arg.NUM_SAMPLES)
+            loss_log.append(loss.data)
+            optT.zero_grad() #clears old gradients from the last step
+            loss.backward(retain_graph=True) #computes the derivative of the loss w.r.t. the parameters using backpropagation
+            gradient.append(theta.grad.data.clone())
+            optT.step() # performing single optimize step: this changes theta
+            theta.data=theta.data.clamp(1e-4,999)
+            theta_log.append(theta.data.clone())
 
+            loss_diff.append(torch.abs(prev_loss - loss))
+            prev_loss = loss.data
+                #print("num_theta:{}, num:{}, loss:{}".format(n, it, np.round(loss.data.item(), 6)))
+                #print("num:{},theta diff sum:{}".format(it, 1e6 * (true_theta - theta.data.clone()).sum().data))
+            print('number update: \n', num_update)
+            print('converged_theta:\n{}'.format( theta.data.clone() ) )
+            print('true theta:     \n{}'.format(true_theta.data.clone()))
+            print('loss: \n',loss)
+                # print('\ngrad     ', theta.grad.data.clone())
+
+        save_dict['theta_estimations'].append(theta.data.clone().tolist())
+        savename=('inverse_data/' + filename + "EP" + str(arg.NUM_EP) + "updates" + str(number_updates)+"sample"+str(arg.NUM_SAMPLES) +"IT"+ str(arg.NUM_IT) + '.pkl')
+        torch.save(save_dict, savename)
+
+    
 
 def trajectory(agent, phi, theta, env, NUM_EP):
     with torch.no_grad():
@@ -239,7 +230,7 @@ def trajectory(agent, phi, theta, env, NUM_EP):
         tasks=[] # vars that define an episode
 
         #---------reset the env, using theta and phi. theta not necessarily equals phi
-        theta=nn.Parameter(theta)
+        theta=torch.nn.Parameter(theta)
         env.reset(phi=phi,theta=theta)
 
         episode = 1
@@ -338,7 +329,7 @@ def trajectory_(agent, theta, env, arg, gains_range, std_range, goal_radius_rang
     return x_traj, obs_traj, a_traj, b_traj
 
 
-def getLoss(agent, states, actions, tasks, phi, theta, env, arg):
+def getLoss(agent, actions, tasks, phi, theta, env, num_iteration=1):
     
     '''
     from the trajectories, compute the loss for current estimation of theta
@@ -353,25 +344,21 @@ def getLoss(agent, states, actions, tasks, phi, theta, env, arg):
     # pro_gains, pro_noise_stds, obs_gains, obs_noise_stds, goal_radius = torch.split(theta.view(-1), 2)
 
     # what is the num samples here? epoch likely
-    for num_it in range(arg.NUM_SAMPLES): 
+    for num_it in range(num_iteration): 
         # repeat for number of episodes in the trajectories
-        for ep, x_traj_ep in enumerate(states): 
+        for ep, task in enumerate(tasks): 
             # initialize the loss var
             logPr_ep = torch.zeros(1)
-            x = x_traj_ep[0].view(-1)
-            pos=tasks[ep][0]
+            pos=task[0]
             # take out the teacher trajectories for one episode
             a_traj_ep = actions[ep]  
             # reset monkey's internal model, using the task parameters, estimation of theta
             env.reset(theta=theta, phi=phi, goal_position=pos)  
             # repeat for steps in episode
-            for it, next_x in enumerate(x_traj_ep[1:]): 
+            for teacher_action in a_traj_ep: 
                 action = agent(env.decision_info)[0] 
-                decision_info,_=env(a_traj_ep[it],task_param=theta) 
-                # env.s=next_x # offset the noise during state transition, is it necessary?
-                action_loss = mse_loss(action , a_traj_ep[it] )
-                # obs_loss = 5*torch.ones(2)+torch.log(np.sqrt(2* pi)*obs_noise_stds) +(next_ox_ - next_ox).view(-1) ** 2/2/(obs_noise_stds**2)
-                # print(action_loss)
+                decision_info,_=env(teacher_action,task_param=theta) 
+                action_loss = mse_loss(action, teacher_action )
                 logPr_ep = logPr_ep + action_loss.sum()
             logPr += logPr_ep
         # print('loss is: ',logPr)
@@ -501,3 +488,5 @@ def inverse_sigmoid(parameter):
 #                    'a_traj_log': a_traj
 #                    }
 #     return init_result
+
+

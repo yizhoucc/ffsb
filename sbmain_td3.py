@@ -48,11 +48,11 @@ model = TD3(MlpPolicy,
             n_cpu_tf_sess=None,            
             )
 
-train_time=500000 
+train_time=500000
 
 for i in range(10):  
     model.learn(total_timesteps=int(train_time/10))
-    model.save("TD_95gamma_mc_{}_{}_{}_{}_{}".format(train_time,i,
+    model.save("trained_agent/TD_95gamma_mc_{}_{}_{}_{}_{}".format(train_time,i,
     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
     ))
     env_new_cord.max_distance=env_new_cord.max_distance+0.1
@@ -61,7 +61,7 @@ env_new_cord.goal_radius_range=[0.1,0.3]
 env_new_cord.EPISODE_LEN=40
 for i in range(10):  
     model.learn(total_timesteps=int(train_time/10))
-    model.save("TD_95gamma_mc_smallgoal_{}_{}_{}_{}_{}".format(train_time,i,
+    model.save("../trained_agent/TD_95gamma_mc_smallgoal_{}_{}_{}_{}_{}".format(train_time,i,
     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
     ))
 

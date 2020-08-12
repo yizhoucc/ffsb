@@ -6,7 +6,7 @@ from copy import copy
 import time
 import random
 seed=time.time().as_integer_ratio()[0]
-seed=2
+seed=6
 random.seed(seed)
 import torch
 torch.manual_seed(seed)
@@ -19,7 +19,7 @@ torch.backends.cudnn.benchmark = False
 
 
 # -----------invser functions-------------
-from InverseFuncs import trajectory, getLoss, reset_theta, theta_range,reset_theta_log, single_inverse
+from InverseFuncs import trajectory, getLoss, reset_theta, theta_range,reset_theta_log, single_theta_inverse
 
 
 # ---------loading env and agent----------
@@ -30,20 +30,20 @@ arg = Config()
 
 DISCOUNT_FACTOR = 0.99
 arg.NUM_SAMPLES=2
-arg.NUM_EP = 1000
-arg.NUM_IT = 10 # number of iteration for gradient descent
+arg.NUM_EP = 100
+arg.NUM_IT = 2 # number of iteration for gradient descent
 arg.NUM_thetas = 1
-arg.ADAM_LR = 0.007
+arg.ADAM_LR = 0.07
 arg.LR_STEP = 2
-arg.LR_STOP = 50
+arg.LR_STOP = 0.0001
 arg.lr_gamma = 0.95
 arg.PI_STD=1
 arg.goal_radius_range=[0.05,0.2]
-
+number_updates=500
 
 # agent convert to torch model
 import policy_torch
-baselines_mlp_model = TD3.load("TD_95gamma_mc_smallgoal_500000_9_24_1_6.zip")
+baselines_mlp_model = TD3.load('trained_agent//TD_95gamma_mc_smallgoal_500000_9_24_1_6.zip')
 agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[128,128])
 
 # loading enviorment, same as training
@@ -52,37 +52,52 @@ env=ffenv_new_cord.FireflyAgentCenter(arg)
 # TODO, move it to a function of env
 env.agent_knows_phi=False
 
-true_theta_log = []
-true_loss_log = []
-true_loss_act_log = []
-true_loss_obs_log = []
-final_theta_log = []
-stderr_log = []
-result_log = []
-number_update=100
-filename="testnew"
 
-# use serval theta to inverse
-for num_thetas in range(arg.NUM_thetas):
 
-    # make sure phi and true theta stay the same 
-    true_theta = env.reset_task_param()
-    env.presist_phi=True
-    env.reset(phi=true_theta,theta=true_theta) # here we first testing teacher truetheta=phi case
-    true_theta_log.append(true_theta.data.clone())
+#----------------manul run part-------------
+# true_theta_log = []
+# true_loss_log = []
+# true_loss_act_log = []
+# true_loss_obs_log = []
+# final_theta_log = []
+# stderr_log = []
+# result_log = []
 
-    theta=env.reset_task_param()
-    phi=true_theta.data.clone()
-    for num_update in range(number_update):
-        states, actions, tasks = trajectory(
-            agent, phi, true_theta, env, arg.NUM_EP)
+# save_dict={'theta_estimations':[]}
+# filename="test_seed"+str(seed)
+
+# # use serval theta to inverse
+# for num_thetas in range(arg.NUM_thetas):
+
+#     # make sure phi and true theta stay the same 
+#     true_theta = env.reset_task_param()
+#     env.presist_phi=True
+#     env.reset(phi=true_theta,theta=true_theta) # here we first testing teacher truetheta=phi case
+#     theta=env.reset_task_param()
+#     phi=env.reset_task_param()
+
+#     save_dict['true_theta']=true_theta.data.clone().tolist()
+#     save_dict['phi']=true_theta.data.clone().tolist()
+#     save_dict['inital_theta']=theta.data.clone().tolist()
+
+
+#     for num_update in range(number_updates):
+#         states, actions, tasks = trajectory(
+#             agent, phi, true_theta, env, arg.NUM_EP)
             
-        result = single_inverse(true_theta, phi, arg, env, agent, states, actions, tasks, filename, num_thetas, initial_theta=theta)
+#         result = single_inverse(true_theta, phi, arg, env, agent, states, actions, tasks, filename, num_thetas, initial_theta=theta)
+#         save_dict['theta_estimations'].append(result.tolist())
+#         savename=('inverse_data/' + filename + "EP" + str(arg.NUM_EP) + "updates" + str(number_update)+"sample"+str(arg.NUM_SAMPLES) +"IT"+ str(arg.NUM_IT) + '.pkl')
+#         torch.save(save_dict, savename)
+#         print(result)
 
-        # savename=('../firefly-inverse-data/data/' + filename + str(num_thetas) + "EP" + str(arg.NUM_EP) + str(
-        #     np.around(arg.PI_STD, decimals=2))+"sample"+str(arg.NUM_SAMPLES) +"IT"+ str(arg.NUM_IT) + '_LR_parttheta_result.pkl')
-        # torch.save(result, savename)
-        print(result)
+#------------------------new function part----------------
+filename="EP" + str(arg.NUM_EP) + "updates" + str(number_updates)+"lr"+str(arg.ADAM_LR)+'step'+str(arg.LR_STEP)
+single_theta_inverse(arg, env, agent, filename, 
+                number_updates=number_updates,
+                true_theta=None, phi=None,init_theta=None,
+                states=None, actions=None, tasks=None)
+
 
 print('done')
 
@@ -128,3 +143,4 @@ in single inverse,
 
 
 '''
+

@@ -1,6 +1,10 @@
 # will generate a circle of goal ( actually a gassian)
 # and a cov ellipse
+from scipy.stats import norm, chi2
 
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse, Circle
 
 import numpy as np
 from numpy import pi
@@ -14,17 +18,19 @@ import scipy.stats as stats
 import math
 
 from stable_baselines import DDPG, TD3
-from FireflyEnv import ffenv_new_cord
+from FireflyEnv import ffenv_new_cord, firefly_action_cost
 from reward_functions import reward_singleff
 from Config import Config
 arg=Config()
-arg.goal_radius_range=[0.15,0.3]
-env=ffenv_new_cord.FireflyAgentCenter(arg)
+arg.goal_radius_range=[0.1,0.3]
 
-# modelname='DDPG_95gamma_500000_0_17_10_30.zip'
-# model=DDPG.load(modelname)
+# no action cost model
+# env=ffenv_new_cord.FireflyAgentCenter(arg)
+# model=TD3.load('trained_agent/TD_95gamma_mc_500000_0_23_22_8.zip')
 
-model=TD3.load('TD_95gamma_mc_500000_0_23_22_8.zip')
+# action cost model
+env=firefly_action_cost.FireflyActionCost(arg)
+model=TD3.load('trained_agent/TD_action_cost_sg_700000_9_11_6_17')
 
 model.set_env(env)
 
@@ -84,7 +90,7 @@ def plot_belief(env,title='title',**kwargs):
     plt.quiver(pos.detach()[0], pos.detach()[1],np.cos(env.b.detach()[2,0].item()),np.sin(env.b.detach()[2,0].item()), color='r', scale=10)
     plot_cov_ellipse(cov, pos, nstd=2,ax=ax)
     # plot_cov_ellipse(np.diag([1,1])*0.05, [env.goalx,env.goaly], nstd=1, ax=ax)
-    plot_circle(np.eye(2)*env.phi[-1,0].item(),[env.goalx,env.goaly],ax=ax,color='y')
+    plot_circle(np.eye(2)*env.phi[8,0].item(),[env.goalx,env.goaly],ax=ax,color='y')
     return f1
 
 # np.sqrt(env.P[:3,:3])
@@ -100,7 +106,6 @@ def plot_belief(env,title='title',**kwargs):
 
 
 
-from scipy.stats import norm, chi2
 
 def cov_ellipse(cov, q=None, nsig=None, **kwargs):
     """
@@ -136,9 +141,6 @@ def cov_ellipse(cov, q=None, nsig=None, **kwargs):
     return width, height, rotation
 
 
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse, Circle
 
 def plot_point_cov(points, nstd=2, ax=None, **kwargs):
     """
@@ -163,7 +165,7 @@ def plot_point_cov(points, nstd=2, ax=None, **kwargs):
     return plot_cov_ellipse(cov, pos, nstd, ax, **kwargs)
 
 
-def plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=None, **kwargs):
+def plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=None,alpha=0.5, **kwargs):
     """
     Plots an `nstd` sigma error ellipse based on the specified covariance
     matrix (`cov`). Additional keyword arguments are passed on to the 
@@ -204,7 +206,7 @@ def plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=None, **kwargs):
     ellip = Ellipse(xy=pos, width=width, height=height, angle=theta, **kwargs)
     if color is not None:
         ellip.set_color(color)
-    ellip.set_alpha(0.5)
+    ellip.set_alpha(alpha)
     ax.add_artist(ellip)
     return ellip
     
@@ -363,7 +365,7 @@ while True:
         action,_=model.predict(env.decision_info)
         decision_info,_,done,_=env.step(action)
         fig=plot_belief(env,title=('action',action,env.phi),kwargs={'title':action})
-        # fig.savefig("{}.png".format(env.episode_time))
+        fig.savefig("{}.png".format(env.episode_time))
         print(env.decision_info[0,:2],action)
         print(env.episode_time)
     if env.caculate_reward()==0.:
@@ -371,47 +373,83 @@ while True:
     print('final reward ',env.caculate_reward(), env.episode_time)
 
 
+
 # plot belief with torch agent, to make sure translate correctly
-import policy_torch
-agent = policy_torch.copy_mlp_weights(model,layers=[128,128])
+# import policy_torch
+# agent = policy_torch.copy_mlp_weights(model,layers=[128,128])
+# env.reset()
+# while not env.stop:
+#     action = agent(env.decision_info)[0]
+#     decision_info,done=env(action, env.theta)
+#     fig=plot_belief(env,title=(action,env.phi),kwargs={'title':action})
+#     # fig.savefig("{}.png".format(env.episode_time))
+
+
+# # action distribution
 env.reset()
-while not env.stop:
-    action = agent(env.decision_info)[0]
-    decision_info,done=env(action, env.theta)
-    fig=plot_belief(env,title=(action,env.phi),kwargs={'title':action})
-    # fig.savefig("{}.png".format(env.episode_time))
+theta=env.theta
+phi=env.phi
+pos=[env.goalx,env.goaly]
 
+theta=env.reset_task_param()
 
-# action distribution
-number_trials=10
+number_trials=20
 v=[]
 w=[]
 d=[]
+mu=[]
+cov=[]
 for trial_num in range(number_trials):
     env.reset(theta=theta.detach(), phi=phi.detach(), goal_position=pos)
+    # env.reset()
     done=False
     vs=[]
     ws=[]
     ds=[]
+    mus=[]
+    covs=[]
     while not done:
         action,_=model.predict(env.decision_info)
         decision_info,_,done,_=env.step(action)
         vs.append(action[0])
         ws.append(action[1])
         ds.append(decision_info[0].tolist()[3:3+16])
+        mus.append(env.b[:2])
+        covs.append(env.P[:2,:2])
     # print(vs, ws)
     print('trial finished at : ',env.episode_time)
     v.append(vs)
     w.append(ws)
     d.append(ds)
+    mu.append(mus)
+    cov.append(covs)
 for trial in range(number_trials):
     plt.plot(v[trial])
 for trial in range(number_trials):
     plt.plot(w[trial])
 
-# testing decision info distribution 
-d_entry=8
-t_entry=4
+# belief distribution of single trial
+fig = plt.figure(figsize=[8, 8])
+ax = fig.add_subplot()
+ax.set_xlim([0,1])
+ax.set_ylim([-0.5,0.5])
+for covs, mus in zip(cov, mu):
+    for onecov,onemu in zip(covs, mus):
+        plot_cov_ellipse(onecov, onemu, ax=ax,nstd=2,alpha=0.1)
+
+fig = plt.figure(figsize=[8, 8])
+ax = fig.add_subplot()
+ax.set_xlim([0,1])
+ax.set_ylim([-0.5,0.5])
+for covs, mus in zip(cov, mu):
+    for onecov,onemu in zip(covs, mus):
+        ax.scatter(onemu[0],onemu[1])
+
+
+
+# # testing decision info distribution 
+d_entry=3
+t_entry=9
 entry_ls=[]
 for trial in range(number_trials):
     entry_ls.append(d[trial][t_entry][d_entry])
@@ -419,20 +457,124 @@ plt.plot(entry_ls)
 
 # testing decision info growth 
 d_entry=5
-trial_entry=8
+trial_entry=7
 entry_ls=[]
 for t in range(len(d[trial_entry])):
     entry_ls.append(d[trial_entry][t][d_entry])
 plt.plot(entry_ls)
 
 
-mu=torch.Tensor([ 0.2194, 0.2194])
-cov=torch.Tensor([[5.0709e-05, 4.5831e-06],
-        [4.5831e-06, 5.9715e-07]])
-bins=20
-r=0.1873
-mu=torch.Tensor([ 0., -0.])
+# mu=torch.Tensor([ 0.2194, 0.2194])
+# cov=torch.Tensor([[5.0709e-05, 4.5831e-06],
+#         [4.5831e-06, 5.9715e-07]])
+# bins=20
+# r=0.1873
+# mu=torch.Tensor([ 0., -0.])
 
-xrange=[mu[0]-goal_radius, mu[0]+goal_radius]
-yrange=[mu[1]-goal_radius, mu[1]+goal_radius]
-P=0
+# xrange=[mu[0]-goal_radius, mu[0]+goal_radius]
+# yrange=[mu[1]-goal_radius, mu[1]+goal_radius]
+# P=0
+v=[]
+w=[]
+for i in range(1000):
+    decision_info= env.decision_info
+    decision_info[:,:9]=env.reset_task_param().view(1,-1)
+    action,_=model.predict(decision_info)
+    v.append(action[0])
+    w.append(action[1])
+plt.hist(v,bins=100)
+plt.plot([true_action[0],true_action[0]],[0,99],color='r')
+plt.hist(w,bins=100)
+plt.plot([true_action[1],true_action[1]],[0,99],color='r')
+
+
+true_action,_=model.predict(env.decision_info)
+decision_info,_,done,_=env.step(true_action)
+
+
+
+# plot policy surface
+def plot_policy_surfaces(decision_info,model):
+    r_range=[0.2,1.0]
+    r_ticks=0.01
+    r_labels=[r_range[0]]
+    a_range=[-pi/4, pi/4]
+    a_ticks=0.05
+    a_labels=[a_range[0]]
+    while r_labels[-1]+r_ticks<=r_range[-1]:
+        r_labels.append(r_labels[-1]+r_ticks)
+    while a_labels[-1]+a_ticks<=a_range[-1]:
+        a_labels.append(a_labels[-1]+a_ticks)
+    policy1_data_v=np.zeros((len(r_labels),len(a_labels)))
+    policy1_data_w=np.zeros((len(r_labels),len(a_labels)))
+    for ri in range(len(r_labels)):
+        for ai in range(len(a_labels)):
+            action,_=model.predict(decision_info)
+            decision_info[:,0]=r_labels[ri]
+            decision_info[:,1]=a_labels[ai]
+            action,_=model.predict(decision_info)
+            policy1_data_v[ri,ai]=action[0]
+            policy1_data_w[ri,ai]=action[1]
+
+    fig, ax = plt.subplots(1, 2,
+            gridspec_kw={'hspace': 0.4, 'wspace': 0.2},figsize=(16,16))
+    # fig.suptitle('{} and {} policy surface'.format('rua',fontsize=40))
+    ax[0].set_title('forward velocity',fontsize=24)
+    ax[0].imshow(policy1_data_v,origin='lower',vmin=-1.,vmax=1.,extent=[a_labels[0],a_labels[-1],r_labels[0],r_labels[-1]])
+    ax[1].set_title('ang velocity',fontsize=24)
+    ax[1].imshow(policy1_data_w,origin='lower',vmin=-1.,vmax=1.,extent=[a_labels[0],a_labels[-1],r_labels[0],r_labels[-1]])
+    
+    return fig
+
+def inverseCholesky(vecL):
+    """
+    Performs the inverse operation to lower cholesky decomposition
+    and converts vectorized lower cholesky to matrix P
+    P = L L.t()
+    """
+    size = int(np.sqrt(2 * len(vecL)))
+    L = np.zeros((size, size))
+    mask = np.tril(np.ones((size, size)))
+    L[mask == 1] = vecL
+    P = L@(L.transpose())
+    return P
+
+# test policy surface when change cov
+from FireflyEnv.env_utils import *
+
+env.reset()
+decision_info= env.decision_info
+
+true_action,_=model.predict(env.decision_info)
+_,_,_,_=env.step(true_action)
+decision_info[:,5:-9]=vectorLowerCholesky(env.P)
+
+plot_policy_surfaces(decision_info,model)
+plot_policy_surfaces(env.decision_info,model)
+
+
+
+# ax.set_xlim([0,1])
+# ax.set_ylim([-0.5,0.5])
+
+
+    # for a in ax.flat:
+    #     a.set(xlabel='relative angle', ylabel='relative distance')
+    # # for a in ax.flat:
+    # #     a.label_outer()
+
+    # ax[2,0].text(-1.3,+5.5,'time {}'.format(str(belief.tolist()[4])),fontsize=24)
+    # ax[2,0].text(-3.3,-2.5,'theta {}'.format(str(['{:.2f}'.format(x) for x in (belief.tolist()[20:])])),fontsize=20)
+    # ax[2,0].text(-2.3,1.5,'scale bar,  -1                0                +1',fontsize=24)
+
+    # ax[2,0].imshow((np.asarray(list(range(10)))/10).reshape(1,-1))
+    # ax[2,0].axis('off')
+
+    # ax[2,1].set_title('P matrix',fontsize=24)
+    # ax[2,1].imshow(inverseCholesky(belief.tolist()[5:20]))
+    # ax[2,1].axis('off')
+
+    # plt.savefig('./policy plots/{} and {} policy surface {}.png'.format(torch_model1.name,torch_model2.name,name_index))
+
+
+

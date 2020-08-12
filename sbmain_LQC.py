@@ -78,7 +78,7 @@ train_time=500000
 
 for i in range(5):  
     model.learn(total_timesteps=train_time/5)
-    model.save("DDPG_95gamma_{}_{}_{}_{}_{}".format(train_time,i,
+    model.save("../trained_agent/DDPG_95gamma_{}_{}_{}_{}_{}".format(train_time,i,
     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
     ))
     env.max_distance=env.max_distance+0.1
@@ -89,7 +89,7 @@ env.EPISODE_LEN=40
 
 for i in range(5):  
     model.learn(total_timesteps=train_time/5)
-    model.save("DDPG_95gamma_smallgoal_{}_{}_{}_{}_{}".format(train_time,i,
+    model.save("../trained_agent/DDPG_95gamma_smallgoal_{}_{}_{}_{}_{}".format(train_time,i,
     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
     ))
 

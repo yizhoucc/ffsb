@@ -208,3 +208,29 @@ def belief_reward_mc(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx
         reward=reward.item()
         # print('reward as float',reward)
     return reward
+
+
+def action_cost_magnitude(action):
+    # sum up the squared norm action magnitude
+    cost=np.sum(np.linalg.norm(action)**2)
+    return cost
+
+
+def action_cost_dev(action, previous_action):
+    # sum up the norm squre for delta action
+    cost=(np.linalg.norm(action-previous_action))**2
+    return cost
+
+
+def action_cost_wrapper(action, previous_action,task_param):
+    mag_cost=action_cost_magnitude(action)
+    dev_cost=action_cost_dev(action, previous_action)
+    total_cost=task_param[9]*mag_cost+task_param[10]*dev_cost
+    return total_cost
+
+
+# def reward_wrapper_ac(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,nsamples=800,time=0,discount=0.95, actions=None, action_cost_param=[0.05,0.05]):
+#     reward=belief_reward_mc(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,nsamples=nsamples,time=time,discount=discount)
+#     cost=action_cost_param[0]*action_cost_magnitude(actions)+action_cost_param[1]*action_cost_dev(actions)    
+#     final_reward=reward-cost
+#     return final_reward

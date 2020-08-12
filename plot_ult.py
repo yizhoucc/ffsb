@@ -4,8 +4,198 @@ from torch import nn
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits import axes_grid1
+from matplotlib.patches import Ellipse, Circle
 
 
+def plot_belief_trajectory(model, env, title, ax=None, **kwargs):
+    if ax is None:
+        f1=plt.figure(figsize=(10,10))
+        ax = plt.gca()
+        ax.set_ylim(-1.5,1.5)
+        ax.set_xlim(-1.5,1.5)
+
+
+def plot_belief(env,title='title', alpha_factor=1,**kwargs):
+    'plot the belief, show the ellipse with goal circle, heading'
+    f1=plt.figure(figsize=(10,10))
+    ax = plt.gca()
+    ax.set_ylim(-1.5,1.5)
+    ax.set_xlim(-1.5,1.5)
+    pos=env.b[:2,0].detach()
+    cov=env.P[:2,:2].detach()
+    # plt.plot(pos[0],pos[1],'o')
+    # print('test',title)
+    if kwargs.get('title'):
+        print('test',kwargs.get('title'))
+        title=kwargs.get('title')
+    plt.title(title)
+    # real position red dot
+    plt.plot(env.s.detach()[0,0],env.s.detach()[1,0],'ro')
+    # green line showing mean belief to goal
+    plt.plot([pos.detach()[0],pos.detach()[0]+env.decision_info.detach()[0,0]*np.cos(env.b.detach()[2,0]+env.decision_info.detach()[0,1]) ],
+    [pos.detach()[1],pos.detach()[1]+env.decision_info.detach()[0,0]*np.sin(env.b.detach()[2,0]+env.decision_info.detach()[0,1])],'g')
+    # red arrow of belief heading direction
+    plt.quiver(pos.detach()[0], pos.detach()[1],np.cos(env.b.detach()[2,0].item()),np.sin(env.b.detach()[2,0].item()), 
+            color='r', scale=10, alpha=0.5*alpha_factor)
+    # blue ellipse of belief
+    plot_cov_ellipse(cov, pos, alpha_factor=1,nstd=2,ax=ax)
+    # yellow goal
+    plot_circle(np.eye(2)*env.phi[-1,0].item(),[env.goalx,env.goaly],ax=ax,color='y')
+    
+    return f1
+
+
+def cov_ellipse(cov, q=None, nsig=None, **kwargs):
+    """
+    Parameters
+    ----------
+    cov : (2, 2) array
+        Covariance matrix.
+    q : float, optional
+        Confidence level, should be in (0, 1)
+    nsig : int, optional
+        Confidence level in unit of standard deviations. 
+        E.g. 1 stands for 68.3% and 2 stands for 95.4%.
+
+    Returns
+    -------
+    width, height, rotation :
+         The lengths of two axises and the rotation angle in degree
+    for the ellipse.
+    """
+
+    if q is not None:
+        q = np.asarray(q)
+    elif nsig is not None:
+        q = 2 * norm.cdf(nsig) - 1
+    else:
+        raise ValueError('One of `q` and `nsig` should be specified.')
+    r2 = chi2.ppf(q, 2)
+
+    val, vec = np.linalg.eigh(cov)
+    width, height = 2 * np.sqrt(val[:, None] * r2)
+    rotation = np.degrees(np.arctan2(*vec[::-1, 0]))
+
+    return width, height, rotation
+
+
+def plot_point_cov(points, nstd=2, ax=None, **kwargs):
+    """
+    Plots an `nstd` sigma ellipse based on the mean and covariance of a point
+    "cloud" (points, an Nx2 array).
+
+    Parameters
+    ----------
+        points : An Nx2 array of the data points.
+        nstd : The radius of the ellipse in numbers of standard deviations.
+            Defaults to 2 standard deviations.
+        ax : The axis that the ellipse will be plotted on. Defaults to the 
+            current axis.
+        Additional keyword arguments are pass on to the ellipse patch.
+
+    Returns
+    -------
+        A matplotlib ellipse artist
+    """
+    pos = points.mean(axis=0)
+    cov = np.cov(points, rowvar=False)
+    return plot_cov_ellipse(cov, pos, nstd, ax, **kwargs)
+
+
+def plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=None,alpha_factor=1 **kwargs):
+    """
+    Plots an `nstd` sigma error ellipse based on the specified covariance
+    matrix (`cov`). Additional keyword arguments are passed on to the 
+    ellipse patch artist.
+
+    Parameters
+    ----------
+        cov : The 2x2 covariance matrix to base the ellipse on
+        pos : The location of the center of the ellipse. Expects a 2-element
+            sequence of [x0, y0].
+        nstd : The radius of the ellipse in numbers of standard deviations.
+            Defaults to 2 standard deviations.
+        ax : The axis that the ellipse will be plotted on. Defaults to the 
+            current axis.
+        Additional keyword arguments are pass on to the ellipse patch.
+
+    Returns
+    -------
+        A matplotlib ellipse artist
+    """
+    def eigsorted(cov):
+        vals, vecs = np.linalg.eigh(cov)
+        order = vals.argsort()[::-1]
+        return vals[order], vecs[:,order]
+
+    if ax is None:
+        figure=plt.figure(figsize=(10,10))
+        ax = plt.gca()
+        ax.set_ylim(-1.5,1.5)
+        ax.set_xlim(-1.5,1.5)
+
+
+    vals, vecs = eigsorted(cov)
+    theta = np.degrees(np.arctan2(*vecs[:,0][::-1]))
+
+    # Width and height are "full" widths, not radius
+    width, height = 2 * nstd * np.sqrt(vals)
+    ellip = Ellipse(xy=pos, width=width, height=height, angle=theta, **kwargs)
+    if color is not None:
+        ellip.set_color(color)
+    ellip.set_alpha(0.5*alpha_factor)
+    ax.add_artist(ellip)
+    return ellip
+
+
+def plot_circle(cov, pos, color=None, ax=None,alpha_factor=1, **kwargs):
+    'plot a circle'
+    if ax is None:
+        figure=plt.figure(figsize=(10,10))
+        ax = plt.gca()
+        ax.set_ylim(-1.5,1.5)
+        ax.set_xlim(-1.5,1.5)
+    assert cov[0,0]==cov[1,1]
+    r=cov[0,0]
+    c = Circle(pos,r)
+    if color is not None:
+        c.set_color(color)
+    c.set_alpha(0.5*alpha_factor)
+    ax.add_artist(c)
+    return c
+
+
+def overlap_mc(r, cov, mu, nsamples=1000):
+    'return the overlaping of a circle and ellipse using mc'
+    # xrange=[-cov[0,0],cov[0,0]]
+    # yrange=[-cov[1,1],cov[1,1]]
+    # xrange=[mu[0]-r*1.1,mu[0]+r*1.1]
+    # yrange=[mu[1]-r*1.1,mu[1]+r*1.1]
+
+    check=[]
+    xs, ys = np.random.multivariate_normal(-mu, cov, nsamples).T
+    # plot_overlap(r,cov,mu,title=None)
+    for i in range(nsamples):
+        # plt.plot(xs[i],ys[i],'.')
+        if (xs[i])**2+(ys[i])**2<=r**2:                
+            check.append(1)
+        else:
+            check.append(0)
+    P=np.mean(check)
+    return P
+
+
+def plot_overlap(r,cov,mu,title=None):
+    'plot the overlap between a circle and ellipse with cov'
+    f1=plt.figure(figsize=(10,10))
+    ax = plt.gca()
+    ax.set_ylim(-1.5,1.5)
+    ax.set_xlim(-1.5,1.5)
+    if title is not None:
+        ax.title.set_text(str(title))
+    plot_cov_ellipse(cov,[0,0],nstd=1,ax=ax)
+    plot_circle(np.eye(2)*r,mu,ax=ax,color='r')
+    return f1
 
 
 def add_colorbar(im, aspect=20, pad_fraction=0.5, **kwargs):

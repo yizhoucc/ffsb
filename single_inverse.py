@@ -88,9 +88,10 @@ def single_inverse(true_theta, arg, env, agent, x_traj,obs_traj, a_traj, filenam
     for i in range(9):
         H[i] = grad(grads[i], theta, retain_graph=True)[0]
     I = H.inverse()
+    # sqrt(diagnal(H^-1))
     stderr = torch.sqrt(I.diag())
 
-
+    # 1/sqrt(diag(H))
     stderr_ii = 1/torch.sqrt(torch.abs(H.diag()))
 
 

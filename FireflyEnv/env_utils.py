@@ -129,8 +129,71 @@ def denorm_parameter(parameter,param_range, given_range=[0.001,0.999]):
     parameter=(parameter+c)/k
     return parameter
 
+
 def inverse_sigmoid(parameter):
     return torch.log(parameter/(1-parameter))
 
+
 def placeholder_func(input):
     return input
+
+
+# for acc control
+def get_a(vm, dt=0.1, T=7, target_d=3, control_gain=1):
+    # return max a for given vm
+    lowera=0
+    uppera=0.99
+    a=(lowera+uppera)/2
+    
+    while uppera-lowera>0.02:
+        d=get_d(a, vm=vm, dt=dt, T=T,control_gain=control_gain)
+        if d>target_d+0.05:
+            lowera=a
+            a=(lowera+uppera)/2
+        elif d<target_d-0.05:
+            uppera=a
+            a=(lowera+uppera)/2
+        else:
+            return a
+        # print(a, lowera, uppera)
+    return a
+
+
+def get_d(a, vm, dt=0.1, T=7,control_gain=1):
+    # return max d given a and vm
+    s=get_s(a, vm, dt=dt, T=T,control_gain=control_gain)
+    b=vm*(1-a)/control_gain
+    d=0
+    v=0
+    for i in range(s):
+        v=v*a+b*control_gain
+        d=d+v*dt
+    for i in range(int(T/dt-s)):
+        v=v*a-b*control_gain
+        d=d+v*dt
+    return d
+
+
+def get_s(a, vm, dt=0.1,T=7,control_gain=1):
+    # return switch time given a and vm
+    b=vm*(1-a)/control_gain
+    totalt=T/dt
+    s=int(totalt/2)
+    lowers=0
+    uppers=totalt
+    while uppers-lowers>1:
+        v=0
+        for i in range(int(s)):
+            v=v*a+b*control_gain
+        for i in range(int(totalt-s)):
+            v=v*a-b*control_gain
+        if v>0.01:
+            uppers=s
+            s=round((lowers+uppers)/2)
+        elif v<-0.01:
+            lowers=s
+            s=round((lowers+uppers)/2)
+        else:
+            return s
+        # print(s)
+    return int(s)

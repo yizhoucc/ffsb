@@ -3,6 +3,28 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import pi
+
+ 
+def plot_polar_contour(values, azimuths, zeniths):
+
+    theta = azimuths
+    zeniths = np.array(zeniths)
+ 
+    values = np.array(values)
+    values = values.reshape(len(azimuths), len(zeniths))
+ 
+    r, theta = np.meshgrid(zeniths, (azimuths))
+    fig, ax = plt.subplots(subplot_kw=dict(projection='polar'))
+    ax.set_theta_zero_location("N")
+    ax.set_theta_direction(-1)
+
+    cax = ax.contourf(theta, r, values, 30)
+
+    cb = fig.colorbar(cax)
+    cb.set_label("Pixel reflectance")
+ 
+    return fig, ax, cax
+
 class TestArc():
 
     def __init__(self,vm,wm,kwargs=None):
@@ -145,7 +167,86 @@ class TurnthenGo(TestArc):
         except ZeroDivisionError:
             # the stright forward casef
             return d/self.vm
+
+
+class TestRewardP(TurnthenGo):
+
+    def __init__(self,vm,wm, dt=0.1, goal_r=0.2, nv=0.1, nw=0.1, wb='w',  kwargs=None):
+        super().__init__(vm,wm,kwargs=None)
+        # wabers law, assuming noise is propotional to w
+        self.nv=nv
+        self.nw=nw
+        self.waber_law=wb
+        self.dt=dt
+        self.goal_r=goal_r
+
+
+    def calculate_prob(self,T,v,w):
+        # each step, we have:
+        # cov = R@cov@RT + Q
+        # weber instead of waber
+        cov=np.zeros((2,2))
+        if self.waber_law=='w':
+            Q=np.diag([self.nv*self.vm, self.nw*abs(w)])
+        elif self.waber_law=='vw':
+            Q=np.diag([self.nv*v, self.nw*abs(w)])
+        else:
+            Q=np.diag([self.nv*self.vm, self.nw*self.wm])
+
+        R=np.array([[np.cos(w*self.dt),-np.sin(w*self.dt)],[np.sin(w*self.dt),np.cos(w*self.dt)]])
+        for i in range(int(np.ceil(T/self.dt))):
+            # actually we only need cov=cov+Q. rotation dosent matter since goal is circle and we go to the center.
+            # cov=R@cov@R.transpose()+Q
+            cov=cov+Q
+        # assuming goal is another gaussian
+        # assuming goal r is the 1st std
+        gaussian_cov=cov+np.diag([self.goal_r,self.goal_r])
+        peak=1/2/pi/np.sqrt(np.linalg.det(gaussian_cov))
+        return peak
+
+
+
+    def compute_prob_table(self):
+        prob_table=np.zeros( (len(self.theta_lables),len(self.d_lables)) )
+        time_table=np.zeros( (len(self.theta_lables),len(self.d_lables)) )
+        action_table=np.zeros( (len(self.theta_lables),len(self.d_lables),2) )
+
+        for i,theta in enumerate(self.theta_lables):
+            for j,d in enumerate(self.d_lables):
+                v,w=self.choose_action(d,theta)
+                # discrete time steps
+                T=self.calculate_time(d,theta,w)
+                P=self.calculate_prob(T,v,w)
+
+                prob_table[i,j]=P
+                time_table[i,j]=T
+                action_table[i,j]=[v,w]
+
+        self.time_table=time_table
+        self.action_table=action_table
+        self.prob_table=prob_table
+        return prob_table
+
+
  
-test=TestArc(0.2,pi/4)
-test.compute_time_table()
-plt.contourf(test.time_table)
+# test=TestArc(0.2,pi/4)
+# test.compute_time_table()
+# plt.contourf(test.time_table)
+
+test=TestRewardP(0.3,pi/4,wb='vw',nv=0.1,nw=0.001,dt=0.01)
+test.compute_prob_table()
+fig1, ax2 = plt.subplots(constrained_layout=True)
+CS=ax2.contourf(test.time_table)
+cbar = fig1.colorbar(CS)
+
+fig1, ax2 = plt.subplots(constrained_layout=True)
+CS=ax2.contourf(test.prob_table)
+cbar = fig1.colorbar(CS)
+
+fig1, ax2 = plt.subplots(constrained_layout=True)
+CS=ax2.contourf(test.prob_table*0.9**test.time_table)
+cbar = fig1.colorbar(CS)
+
+plt.jet()
+plot_polar_contour(test.time_table,test.theta_lables,test.d_lables)
+plot_polar_contour(test.prob_table*0.9**test.time_table,test.theta_lables,test.d_lables)

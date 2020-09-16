@@ -30,8 +30,8 @@ class PyTorchMlp(nn.Module):
       return x
 
 
-def copy_mlp_weights(baselines_model,layers=[64,64],act_fn=nn.functional.relu):
-  torch_mlp = PyTorchMlp(n_inputs=29, n_actions=2,layers=layers,act_fn=act_fn)
+def copy_mlp_weights(baselines_model,layers=[64,64],act_fn=nn.functional.relu,n_inputs=29, n_actions=2):
+  torch_mlp = PyTorchMlp(n_inputs=n_inputs, n_actions=n_actions,layers=layers,act_fn=act_fn)
   model_params = baselines_model.get_parameters()
   
   policy_keys = [key for key in model_params.keys() if "target/pi" in key]

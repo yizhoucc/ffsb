@@ -40,11 +40,10 @@ class Config:
         self.std_range =            [0.05,0.05*5,pi/80,pi/80*5]
         self.goal_radius_range =    [0.1, 0.3] 
         # action cost
-        self.mag_action_cost_range= [0.01,0.05]
+        self.mag_action_cost_range= [0.001,0.05]
         self.dev_action_cost_range= [0.01,0.5]
         # acc control, vt+1 = a*vt + b*ut
-        self.acc_a_range=           [0.01, 0.5]
-        self.acc_b_range=           [0.1,0.5]
+        self.tau_range=             [0.1,8]
 
 
 

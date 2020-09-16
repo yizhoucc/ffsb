@@ -102,7 +102,7 @@ def plot_point_cov(points, nstd=2, ax=None, **kwargs):
     return plot_cov_ellipse(cov, pos, nstd, ax, **kwargs)
 
 
-def plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=None,alpha_factor=1 **kwargs):
+def plot_cov_ellipse(cov, pos=[0,0], nstd=2, color=None, ax=None,alpha_factor=1, **kwargs):
     """
     Plots an `nstd` sigma error ellipse based on the specified covariance
     matrix (`cov`). Additional keyword arguments are passed on to the 
@@ -207,6 +207,7 @@ def add_colorbar(im, aspect=20, pad_fraction=0.5, **kwargs):
     cax = divider.append_axes("right", size=width, pad=pad)
     plt.sca(current_ax)
     return im.axes.figure.colorbar(im, cax=cax, **kwargs)
+    
 
 def inverseCholesky(vecL):
     """

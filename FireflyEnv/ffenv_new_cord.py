@@ -175,9 +175,9 @@ class FireflyAgentCenter(FireflyEnvBase):
         a_v = a[0]  # action for velocity
         a_w = a[1]  # action for angular velocity
         # sample noise value and apply to v, w together with gains
-        w=torch.distributions.Normal(0,task_param[2:4,0]).sample()        
+        w=torch.distributions.Normal(0,torch.ones([2,1])).sample()*task_param[2:4]    
         vel = 0.0 * vel + task_param[0,0] * a_v + w[0] 
-        ang_vel = 0.0 * ang_vel + task_param[1] * a_w + w[1]
+        ang_vel = 0.0 * ang_vel + task_param[1,0] * a_w + w[1]
 
         next_s = torch.stack((px, py, heading, vel, ang_vel)).view(1,-1)
         
@@ -283,6 +283,7 @@ class FireflyAgentCenter(FireflyEnvBase):
         # debug check
         if not is_pos_def(predicted_P): # should be positive definate. if not, show debug. 
             # if noise go to 0, happens.
+            print('theta: ', task_param)
             print("predicted_P:", predicted_P)
             print('Q:',Q)
             print("previous_P:", previous_P)
@@ -303,7 +304,13 @@ class FireflyAgentCenter(FireflyEnvBase):
         # debug check
         if not is_pos_def(P): 
             print("here")
-            print("P:", P)
+            print("updated P:", P)
+            print("K:", K)
+            print("H:", H)
+            print("I - KH:", I_KH)
+            print("error(obs - H@predicted_b):", error)
+            print('task parameter:',task_param)
+
             P = (P + P.t()) / 2 + 1e-6 * I  # make symmetric to avoid computational overflows
 
         # b=self.update_state(b)
@@ -404,7 +411,7 @@ class FireflyAgentCenter(FireflyEnvBase):
         
         task_param=self.theta if task_param is None else task_param
         # sample some noise
-        on = torch.distributions.Normal(0,task_param[6:8,0]).sample() # on is observation noise
+        on = torch.distributions.Normal(0,torch.ones([2,1])).sample()*task_param[6:8] # on is observation noise
         vel, ang_vel = torch.split(s.view(-1),1)[-2:] # 1,5 to vector and take last two
 
         ovel = task_param[4,0] * vel + on[0] # observe velocity

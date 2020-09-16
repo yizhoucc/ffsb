@@ -546,4 +546,125 @@ regression again p, b will help.
 
 
 
+make sure model is trained
+	cirriculum or just add time
+	plotting functions
 
+representation of belief, multi
+	how agent represent/compress belief of multi firefly
+	representation learning
+eye movement, new observation
+	eye movement probably signals the 'belief'
+	eye movement may helps short term memory
+	side information?
+acceration, 
+	shoudl be easy. just the same frame work.
+
+background,
+inverse need some differantiable policy surface to work better.
+neither selu or action smoothing's result is not exactly what we want.
+maybe the optimal policy is not smooth?
+	math of arcs
+	 to prove: better policy takes less T for d
+	is it = fix T and better policy can reach further goals?
+to prepare integrate the real monkey data,
+	monkey joystick
+		need to find some way to map it to rectangle.
+		seems they use some filter. is it possible for 'reconstruction'?
+model action output,
+	real task env
+		reward spare, too long, hard to learn
+		hierachical or reward shaping, optimal policy?
+		change in Q surface and not ultilize the learning before switching
+		encourage agent to move towards the goal, by N(mu=goal,std=0.1)
+		encourage agent to stop, by fix reward 0.1
+	HER or PER?
+ 	gamma related to skipping? either way, gamma need some attention
+	agent shouldnt look into inifinite future, or next several eps. 	
+
+
+Qt=rewardt+gamma*Qt+1, where Qt+1=rewardt+1 +gamma*Qt+2 ....
+	recursive belman function. 
+	if large gamma, for a init state of hard ep:
+	if skip, Q=0+gamma*Q(next ep init)...., where Q of next ep = gamma^T *reward expectation, where T is ep length expectation.
+	if not skip, Q= reward expectation*gamma^T +gamma^T*Qnextep....
+???so, seems if the reward expectation of this 'hard' ep (usually not hard, just longer) is large enough, agent will skip less.
+if gamma is large, looking into infinite future. optimaizing on total R/T? exp of reward of infinite future is same. 
+if gamma is apporiately small, say, only look into next ep. if skip, exp reward larger. if not skip, low exp.
+
+
+ 1.if bound, sampling.         2.if slow, 2nd order natrual gradient, newton
+after some train, freeze gain and train for noise.
+think about t0, x0 and a0. to get b1, first Ax, APA+Q, then use o1, which is Hx1, R.
+update, we mix APA+Q by KH, containing P,Q,R. and b=x+K(z-hx)
+K, how much we trust obs.
+because from a to belief isnt a one to few, we do it forward direction:
+sample pronoise, obsnoise, and a obs point using this obsnoise that gives b, that action from this belief is within a small deviation from action. (soft 0,1) (sample to get a belief good for this context)
+because we know the range of the noise (the bound), we only need to sample within the gaussian circle. And because this has real world state meaning, if within range, the policy likely to give similar action.
+adv: real animal data is not as many as we want. here, we explore into depth in the data.
+problem: there is a theta in belief that give to policy. we dont know how much the policy depends on the theta.
+I need some time to finalize it, and implant. 1+1wk
+
+next step, chose from these(check heissian,  new, )
+architecture:
+env-agent/policy pair, as data generator and iterator. 
+so two set for simulation, one set for real data.
+algorithm, call the pair to collect teacher data, and call the pair to iterate, calculat loss, update.
+it has universal function such as log the theta change, loss change, grad, ep.
+it has specific function to initialize theta and phi, and pass to the env agent pair
+
+
+LQC: minimize the input error sum, minimize the integral, so that output is stable and flat.
+kalman filter: predict future, and update prediction by actual obs.
+compare, LQC, give the input update, and actual update the future by minimizing noise.
+
+
+
+8.26
+questions
+	covariance matrix singular, cause: maybe: noise param too small
+	how to preciesly get the cause, and if this is affecting the result
+	hwo to interpret when cov is singular, having eigvalue 0?
+	
+	action cost inverse has heissian singular, while orginal no action cost hessian is not.
+	what means by hessian is singular? some eig value are 0. some parameter 2nd derivative is linear combination of other?
+	theta cov=- invserse(H), how to represent a multi dim gaussian in pc space?
+
+results:
+	multi initial point solving for one true theta
+feedback:
+	bug of hard coding error, not calculating grad for newer 2 rows, resulting in 0 as eig value for heissian.
+
+
+
+aug 31
+monkey data: 
+	trials missing first several data point. if dt=0.1. first 0-3
+		assuming linear increase in v, w for these points？
+	controls, sometimes exceed 1 (due to noise and filtering)
+		cut it to 1
+	at least for this monkey, hes not using full v. and making up and down w. (not s shape trajectory tho)
+		same for easy trials.
+
+plan inverse:
+	we know process gains, goal radius. 1. fix these, solve for noises and obs gain. 2. solve for all, use these as checks
+question:
+	continue on ploting the confident intervalhttps://wifi.xfinity.com/default.php#find-a-hotspot
+	what is the correct way to convert high dim cov to pca dim?
+	diagnal: simga in u, v should be weighed sum of n dim sigmas, so: u=vector*u eig vector	
+	how about rotations(correlations)?
+
+	after the noise samping change:
+	noise parameters are still in a ralation. how to untangle these?
+	if large obs noise(not rely on obs), when further increase obs noise, performance is not affected.
+	if small obs noise(rely on obs), increase obs noise change actions.
+	d action/ d obs noise gives info about obs and process noise ratio
+plots:
+monkey trails, 
+
+start y vs start v. correlation
+start x vs trials, distribution hist
+start y vs trials. distribution hist
+start y vs w. correlation
+
+feedback: think about the matrix operation. so it would be just ABAT format.

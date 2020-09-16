@@ -1,7 +1,7 @@
 
 from stable_baselines.td3.policies import MlpPolicy
 from stable_baselines import TD3
-from FireflyEnv import firefly_action_cost
+from FireflyEnv import firefly_acc
 from Config import Config
 arg=Config()
 import numpy as np
@@ -14,7 +14,7 @@ from reward_functions import reward_singleff
 action_noise = NormalActionNoise(mean=np.zeros(2), sigma=float(0.5) * np.ones(2))
 
 arg.goal_radius_range=[0.15,0.3]
-env=firefly_action_cost.FireflyActionCost(arg)
+env=firefly_acc.FireflyAcc(arg)
 env.max_distance=0.5
 
 
@@ -45,22 +45,20 @@ model = TD3(MlpPolicy,
             n_cpu_tf_sess=None,            
             )
 
-train_time=700000 
-env.cost_scale=0.1
-for i in range(10):  
-    model.learn(total_timesteps=int(train_time/10))
-    model.save("trained_agent/TD_action_cost_{}_{}_{}_{}_{}".format(train_time,i,
-    str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
-    ))
-    env.max_distance=env.max_distance+0.1
-    env.cost_scale=env.cost_scale+0.02
+train_time=1000000 
 
-env.goal_radius_range=[0.1,0.3]
-env.EPISODE_LEN=40
 for i in range(10):  
     model.learn(total_timesteps=int(train_time/10))
-    model.save("trained_agent/TD_action_cost_sg_{}_{}_{}_{}_{}".format(train_time,i,
+    model.save("trained_agent/TD_acc_control_{}_{}_{}_{}_{}".format(train_time,i,
     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
     ))
-    env.cost_scale=env.cost_scale+0.02
+    env.max_distance=env.max_distance+0.05
+
+# env.goal_radius_range=[0.1,0.3]
+
+# for i in range(10):  
+#     model.learn(total_timesteps=int(train_time/10))
+#     model.save("trained_agent/TD_acc_control_sg_{}_{}_{}_{}_{}".format(train_time,i,
+#     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
+#     ))
 

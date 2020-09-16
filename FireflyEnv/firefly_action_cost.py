@@ -13,6 +13,10 @@ from reward_functions import reward_singleff
 # obs space is inf
 # representation
 
+# done, make max action cost lower than possible reward
+# lowest possible reward, a function, now value is reward_scale*gamma**T <2.5
+# using 2.5 as max cost.
+# we first random a alpha, then random a beta in proper range.
 
 
 class FireflyActionCost(FireflyAgentCenter): 
@@ -34,6 +38,7 @@ class FireflyActionCost(FireflyAgentCenter):
         self.observation_space = spaces.Box(low=low, high=high,shape=(1,31),dtype=np.float32)
 
         self.cost_function=reward_singleff.action_cost_wrapper
+        self.cost_scale=1
 
 
     def _apply_param_range(self,gains_range=None,std_range=None,goal_radius_range=None,mag_action_cost_range=None,dev_action_cost_range=None):
@@ -55,6 +60,16 @@ class FireflyActionCost(FireflyAgentCenter):
         self.decision_info = self.wrap_decision_info(b=self.b, time=self.episode_time, task_param=self.theta)
         self.decision_info = row_vector(self.decision_info)
         self.previous_action=np.zeros(2)
+
+
+    def constrained_cost_factor_range(self, alpha_param, max_cost=2.5,total_steps=40):
+        # mag cost, assuming v is always max (which is true)
+        # assuming 40 max steps
+        mag_cost=alpha_param*total_steps
+        max_dev_cost=max_cost-mag_cost
+        max_beta_param=max_dev_cost/3 # theortically, 0 to 1/-1 then to opposite, has the min dev cost
+        beta_param_range= [0.001, max_beta_param]
+        return beta_param_range
 
 
     def reset_task_param(self,                
@@ -86,7 +101,9 @@ class FireflyActionCost(FireflyAgentCenter):
         _goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.goal_radius_range[1])
 
         _mag_action_cost_factor = torch.zeros(1).uniform_(self.mag_action_cost_range[0], self.mag_action_cost_range[1])
-        _dev_action_cost_factor = torch.zeros(1).uniform_(self.dev_action_cost_range[0], self.dev_action_cost_range[1])
+        # _dev_action_cost_factor = torch.zeros(1).uniform_(self.dev_action_cost_range[0], self.dev_action_cost_range[1])
+        beta_range=self.constrained_cost_factor_range(_mag_action_cost_factor)
+        _dev_action_cost_factor = torch.zeros(1).uniform_(float(beta_range[0]),float(beta_range[1]))
 
         phi=torch.cat([_pro_gains,_pro_noise_stds,_obs_gains,_obs_noise_stds,_goal_radius,_mag_action_cost_factor,_dev_action_cost_factor])
 
@@ -119,4 +136,4 @@ class FireflyActionCost(FireflyAgentCenter):
         else:
             reward=0.
         cost=self.cost_function(self.a, self.previous_action,task_param=self.phi)
-        return reward-cost
+        return reward-self.cost_scale*cost

@@ -18,59 +18,111 @@ import scipy.stats as stats
 import math
 
 from stable_baselines import DDPG, TD3
-from FireflyEnv import ffenv_new_cord, firefly_action_cost
+from FireflyEnv import ffenv_new_cord, firefly_action_cost, firefly_acc
 from reward_functions import reward_singleff
 from Config import Config
 arg=Config()
 arg.goal_radius_range=[0.1,0.3]
 
-# no action cost model
+# # no action cost model
 # env=ffenv_new_cord.FireflyAgentCenter(arg)
 # model=TD3.load('trained_agent/TD_95gamma_mc_500000_0_23_22_8.zip')
 
-# action cost model
-env=firefly_action_cost.FireflyActionCost(arg)
-model=TD3.load('trained_agent/TD_action_cost_sg_700000_9_11_6_17')
+# # action cost model
+# env=firefly_action_cost.FireflyActionCost(arg)
+# # modelname='trained_agent/TD_action_cost_sg_700000_9_11_6_17'# non ranged working model
+# modelname='trained_agent/TD_action_cost_700000_8_19_21_56'# ranged model last
+# model=TD3.load(modelname)
+
+# acc model
+env=firefly_acc.FireflyAcc(arg)
+model=TD3.load('trained_agent/TD_acc_control_1000000_3_15_18_34.zip')
 
 model.set_env(env)
+# series of plots describing the trail
+#-------------------------------------------------------
+env.max_distance=0.5
+env.reset(
+    # pro_noise_stds=torch.Tensor([0.2,0.2])
+        # pro_gains=torch.Tensor([0.5,1]),
+        # obs_gains=torch.Tensor([0.51,1])
+)
+done=False
+# phi=env.phi
+while not done:
+    action,_=model.predict(env.decision_info)
+    decision_info,_,done,_=env.step(action)
+    fig=plot_belief(env,title=('action',action,"velocity", env.s[-2:],'phi:',env.phi),kwargs={'title':action})
+    # fig.savefig("{}.png".format(env.episode_time))
+    # print(env.decision_info[0,:2],action)        
+    # print(env.s[:,0],en v.phi[:-2,0])
+    # print(env.episode_time)
+
+# action distribution------------------------------
+def return_vw_distribution(env, model,number_trials=10):
+    env.reset()
+    theta=env.theta
+    phi=env.phi
+    pos=[env.goalx,env.goaly]
+    theta=env.reset_task_param()
+    v=[]
+    w=[]
+    d=[]
+    mu=[]
+    cov=[]
+    for trial_num in range(number_trials):
+        env.reset(theta=theta.detach(), phi=phi.detach(), goal_position=pos)
+        # env.reset()
+        done=False
+        vs=[]
+        ws=[]
+        ds=[]
+        mus=[]
+        covs=[]
+        while not done:
+            action,_=model.predict(env.decision_info)
+            decision_info,_,done,_=env.step(action)
+            vs.append(action[0])
+            ws.append(action[1])
+            ds.append(decision_info[0].tolist()[3:3+16])
+            mus.append(env.b[:2])
+            covs.append(env.P[:2,:2])
+        # print(vs, ws)
+        print('trial finished at : ',env.episode_time)
+        v.append(vs)
+        w.append(ws)
+        d.append(ds)
+        mu.append(mus)
+        cov.append(covs)
+    return v, w
+
+def plot_vw_distribution(env, model, number_trials=10):
+    v,w=return_vw_distribution(env, model,number_trials=number_trials)
+    fig = plt.figure(figsize=[16, 9])
+    ax = fig.add_subplot(121)
+    ax1 = fig.add_subplot(122)
+    ax.set_title('forward velocity V control of the agent', fontsize=20)
+    ax1.set_title('angular velocity W control of the agent', fontsize=20)
+    ax.set_xlabel('time steps, dt=0.1', fontsize=15)
+    ax1.set_xlabel('time steps, dt=0.1', fontsize=15)
+    ax.set_ylabel('control, range=[-1,1]', fontsize=15)
+    ax1.set_ylabel('control, range=[-1,1]', fontsize=15)
+    ax.set_ylim([-1.1,1.1])
+    ax1.set_ylim([-1.1,1.1])
+    for vs in v:
+        ax.plot(vs)
+    for ws in w:
+        ax1.plot(ws) 
+    return fig
+
+plot_vw_distribution(env, model, number_trials=10)
 
 
-# action=[1,1]
-# action=[1,-1]
-# action=[1,0]
-# action=[0,0]
-# def raction():
-#     return [np.random.randint(2),np.random.randint(2)]
-# env.step(action)
-# env.s
-# env.b
-# env.episode_time
-
-# env.reset()
-
-# env.reset(
-#     pro_gains=torch.Tensor([1,2]),
-#     pro_noise_stds=torch.Tensor([0.4,0.4]),
-#     obs_noise_stds=torch.Tensor([0.4,0.4]))
-# while env.episode_time<30:
-#     # action=raction()
-#     action=[1,1]
-#     action=[1,-1]
-#     action=[1,0]
-#     env.step(action)
-#     fig=plot_belief(env)
 
 
-#     fig.savefig("{}.png".format(env.episode_time))
-# env.phi
-# env.std_range
-# env.reset_task_param()
-# torch.distributions.Normal(0,env.phi[2:4]).sample()        
-# env.phi[2:4]
-# env.P[:3,:3]
-# pos=env.b[0,:2]
-# cov=env.P[:2,:2]
 
+
+#-------------------------------------------------------
 def plot_belief(env,title='title',**kwargs):
     f1=plt.figure(figsize=(10,10))
     ax = plt.gca()
@@ -92,19 +144,6 @@ def plot_belief(env,title='title',**kwargs):
     # plot_cov_ellipse(np.diag([1,1])*0.05, [env.goalx,env.goaly], nstd=1, ax=ax)
     plot_circle(np.eye(2)*env.phi[8,0].item(),[env.goalx,env.goaly],ax=ax,color='y')
     return f1
-
-# np.sqrt(env.P[:3,:3])
-
-# mu=0
-# sigma=0.1
-# x = np.linspace(mu - 3*sigma, mu + 3*sigma, 100)
-# plt.plot(x, stats.norm.pdf(x, mu, sigma))
-
-
-# plot_cov_ellipse(cov, [0.5,0.5], nstd=2)
-# plot_cov_ellipse(np.diag([1,1])*0.05, [0.5,0.5], nstd=2)
-
-
 
 
 def cov_ellipse(cov, q=None, nsig=None, **kwargs):
@@ -139,7 +178,6 @@ def cov_ellipse(cov, q=None, nsig=None, **kwargs):
     rotation = np.degrees(np.arctan2(*vec[::-1, 0]))
 
     return width, height, rotation
-
 
 
 def plot_point_cov(points, nstd=2, ax=None, **kwargs):
@@ -227,18 +265,6 @@ def plot_circle(cov, pos, color=None, ax=None, **kwargs):
     ax.add_artist(c)
     return c
 
-# points = np.random.multivariate_normal(
-#         mean=(1,1), cov=[[0.4, 9],[9, 10]], size=1000
-#         )
-# # Plot the raw points...
-# x, y = points.T
-# plt.plot(x, y, 'ro')
-
-# # Plot a transparent 3 standard deviation covariance ellipse
-# plot_point_cov(points, nstd=3, alpha=0.5, color='green')
-
-# plt.show()
-
 
 ## - ----------------------------
 # show ellipse and circle 
@@ -281,6 +307,7 @@ def overlap_intergration(r, cov, mu, bins=20):
 
     return P
 
+
 def overlap_mc(r, cov, mu, nsamples=1000):
     # xrange=[-cov[0,0],cov[0,0]]
     # yrange=[-cov[1,1],cov[1,1]]
@@ -299,12 +326,6 @@ def overlap_mc(r, cov, mu, nsamples=1000):
     P=np.mean(check)
     return P
 
-
-
-
-# plot_overlap(r,cov,mu,title=None)
-# for i in range(nsamples):
-#     plt.plot(xs[i],ys[i],'.')
 
 def plot_overlap(r,cov,mu,title=None):
     f1=plt.figure(figsize=(10,10))
@@ -329,27 +350,6 @@ def plot_overlap(r,cov,mu,title=None):
 #     for j in np.linspace(-0.5,0.5,19):
 #         plot_overlap(r,cov,[i,j],title=str(str(overlap_intergration(r,cov,[i,j]))+str(overlap_prob(r,cov,[i,j]))))
 #         plt.savefig("{}_{}.png".format(str(i),str(j)))
-theta=torch.Tensor(
-    [[0.4990],
-        [3.1182],
-        [0.2064],
-        [0.1697],
-        [0.5622],
-        [2.7172],
-        [0.2474],
-        [0.1377],
-        [0.1957]])
-phi=torch.Tensor(
-    [[0.5020],
-    [3.1152],
-    [0.2094],
-    [0.1667],
-    [0.5652],
-    [2.7202],
-    [0.2444],
-    [0.1347],
-    [0.1987]])
-pos=[0.7,0.4]
 
 # plot belief with stable baselines agent
 # env.reset(
@@ -358,16 +358,21 @@ pos=[0.7,0.4]
 # env.reset(phi=phi, theta=phi)
 # env.reset(theta=theta.detach(), phi=phi.detach(), goal_position=pos)
 while True:
-    env.reset()
+    env.reset(
+        # pro_noise_stds=torch.Tensor([0.2,0.2])
+            # pro_gains=torch.Tensor([0.5,1]),
+            # obs_gains=torch.Tensor([0.51,1])
+    )
     done=False
     # phi=env.phi
     while not done:
         action,_=model.predict(env.decision_info)
         decision_info,_,done,_=env.step(action)
         fig=plot_belief(env,title=('action',action,env.phi),kwargs={'title':action})
-        fig.savefig("{}.png".format(env.episode_time))
-        print(env.decision_info[0,:2],action)
-        print(env.episode_time)
+        # fig.savefig("{}.png".format(env.episode_time))
+        # print(env.decision_info[0,:2],action)        
+        # print(env.s[:,0],env.phi[:-2,0])
+        # print(env.episode_time)
     if env.caculate_reward()==0.:
         break
     print('final reward ',env.caculate_reward(), env.episode_time)
@@ -385,48 +390,7 @@ while True:
 #     # fig.savefig("{}.png".format(env.episode_time))
 
 
-# # action distribution
-env.reset()
-theta=env.theta
-phi=env.phi
-pos=[env.goalx,env.goaly]
 
-theta=env.reset_task_param()
-
-number_trials=20
-v=[]
-w=[]
-d=[]
-mu=[]
-cov=[]
-for trial_num in range(number_trials):
-    env.reset(theta=theta.detach(), phi=phi.detach(), goal_position=pos)
-    # env.reset()
-    done=False
-    vs=[]
-    ws=[]
-    ds=[]
-    mus=[]
-    covs=[]
-    while not done:
-        action,_=model.predict(env.decision_info)
-        decision_info,_,done,_=env.step(action)
-        vs.append(action[0])
-        ws.append(action[1])
-        ds.append(decision_info[0].tolist()[3:3+16])
-        mus.append(env.b[:2])
-        covs.append(env.P[:2,:2])
-    # print(vs, ws)
-    print('trial finished at : ',env.episode_time)
-    v.append(vs)
-    w.append(ws)
-    d.append(ds)
-    mu.append(mus)
-    cov.append(covs)
-for trial in range(number_trials):
-    plt.plot(v[trial])
-for trial in range(number_trials):
-    plt.plot(w[trial])
 
 # belief distribution of single trial
 fig = plt.figure(figsize=[8, 8])

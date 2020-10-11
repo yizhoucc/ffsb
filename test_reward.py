@@ -12,51 +12,104 @@ import time
 import torch
 import gym
 from stable_baselines.ddpg.policies import LnMlpPolicy, MlpPolicy
-
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import math
-
 from stable_baselines import DDPG, TD3
-from FireflyEnv import ffenv_new_cord, firefly_action_cost, firefly_acc
+import TD3_test
+from FireflyEnv import ffenv_new_cord, firefly_action_cost, firefly_acc, firefly_accac, firefly_mdp
 from reward_functions import reward_singleff
 from Config import Config
 arg=Config()
 arg.goal_radius_range=[0.1,0.3]
+from FireflyEnv.env_utils import vectorLowerCholesky
+from plot_ult import add_colorbar
 
 # # no action cost model
 # env=ffenv_new_cord.FireflyAgentCenter(arg)
 # model=TD3.load('trained_agent/TD_95gamma_mc_500000_0_23_22_8.zip')
 
-# # action cost model
-# env=firefly_action_cost.FireflyActionCost(arg)
-# # modelname='trained_agent/TD_action_cost_sg_700000_9_11_6_17'# non ranged working model
-# modelname='trained_agent/TD_action_cost_700000_8_19_21_56'# ranged model last
-# model=TD3.load(modelname)
+# action cost model
+env=firefly_action_cost.FireflyActionCost(arg)
+# modelname='trained_agent/TD_action_cost_sg_700000_9_11_6_17'# non ranged working model
+modelname='trained_agent/TD_action_cost_700000_8_19_21_56'# ranged model last
+model=TD3.load(modelname)
 
 # acc model
 env=firefly_acc.FireflyAcc(arg)
-model=TD3.load('trained_agent/TD_acc_control_1000000_3_15_18_34.zip')
-
+model=TD3.load('trained_agent/.zip')
 model.set_env(env)
+
+# acc ac model
+env=firefly_accac.FireflyAccAc(arg)
+model=TD3.load('trained_agent/accac_final_1000000_9_11_4_39.zip')
+model.set_env(env)
+
+# acc mdp model
+env=firefly_mdp.FireflyMDP(arg)
+model=TD3.load('trained_agent/mdp_noise_1000000_2_9_18_8')
+model.set_env(env)
+
+
 # series of plots describing the trail
 #-------------------------------------------------------
-env.max_distance=0.5
-env.reset(
-    # pro_noise_stds=torch.Tensor([0.2,0.2])
+# max_distance=1
+# uppertau=8.08
+# param_range_dict={  'tau_range':[0.05, uppertau],
+#                     }
+env.terminal_vel= 0.025 
+env.dt=0.2
+env.episode_len=35
+env.std_range = [0.02,0.1,0.02,0.1]
+# env.setup(arg, max_distance=max_distance,param_range_dict=param_range_dict)
+
+decision_info=env.reset(
+    pro_noise_stds=torch.Tensor([0.2,0.3]),
+    obs_noise_stds=torch.Tensor([0.2,0.3]),
         # pro_gains=torch.Tensor([0.5,1]),
         # obs_gains=torch.Tensor([0.51,1])
 )
+trial_index=38
+decision_info=env.reset(
+        goal_position=task_info[trial_index]['pos'],
+        phi=task_info[trial_index]['phi'],
+        theta=task_info[trial_index]['theta'])
+decision_info=env.reset()
 done=False
-# phi=env.phi
 while not done:
     action,_=model.predict(env.decision_info)
     decision_info,_,done,_=env.step(action)
-    fig=plot_belief(env,title=('action',action,"velocity", env.s[-2:],'phi:',env.phi),kwargs={'title':action})
+    fig=plot_belief(env,title=('action',action,"velocity", env.s[-2:],'tau:',env.phi[9]),kwargs={'title':action})
     # fig.savefig("{}.png".format(env.episode_time))
     # print(env.decision_info[0,:2],action)        
     # print(env.s[:,0],en v.phi[:-2,0])
     # print(env.episode_time)
+    # print(env.s[3,0],env.b[3,0])
+
+
+# Bangbang control
+env.std_range=[1e-4,1e-3,1e-4,1e-3]
+decision_info=env.reset()
+action,s=model.predict(env.decision_info)
+print(s)
+
+
+while env.episode_time*env.dt<s:
+    decision_info,_,done,_=env.step(action)
+    fig=plot_belief(env,title=('CTRL',action,"velocity", env.s[-2:],'tau:',env.phi[9]))
+action=[-a for a in action]
+while env.s[3,0]>=0:
+    decision_info,_,done,_=env.step(action)
+    fig=plot_belief(env,title=('-CTRL',action,"velocity", env.s[-2:],'tau:',env.phi[9]))
+
+# bangbang control discrete (more like rl agent)
+
+
+plot_vw_distribution(env, model, number_trials=1)
+correct_rate(env, model, number_trials=100, correct_threshold=0.5)
+
+task_info=get_wrong_trial(env,model)
+correct_rate(env, model, number_trials=100, task_info=task_info)
 
 # action distribution------------------------------
 def return_vw_distribution(env, model,number_trials=10):
@@ -70,6 +123,8 @@ def return_vw_distribution(env, model,number_trials=10):
     d=[]
     mu=[]
     cov=[]
+    vv=[]
+    vw=[]
     for trial_num in range(number_trials):
         env.reset(theta=theta.detach(), phi=phi.detach(), goal_position=pos)
         # env.reset()
@@ -79,11 +134,15 @@ def return_vw_distribution(env, model,number_trials=10):
         ds=[]
         mus=[]
         covs=[]
+        vvs=[]
+        vws=[]
         while not done:
             action,_=model.predict(env.decision_info)
             decision_info,_,done,_=env.step(action)
             vs.append(action[0])
             ws.append(action[1])
+            vvs.append(env.s[3])
+            vws.append(env.s[4])
             ds.append(decision_info[0].tolist()[3:3+16])
             mus.append(env.b[:2])
             covs.append(env.P[:2,:2])
@@ -94,13 +153,16 @@ def return_vw_distribution(env, model,number_trials=10):
         d.append(ds)
         mu.append(mus)
         cov.append(covs)
-    return v, w
+        vv.append(vvs)
+        vw.append(vws)
+    return v, w, vv, vw
+
 
 def plot_vw_distribution(env, model, number_trials=10):
-    v,w=return_vw_distribution(env, model,number_trials=number_trials)
-    fig = plt.figure(figsize=[16, 9])
-    ax = fig.add_subplot(121)
-    ax1 = fig.add_subplot(122)
+    v,w, vv, vw=return_vw_distribution(env, model,number_trials=number_trials)
+    fig = plt.figure(figsize=[9, 9])
+    ax = fig.add_subplot(221)
+    ax1 = fig.add_subplot(222)
     ax.set_title('forward velocity V control of the agent', fontsize=20)
     ax1.set_title('angular velocity W control of the agent', fontsize=20)
     ax.set_xlabel('time steps, dt=0.1', fontsize=15)
@@ -109,20 +171,78 @@ def plot_vw_distribution(env, model, number_trials=10):
     ax1.set_ylabel('control, range=[-1,1]', fontsize=15)
     ax.set_ylim([-1.1,1.1])
     ax1.set_ylim([-1.1,1.1])
+    ax2 = fig.add_subplot(223)
+    ax3 = fig.add_subplot(224)
+    ax2.set_xlabel('time steps, dt=0.1', fontsize=15)
+    ax3.set_xlabel('time steps, dt=0.1', fontsize=15)
+    ax2.set_ylabel('v', fontsize=15)
+    ax3.set_ylabel('w', fontsize=15)
+    ax2.set_ylim([-1.1,1.1])
+    ax3.set_ylim([-1.1,1.1])
+
     for vs in v:
         ax.plot(vs)
     for ws in w:
         ax1.plot(ws) 
+    for vvs in vv:
+        ax2.plot(vvs)
+    for vws in vw:
+        ax3.plot(vws)
+
     return fig
 
-plot_vw_distribution(env, model, number_trials=10)
+
+def correct_rate(env, model, number_trials=100, task_info=None,correct_threshold=5):
+    correct=0
+    if task_info is list:
+        for i in range(len(task_info)):
+                env.reset(goal_position=task_info['pos'],
+                            phi=task_info['phi'],
+                            theta=task_info['theta'])
+                done=False
+                while not done:
+                    action,_=model.predict(env.decision_info)
+                    decision_info,_,done,_=env.step(action)
+                    # fig.savefig("{}.png".format(env.episode_time))
+                if env.episode_reward>5:
+                    correct=correct+1
+
+    else:
+        for i in range(number_trials):
+            if task_info is dict:
+                env.reset(goal_position=task_info['pos'],
+                            phi=task_info['phi'],
+                            theta=task_info['theta'])
+            else:
+                env.reset()
+                done=False
+                while not done:
+                    action,_=model.predict(env.decision_info)
+                    decision_info,_,done,_=env.step(action)
+                    # fig.savefig("{}.png".format(env.episode_time))
+                if env.episode_reward>correct_threshold:
+                    correct=correct+1
+    return correct/number_trials
 
 
+def get_wrong_trial(env,model, number_trials=100):
+    tasks=[]
+    while len(tasks)<number_trials:
+        task_info={}
+        while task_info=={}:
+            done=False
+            while not done:
+                action,_=model.predict(env.decision_info)
+                decision_info,_,done,_=env.step(action)
+                if env.episode_reward<5:
+                    task_info['pos']=[env.goalx,env.goaly]
+                    task_info['phi']=env.phi
+                    task_info['theta']=env.theta
+        tasks.append(task_info)
+    return tasks
+    # v w and controls for some trials    
 
-
-
-
-#-------------------------------------------------------
+#------------------------------------------------------
 def plot_belief(env,title='title',**kwargs):
     f1=plt.figure(figsize=(10,10))
     ax = plt.gca()
@@ -266,9 +386,6 @@ def plot_circle(cov, pos, color=None, ax=None, **kwargs):
     return c
 
 
-## - ----------------------------
-# show ellipse and circle 
-# given r, cov, and offset mu, calculate overlap
 def overlap_prob(r, cov, mu ):
     # normalizing_z=2*pi*r**2
     rop=cov.copy()
@@ -357,25 +474,25 @@ def plot_overlap(r,cov,mu,title=None):
 #     obs_noise_stds=torch.Tensor([0.05*8,pi/80*8]))
 # env.reset(phi=phi, theta=phi)
 # env.reset(theta=theta.detach(), phi=phi.detach(), goal_position=pos)
-while True:
-    env.reset(
-        # pro_noise_stds=torch.Tensor([0.2,0.2])
-            # pro_gains=torch.Tensor([0.5,1]),
-            # obs_gains=torch.Tensor([0.51,1])
-    )
-    done=False
-    # phi=env.phi
-    while not done:
-        action,_=model.predict(env.decision_info)
-        decision_info,_,done,_=env.step(action)
-        fig=plot_belief(env,title=('action',action,env.phi),kwargs={'title':action})
-        # fig.savefig("{}.png".format(env.episode_time))
-        # print(env.decision_info[0,:2],action)        
-        # print(env.s[:,0],env.phi[:-2,0])
-        # print(env.episode_time)
-    if env.caculate_reward()==0.:
-        break
-    print('final reward ',env.caculate_reward(), env.episode_time)
+# while True:
+#     env.reset(
+#         # pro_noise_stds=torch.Tensor([0.2,0.2])
+#             # pro_gains=torch.Tensor([0.5,1]),
+#             # obs_gains=torch.Tensor([0.51,1])
+#     )
+#     done=False
+#     # phi=env.phi
+#     while not done:
+#         action,_=model.predict(env.decision_info)
+#         decision_info,_,done,_=env.step(action)
+#         # fig=plot_belief(env,title=('action',action,env.phi),kwargs={'title':action})
+#         # fig.savefig("{}.png".format(env.episode_time))
+#         # print(env.decision_info[0,:2],action)        
+#         # print(env.s[:,0],env.phi[:-2,0])
+#         # print(env.episode_time)
+#     # if env.caculate_reward()==0.:
+#     #     break
+#     print('final reward ',env.caculate_reward(), env.episode_time)
 
 
 
@@ -412,6 +529,7 @@ for covs, mus in zip(cov, mu):
 
 
 # # testing decision info distribution 
+number_trials=10
 d_entry=3
 t_entry=9
 entry_ls=[]
@@ -459,7 +577,7 @@ decision_info,_,done,_=env.step(true_action)
 
 # plot policy surface
 def plot_policy_surfaces(decision_info,model):
-    r_range=[0.2,1.0]
+    r_range=[0.0,1.0]
     r_ticks=0.01
     r_labels=[r_range[0]]
     a_range=[-pi/4, pi/4]
@@ -483,11 +601,16 @@ def plot_policy_surfaces(decision_info,model):
     fig, ax = plt.subplots(1, 2,
             gridspec_kw={'hspace': 0.4, 'wspace': 0.2},figsize=(16,16))
     # fig.suptitle('{} and {} policy surface'.format('rua',fontsize=40))
-    ax[0].set_title('forward velocity',fontsize=24)
-    ax[0].imshow(policy1_data_v,origin='lower',vmin=-1.,vmax=1.,extent=[a_labels[0],a_labels[-1],r_labels[0],r_labels[-1]])
+    ax[0].set_title('forward velocity  '+'tau : '+str( env.phi[9]),fontsize=24)
+    ax[0].set_xlabel('relative angle',fontsize=18)
+    ax[0].set_ylabel('relative distance',fontsize=18)
+    im1=ax[0].imshow(policy1_data_v,origin='lower',vmin=-1.,vmax=1.,extent=[a_labels[0],a_labels[-1],r_labels[0],r_labels[-1]])
+    # add_colorbar(im1)
     ax[1].set_title('ang velocity',fontsize=24)
-    ax[1].imshow(policy1_data_w,origin='lower',vmin=-1.,vmax=1.,extent=[a_labels[0],a_labels[-1],r_labels[0],r_labels[-1]])
-    
+    ax[1].set_xlabel('relative angle',fontsize=18)
+    ax[1].set_xlabel('relative distance',fontsize=18)
+    im2=ax[1].imshow(policy1_data_w,origin='lower',vmin=-1.,vmax=1.,extent=[a_labels[0],a_labels[-1],r_labels[0],r_labels[-1]])
+    add_colorbar(im2)
     return fig
 
 def inverseCholesky(vecL):
@@ -507,15 +630,24 @@ def inverseCholesky(vecL):
 from FireflyEnv.env_utils import *
 
 env.reset()
+
 decision_info= env.decision_info
+true_action,_=model.predict(env.decision_info)
+_,_,_,_=env.step(true_action)
+decision_info[:,5:5+15]=vectorLowerCholesky(env.P)
+plot_policy_surfaces(decision_info,model)
 
 true_action,_=model.predict(env.decision_info)
 _,_,_,_=env.step(true_action)
-decision_info[:,5:-9]=vectorLowerCholesky(env.P)
-
-plot_policy_surfaces(decision_info,model)
 plot_policy_surfaces(env.decision_info,model)
 
+
+env.episode_time=env.episode_time+10
+print(env.episode_time)
+env.decision_info[:,2:4]=env.decision_info[:,2:4]*0+1
+
+decision_info=env.wrap_decision_info()
+plot_policy_surfaces(decision_info,model)
 
 
 # ax.set_xlim([0,1])

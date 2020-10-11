@@ -188,6 +188,7 @@ def column_feature_data(list_data):
 def plot_inverse_trajectory(theta_trajectory,true_theta, env,agent,
                       phi=None, method='PCA', background_data=None, 
                       background_contour=False,
+                      background_look='contour',
                       ax=None, loss_sample_size=100):
     '''    
     plot the inverse trajectory in 2d pc space
@@ -207,7 +208,10 @@ def plot_inverse_trajectory(theta_trajectory,true_theta, env,agent,
     # reshape the data into colume as features
     data_matrix=column_feature_data(theta_trajectory)
     if method=='PCA':
-      score, evectors, evals = pca(data_matrix)
+      try:
+        score, evectors, evals = pca(data_matrix)
+      except LinAlgError:
+        score, evectors, evals = pca(data_matrix)
       # note, the evectors are arranged in cols. one col, one evector.
       plt.xlabel('Projection basis vector 1')
       plt.ylabel('Projection basis vector 2')
@@ -261,9 +265,10 @@ def plot_inverse_trajectory(theta_trajectory,true_theta, env,agent,
       xyrange=[current_xrange,current_yrange]
       # ax1.contourf(X,Y,background_data)
       if background_contour:
-        background_data=plot_background(ax, xyrange,mu, evectors, loss_function, number_pixels=20) if background_data is None else background_data
-      
+        background_data=plot_background(ax, xyrange,mu, evectors, loss_function, number_pixels=20,look=background_look) if background_data is None else background_data
+
       # replot, to lay on top
+      plot_cov_ellipse(cov_pc,pos=score[-1,:2],alpha_factor=0.5,ax=ax)
       ax.scatter(true_theta_pc[0],true_theta_pc[1],marker='o',c='',edgecolors='r')
       row_cursor=0
       while row_cursor<score.shape[0]-1:
@@ -470,6 +475,7 @@ def _jacobian(y, x, create_graph=False):
         grad_y[i] = 0.                                                                                
     return torch.stack(jac).reshape(y.shape + x.shape)                                                
 
+
 def _hessian(y, x):                                                                                    
     return jacobian(jacobian(y, x, create_graph=True), x)                                             
 
@@ -506,7 +512,7 @@ def compute_loss_wrapped(env, agent, true_theta, phi, trajectory_data=None, num_
 
 
 def plot_background(ax, xyrange,mu, evectors, loss_function, 
-    number_pixels=10, num_episodes=100, method='PCA',alpha=0.5):
+    number_pixels=5, num_episodes=100, method='PCA', look='contour', alpha=0.5):
   background_data=np.zeros((number_pixels,number_pixels))
   X,Y=np.meshgrid(np.linspace(xyrange[0][0],xyrange[0][1],number_pixels),np.linspace(xyrange[1][0],xyrange[1][1],number_pixels))
   if method =='PCA':
@@ -528,8 +534,11 @@ def plot_background(ax, xyrange,mu, evectors, loss_function,
   #       reconstructed_theta=reconstructed_theta.clip(1e-4,999)
   #       print(loss_function(torch.Tensor(reconstructed_theta).reshape(-1,1)))
   #       background_data[i,j]=loss_function(torch.Tensor(reconstructed_theta).reshape(9,1))
-
-  ax.contourf(X,Y,background_data,alpha=alpha)
+  if look=='contour':
+    ax.contourf(X,Y,background_data,alpha=alpha)
+  elif look=='pixel':
+    im=ax.imshow(X,Y,background_data,alpha=alpha)
+    add_colorbar(im)
   return background_data
 
 
@@ -569,6 +578,7 @@ def loss_surface_two_param(mu,loss_function, index_pair,
 # plt.imshow(background_data_fake)
 # plt.imshow(background_data)
 
+# testing relationship of two noise parameters
 param_pair=[9,10]
 param_range=[[0.001,0.4],[0.001,0.4]]
 loss_function=compute_loss_wrapped(env, agent, true_theta.reshape(-1,1), np.array(phi).reshape(-1,1), trajectory_data=None, num_episodes=1000)
@@ -631,6 +641,36 @@ background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, p
 
 background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi,background_contour=True)
 
+
+
+
+
+# acc-----------------------------------------------
+baselines_mlp_model = TD3.load('trained_agent//acc_retrain_1000000_2_18_21_4.zip')
+agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[128,128],n_inputs=30)
+env=firefly_action_cost.FireflyActionCost(arg)
+env.agent_knows_phi=False
+
+a=load_inverse_data('test_acc_EP200updates100lr0.1step219_23_4EP200updates100sample2IT2')
+theta_trajectory=a['theta_estimations']
+true_theta=a['true_theta']
+theta_estimation=theta_trajectory[-1]
+phi=np.array(a['phi'])
+
+# no bg, faster
+background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)
+# with bg as contour
+background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi,background_contour=True)
+# with bg as img
+background_data=plot_inverse_trajectory(theta_trajectory,
+true_theta,env,agent, phi=phi,background_data=None,
+background_contour=True,
+background_look='pixel')
+# with bg as img, with bg data already in hand
+background_data=plot_inverse_trajectory(theta_trajectory,
+true_theta,env,agent, phi=phi,background_data=background_data,
+background_contour=True,
+background_look='pixel')
 
 
 

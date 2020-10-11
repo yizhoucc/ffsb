@@ -79,13 +79,15 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
                 goal_radius_step=None,
                 max_distance=None,
                 goal_radius_range =None,
+                param_range_dict={},
                     ):
 
         self.presist_phi=           presist_phi
         self.agent_knows_phi=       agent_knows_phi
 
         # set up the parameter range from arg
-        self._apply_param_range() 
+
+        self._apply_param_range(**param_range_dict) 
 
         self.max_distance=max_distance if max_distance is not None else self.world_size
 
@@ -286,7 +288,7 @@ class FireflyEnvBase(gym.Env, torch.nn.Module):
     def reached_goal(self):
         # use real location
         _,distance=self.get_distance(state=self.s)
-        reached_bool= (distance<=self.phi[-1])
+        reached_bool= (distance<=self.phi[8])
         return reached_bool
 
 

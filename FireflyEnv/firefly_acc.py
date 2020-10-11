@@ -10,9 +10,6 @@ from FireflyEnv.ffenv_new_cord import FireflyAgentCenter
 from reward_functions import reward_singleff
 
 
-# todo, bangbang control and others to set range.
-# first random a alpha, then from alpha get beta and noise range.
-
 def get_vm_(tau, d=2, T=7):
     vm=d/2/tau *(1/(np.log(np.cosh(T/2/tau))))
     return vm
@@ -50,7 +47,6 @@ class FireflyAcc(FireflyAgentCenter):
         low=-np.inf
         high=np.inf
         self.observation_space = spaces.Box(low=low, high=high,shape=(1,30),dtype=np.float32)
-
         self.cost_function=reward_singleff.action_cost_wrapper
         
 
@@ -65,6 +61,10 @@ class FireflyAcc(FireflyAgentCenter):
             self.std_range =             self.arg.std_range
         if tau_range is None:
             self.tau_range = compute_tau_range(self.gains_range, d=2*self.world_size, T=self.episode_len*self.dt, tau=1.8)
+            self.tau_range[1]=min(8,self.tau_range[1])
+        else:
+            self.tau_range=tau_range
+            print('tau range', tau_range)
     
 
     # new parameters added. overriding the original functions
@@ -130,7 +130,6 @@ class FireflyAcc(FireflyAgentCenter):
         ang =               torch.zeros(1).uniform_(-pi/4, pi/4) # regard less of the task
         self.goalx =        distance * torch.cos(ang)
         self.goaly =        distance * torch.sin(ang)
-
         vel = torch.zeros(1)
         ang_vel = torch.zeros(1)
         heading=torch.zeros(1) # always facing 0 angle
@@ -141,54 +140,64 @@ class FireflyAcc(FireflyAgentCenter):
 
         else:
             pass
-
         self.s = torch.cat([torch.zeros(1), torch.zeros(1), heading, vel, ang_vel]) # this is state x at t0
         self.s = self.s.view(-1,1) # column vector
         self.agent_start=False
+        # print(self.phi.view(-1))
 
 
     def step(self, action):
         
-        if not self.if_agent_stop(action) and not self.agent_start:
+        if not self.if_agent_stop() and not self.agent_start:
             self.agent_start=True
 
         if self.agent_start:
-            self.stop=True if self.if_agent_stop(action) else False 
+            self.stop=True if self.if_agent_stop() else False 
         else:
             self.stop=False
 
         self.a=action
         self.episode_reward=self.caculate_reward()
-        
         self.s=self.state_step(action,self.s)
         self.o=self.observations(self.s)
         self.b,self.P=self.belief_step(self.b,self.P,self.o,action)
-
         self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_time,task_param=self.theta)
-        # self.ep_count+=1
-
-        # if self.verbose:
-        #     _,d=self.get_distance()
-        #     if self.stop and d<0.3:
-                # print('stop',self.stop,'goal',self.reached_goal(),d,
-                # self.episode_reward,self.episode_time,self.decision_info)
-            
         self.episode_time=self.episode_time+1
-        
         end_current_ep=(self.stop or self.episode_time>=self.episode_len)
 
         return self.decision_info, self.episode_reward, end_current_ep, {}
+
+    def forward(self, action,task_param,state=None, giving_reward=None):
+
+        if not self.if_agent_stop() and not self.agent_start:
+            self.agent_start=True
+
+        if self.agent_start:
+            self.stop=True if self.if_agent_stop() else False 
+        else:
+            self.stop=False
+
+        self.s=self.state_step(action, self.s) # state transition defined by phi.
+        self.o=self.observations(self.s,task_param=task_param) # observation defined by theta.
+        self.b,self.P=self.belief_step(self.b,self.P,self.o,action,task_param=task_param)
+        self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_time,task_param=task_param)
+        self.episode_time=self.episode_time+1
+        end_current_ep=(self.stop or self.episode_time>=self.episode_len)
+             
+        return self.decision_info, end_current_ep
 
 
     # acc control state dynamics
     def a_(self, tau, dt=None):
         dt=self.dt if dt is None else dt
-        return np.exp(-dt/tau)
+        return torch.exp(-dt/tau)
     
     def vm_(self, tau, x=None, T=None):
         x=1.5*self.world_size if x is None else x
         T=self.episode_len*self.dt if T is None else T
-        vm=x/2/tau *(1/(np.log(np.cosh(T/2/tau))))
+        vm=x/2/tau *(1/(torch.log(torch.cosh(T/2/tau))) )
+        if vm==0: # too much velocity control rather than acc control
+            vm=x/T
         return vm
 
     def b_(self, tau, dt=None):
@@ -243,20 +252,41 @@ class FireflyAcc(FireflyAgentCenter):
         return next_s.view(-1,1)
 
 
-    def if_agent_stop(self,action,state=None,task_param=None):
+    def if_agent_stop(self,action=None,state=None,task_param=None):
         terminal=False
         terminal_vel = self.terminal_vel
         task_param=self.phi if task_param is None else task_param
         state=self.s if state is None else state
         px, py, heading, vel, ang_vel = torch.split(state.view(-1), 1)
-        vel=vel*self.a_(task_param[9,0])           +action[0]*task_param[0,0]*self.b_(task_param[9,0])
-        ang_vel=ang_vel*self.a_(task_param[9,0])   +action[1]*task_param[1,0]*self.b_(task_param[9,0])
-        stop = (torch.norm(torch.tensor([vel, ang_vel], dtype=torch.float64)) <= terminal_vel)
+        # vel=vel*self.a_(task_param[9,0])           +action[0]*task_param[0,0]*self.b_(task_param[9,0])
+        # ang_vel=ang_vel*self.a_(task_param[9,0])   +action[1]*task_param[1,0]*self.b_(task_param[9,0])
+        stop = (vel <= terminal_vel)
         if stop:
             terminal= True
 
         return terminal
 
+    def caculate_reward(self):
+        '''
+        calculate the reward, when agent stop (made the decision)
+
+        input:
+        output:
+            reward as float, or tensor?
+        '''
+
+        if self.stop:
+            if self.reached_goal(): # integration reward
+                return self.reward_function(self.stop, self.reached_goal(),
+                self.b,self.P,self.phi[8,0],self.reward,
+                self.goalx,self.goaly,time=self.episode_time/5)
+            else: # gaussian like reward to attract to goal
+                _,d= self.get_distance()
+                # print(d)
+                return max(0, (1-d)) 
+        else: # punish the backward move
+            neg_velocity=self.s[3] if self.s[3]<0 else 0
+            return neg_velocity
 
 
 
@@ -284,14 +314,14 @@ class FireflyAcc(FireflyAgentCenter):
         # partial dev with v
         A[0, 3] = torch.cos(ang) * self.dt*task_param[0,0]
         A[1, 3] = torch.sin(ang) * self.dt*task_param[0,0]
+        A[3,3] = self.a_(task_param[9,0])
         # partial dev with w
         A[2, 4] =  self.dt*task_param[1,0]
+        A[4,4] = self.a_(task_param[9,0])
         # partial dev with theta
         A[0, 2] =  - torch.sin(ang) *vel * self.dt*task_param[0,0]
         A[1, 2] =  torch.cos(ang) *vel * self.dt*task_param[0,0]
-        # partial dev with v and w
-        A[3,3] = self.a_(task_param[9,0])
-        A[4,4] = self.a_(task_param[9,0])
+
 
         return A
 
@@ -312,7 +342,7 @@ class FireflyAcc(FireflyAgentCenter):
         Q[-2:, -2:] = torch.diag((task_param[2:4,0]*self.b_(task_param[9,0]))**2) # variance of vel, ang_vel
         
         # R matrix, observe noise for observation
-        R = torch.diag((task_param[6:8,0])** 2)
+        R = torch.diag((task_param[4:6,0]*task_param[6:8,0]*self.s[3:,0])** 2)
 
         # H matrix, transform x into observe space. only applied to v and w.
         H = torch.zeros(2, 5)
@@ -357,4 +387,23 @@ class FireflyAcc(FireflyAgentCenter):
         return b, P
 
 
+    def observations(self, s, task_param=None): 
 
+        '''
+        get observation of the state
+
+        inpute:
+            state 
+            task param, default is theta
+        output:
+            observation of the state
+        '''
+        task_param=self.theta if task_param is None else task_param
+        # sample some noise
+        on = torch.distributions.Normal(0,torch.ones([2,1])).sample()*task_param[6:8] # on is observation noise
+        vel, ang_vel = torch.split(s.view(-1),1)[-2:] # 1,5 to vector and take last two
+
+        ovel = task_param[4,0] * vel *(1+on[0]) # observe velocity
+        oang_vel = task_param[5,0]* ang_vel *(1+on[1])
+        observation = torch.stack((ovel, oang_vel)) # observed x
+        return observation.view(-1,1)

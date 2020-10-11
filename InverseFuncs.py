@@ -161,7 +161,9 @@ def theta_range(theta, gains_range, std_range, goal_radius_range, Pro_Noise = No
 def single_theta_inverse(arg, env, agent, filename, 
                 number_updates=10,
                 true_theta=None, phi=None,init_theta=None,
-                states=None, actions=None, tasks=None, trajectory_data=None):
+                states=None, actions=None, tasks=None, trajectory_data=None,
+                use_H=False,
+                ):
 
     save_dict={'theta_estimations':[]}
     env.agent_knows_phi=False
@@ -205,25 +207,27 @@ def single_theta_inverse(arg, env, agent, filename,
             loss = getLoss(agent, actions, tasks, phi, theta, env, num_iteration=arg.NUM_SAMPLES)
             loss_log.append(loss.data)
             optT.zero_grad() #clears old gradients from the last step
-            # loss.backward(retain_graph=True) #computes the derivative of the loss w.r.t. the parameters using backpropagation
-            # gradient.append(theta.grad.data.clone())
-            # optT.step() # performing single optimize step: this changes theta
+            loss.backward(retain_graph=True) #computes the derivative of the loss w.r.t. the parameters using backpropagation
+            gradient.append(theta.grad.data.clone())
+            optT.step() # performing single optimize step: this changes theta
             theta.data=theta.data.clamp(1e-4,999)
             theta_log.append(theta.data.clone())
 
             # compute H
-            grads = torch.autograd.grad(loss, theta, create_graph=True)[0]
-            H = torch.zeros(len(true_theta),len(true_theta))
-            for i in range(len(true_theta)):
-                H[i] = torch.autograd.grad(grads[i], theta, retain_graph=True)[0].view(-1)
-            save_dict['Hessian'].append(H)
-            save_dict['H_trace'].append(np.trace(H))
-            cov=np.linalg.inv(H)
-            save_dict['theta_cov'].append(H)
-            stderr=np.sqrt(np.diag(cov)).tolist()
-            save_dict['std_error'].append(stderr)
+            if use_H:
+                grads = torch.autograd.grad(loss, theta, create_graph=True)[0]
+                H = torch.zeros(len(true_theta),len(true_theta))
+                for i in range(len(true_theta)):
+                    H[i] = torch.autograd.grad(grads[i], theta, retain_graph=True)[0].view(-1)
+                save_dict['Hessian'].append(H)
+                save_dict['H_trace'].append(np.trace(H))
+                cov=np.linalg.inv(H)
+                save_dict['theta_cov'].append(H)
+                stderr=np.sqrt(np.diag(cov)).tolist()
+                save_dict['std_error'].append(stderr)
+                print('H_trace: \n',np.trace(H))
+                print('std err: \n',stderr)
 
-        
             # loss_diff.append(torch.abs(prev_loss - loss))
             # prev_loss = loss.data
             #     #print("num_theta:{}, num:{}, loss:{}".format(n, it, np.round(loss.data.item(), 6)))
@@ -232,8 +236,6 @@ def single_theta_inverse(arg, env, agent, filename,
             print('converged_theta:\n{}'.format( theta.data.clone() ) )
             print('true theta:     \n{}'.format(true_theta.data.clone()))
             print('loss: \n',loss)
-            print('H_trace: \n',np.trace(H))
-            print('std err: \n',stderr)
 
                 # print('\ngrad     ', theta.grad.data.clone())
 

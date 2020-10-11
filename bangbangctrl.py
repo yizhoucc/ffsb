@@ -2,6 +2,134 @@ import numpy as np
 import matplotlib.pyplot as plt
 from plot_ult import add_colorbar
 
+
+
+
+
+
+
+class BangBangCtrl():
+    
+    def __init__(self):
+        super().__init__()
+        # self.prev_forward_control=0
+        # self.prev_angular_control=0
+    #     self.env=None
+    
+    # def set_env(env):
+    #     self.env=env
+
+
+    def predict(self, decision_info):
+        # policy out, only use relative d, r, v, w, and tau
+        # obs, a row vector of 32 dim.
+
+        # get info
+        d=decision_info[0,0]
+        theta=decision_info[0,1]
+        # v=decision_info[0,2]
+        # w=decision_info[0,3]
+        task_param=decision_info[0,20:]
+        tau=task_param[9]
+        forward_gain=task_param[0]
+        angular_gain=task_param[1]
+        # check if direction is correct
+        # if not d*v<0 and not r*w<0:
+        #     pass
+        # else:
+        #     print(
+        #         'debug check',
+        #         'd: ',d,
+        #         'v: ',v,
+        #         'theta: ',theta,
+        #         'w: ',w,
+        #     )
+        # calculate the bangbang ctrl
+        vm=get_vm_(tau)
+        wm=get_wm_(tau)
+        uv,uw,s=bangbang(tau, forward_gain, angular_gain, vm, wm, d, theta)
+        return [uv,uw],s
+
+def bangbang(tau, forward_gain, angular_gain, vm, wm, d, theta):
+    a=a_(tau)
+    # b=b_(tau)
+    forward_b=vm*(1-a)
+    angular_b=wm*(1-a)
+
+    radius=d/np.sin(theta)/2
+    eff_radius=vm/wm
+    arc_length=2*theta*radius if theta !=0 else d
+
+    if radius>eff_radius:
+        uv=1
+        uw=np.sign(theta)*forward_b*uv/radius/angular_b
+    elif radius<eff_radius:
+        uw=np.sign(theta)
+        uv=abs(uw)*radius*forward_b/angular_b
+    else:
+        uw=np.sign(theta)
+        uv=1
+    if uv>1 or uw >1 or uw<-1:
+        print('debug: uv, uw', uv, uw)
+
+    vm_trial=forward_b*uv/(1-a)
+    T=2*tau*np.arccosh(np.exp(arc_length/2/tau/vm_trial))
+    s=tau*np.log( (np.exp(T/tau)+1)/2 )
+    return uv, uw, s
+
+def get_vm_(tau, d=2, T=7):
+    vm=d/2/tau *(1/(np.log(np.cosh(T/2/tau))))
+    return vm
+
+def get_wm_(tau, r=pi/2, T=7):
+    wm= 2*r /2/tau *(1/(np.log(np.cosh(T/2/tau))))
+    return wm
+
+
+
+def calr(d,a):
+    radius=d/np.sin(a)/2
+    return radius
+
+
+
+
+def arc(d,a,vm, wm):
+    radius=d/np.sin(a)/2
+    eff_radius=vm/wm
+    arc_length=a*radius
+    if radius>eff_radius:
+        use_vm=True
+        use_wm=False
+    elif radius<eff_radius:
+        use_vm=False
+        use_wm=True
+    else:
+        use_vm=True
+        use_wm=True
+    return use_vm, use_wm, arc_length
+
+def calculate_control(uv=None,uw=None):
+    if uv is None and uw is None:
+        print('need to have one')
+        return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # note, actual task
 '''
 vmax, 200cm/s
@@ -72,15 +200,14 @@ def get_vm(tau, b):
     a=a_(tau)
     return b/(1-a)
 
-def get_vm_(tau, x=2, T=7):
-    vm=x/2/tau *(1/(np.log(np.cosh(T/2/tau))))
-    return vm
+
 
 def b_(tau, dt=0.1):
     return get_vm_(tau)*(1-a_(tau))
 
-tau=0.0281
+tau=0.28
 b_(tau)
+a_(tau)
 
 def getx(a, vm=1, dt=0.1, T=7):
     b=vm*(1-a)

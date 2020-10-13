@@ -1,11 +1,9 @@
 # will generate a circle of goal ( actually a gassian)
 # and a cov ellipse
 from scipy.stats import norm, chi2
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse, Circle
-
 import numpy as np
 from numpy import pi
 import time
@@ -42,7 +40,7 @@ model.set_env(env)
 
 # acc ac model
 env=firefly_accac.FireflyAccAc(arg)
-model=TD3.load('trained_agent/accac_final_1000000_9_11_4_39.zip')
+model=TD3.load('trained_agent/accac_final_1000000_9_11_20_25.zip')
 model.set_env(env)
 
 # acc mdp model

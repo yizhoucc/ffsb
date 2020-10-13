@@ -27,7 +27,7 @@ if modelname is None: # new train
     model = TD3_ff(MlpPolicy,
             env, 
             verbose=1,
-            tensorboard_log="./DDPG_tb/",
+            tensorboard_log="./Tensorboard/",
             action_noise=action_noise,
             buffer_size=int(1e6),
             batch_size=512,
@@ -52,7 +52,7 @@ else: # retrain
     model = TD3_ff.load(modelname,
                     env, 
                     verbose=1,
-                    tensorboard_log="./DDPG_tb/",
+                    tensorboard_log="./Tensorboard/",
                     action_noise=action_noise,
                     buffer_size=int(1e6),
                     batch_size=512,
@@ -76,7 +76,7 @@ else: # retrain
                     )
 
 train_time=1000000 
-env.cost_scale=0.05
+# env.cost_scale=0.1
 for i in range(10):  
     namestr= ("trained_agent/accac_final_{}_{}_{}_{}_{}".format(train_time,i,
     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)

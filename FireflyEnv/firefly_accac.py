@@ -46,7 +46,7 @@ class FireflyAccAc(FireflyAcc):
         high=np.inf
         self.observation_space = spaces.Box(low=low, high=high,shape=(1,32),dtype=np.float32)
         self.cost_function=reward_singleff.action_cost_wrapper
-        self.cost_scale=0.1 # the task is much longer. 
+        self.cost_scale=1 # the task is much longer. 
         self.trial_sum_cost=None
 
     # added previous action buffer
@@ -57,6 +57,8 @@ class FireflyAccAc(FireflyAcc):
         self.decision_info = row_vector(self.decision_info)
         self.previous_action=np.zeros(2)
         self.trial_sum_cost=0
+        self.trial_mag=0
+        self.trial_dev=0
 
 
     def step(self, action):
@@ -70,8 +72,10 @@ class FireflyAccAc(FireflyAcc):
             self.stop=False
 
         self.a=action
-        self.episode_reward, cost=self.caculate_reward()
+        self.episode_reward, cost,mag,dev=self.caculate_reward()
         self.trial_sum_cost+=cost
+        self.trial_mag+=mag
+        self.trial_dev+=dev
         self.s=self.state_step(action,self.s)
         self.o=self.observations(self.s)
         self.b,self.P=self.belief_step(self.b,self.P,self.o,action)
@@ -79,7 +83,7 @@ class FireflyAccAc(FireflyAcc):
         self.episode_time=self.episode_time+1
         end_current_ep=(self.stop or self.episode_time>=self.episode_len)
         if end_current_ep:
-            print('reward: {}, cost: {}'.format(self.episode_reward, self.trial_sum_cost))
+            print('reward: {}, cost: {}, mag{}, dev{}'.format(self.episode_reward, self.trial_sum_cost, self.trial_mag, self.trial_dev))
         return self.decision_info, self.episode_reward, end_current_ep, {}
 
 
@@ -214,7 +218,7 @@ class FireflyAccAc(FireflyAcc):
             if self.reached_goal():
                 reward = self.reward_function(self.stop, self.reached_goal(),
                 self.b,self.P,self.phi[8,0],self.reward,
-                self.goalx,self.goaly) # no time here, use cost to reduce time.
+                self.goalx,self.goaly, verbose=False) # no time here, use cost to reduce time.
             else:
                 _,d= self.get_distance()
                 reward = max(0, (1-d)) 
@@ -222,8 +226,8 @@ class FireflyAccAc(FireflyAcc):
             neg_velocity=self.s[3] if self.s[3]<0 else 0 # punish the backward
             reward = neg_velocity
 
-        cost=self.cost_function(self.a, self.previous_action,task_param=self.phi)
-        return reward, self.cost_scale*cost
+        cost, mag, dev=self.cost_function(self.a, self.previous_action,mag_scalar=self.phi[10], dev_scalar=self.phi[11])
+        return reward, self.cost_scale*cost, mag, dev
 
 
 

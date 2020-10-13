@@ -23,7 +23,7 @@ env.max_distance=0.5
 model = TD3_ff(MlpPolicy,
             env, 
             verbose=1,
-            tensorboard_log="./DDPG_tb/",
+            tensorboard_log="./Tensorboard/",
             action_noise=action_noise,
             buffer_size=int(1e6),
             batch_size=512,

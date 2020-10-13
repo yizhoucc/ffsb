@@ -364,11 +364,11 @@ class TD3_ff(TD3):
                                                         ep_done, writer, self.num_timesteps)
                     # Write reward per 100 points to tensorboard
                     mean_reward = round(float(np.mean(episode_rewards[-101:-1])), 1)
-                    summaryobj=tf.Summary(value=[tf.Summary.Value(tag="mean_100_timestep_reward", simple_value=mean_reward)])
+                    summaryobj=tf.Summary(value=[tf.Summary.Value(tag="eval/mean_100_timestep_reward", simple_value=mean_reward)])
                     writer.add_summary(summaryobj, self.num_timesteps)
                     # Write accuracy to tensorboard
                     accuracy = round(float(np.mean(episode_successes[-101:-1])), 1)
-                    summary=tf.Summary(value=[tf.Summary.Value(tag="recent 100 trial correct%", simple_value=accuracy)])
+                    summary=tf.Summary(value=[tf.Summary.Value(tag="eval/recent 100 trial correct%", simple_value=accuracy)])
                     writer.add_summary(summary, self.num_timesteps)
 
                 if step % self.train_freq == 0:

@@ -184,7 +184,7 @@ def belief_reward_bin_intergration(agent_stops, reached_target, b,P, goal_radius
     # return reward.item()   
 
 
-def belief_reward_mc(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,nsamples=800,time=0,discount=0.95):
+def belief_reward_mc(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,nsamples=800,time=0,discount=0.95, verbose=True):
     
     cov=P[:2,:2]
     mu = torch.Tensor([goalx,goaly])-b[:2,0]  # pos
@@ -199,8 +199,8 @@ def belief_reward_mc(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx
             check.append(0)
 
     P=np.mean(check)
-    
-    print('reward p ',P, ' time t', time)
+    if verbose:
+        print('reward p ',P, ' time t', time)
     reward= P*REWARD*discount**time
 
     if type(reward)==torch.Tensor:
@@ -222,11 +222,11 @@ def action_cost_dev(action, previous_action):
     return cost
 
 
-def action_cost_wrapper(action, previous_action,task_param):
+def action_cost_wrapper(action, previous_action,mag_scalar, dev_scalar):
     mag_cost=action_cost_magnitude(action)
     dev_cost=action_cost_dev(action, previous_action)
-    total_cost=task_param[9]*mag_cost+task_param[10]*dev_cost
-    return total_cost
+    total_cost=mag_scalar*mag_cost+dev_scalar*dev_cost
+    return total_cost, mag_cost, dev_cost
 
 
 # def reward_wrapper_ac(agent_stops, reached_target, b,P, goal_radius, REWARD,goalx,goaly,nsamples=800,time=0,discount=0.95, actions=None, action_cost_param=[0.05,0.05]):

@@ -43,7 +43,8 @@ class Config:
         self.mag_action_cost_range= [0.001,0.05]
         self.dev_action_cost_range= [0.01,0.5]
         # acc control, vt+1 = a*vt + b*ut
-        self.tau_range=             [0.1,8]
+        self.tau_range=             [0.1,5]
+        
 
 
 

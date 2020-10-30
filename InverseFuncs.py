@@ -162,17 +162,24 @@ def single_theta_inverse(arg, env, agent, filename,
                 number_updates=10,
                 true_theta=None, phi=None,init_theta=None,
                 states=None, actions=None, tasks=None, trajectory_data=None,
-                use_H=False,
+                use_H=False, is1d=False
                 ):
 
     save_dict={'theta_estimations':[]}
     env.agent_knows_phi=False
     env.presist_phi=True
-    true_theta=torch.nn.Parameter(true_theta) if true_theta is not None else torch.nn.Parameter(env.reset_task_param())
-    phi=phi if phi is not None else true_theta.data.clone()
-    theta=init_theta if init_theta is not None else env.reset_task_param()
+    true_theta=torch.nn.Parameter(true_theta.clone().detach()) if true_theta is not None else torch.nn.Parameter(env.reset_task_param())
+    true_theta.requires_grad=False
+    phi=phi.clone().detach() if phi is not None else true_theta.data.clone()
+    if init_theta is not None:
+            init_theta = init_theta 
+    else:
+        init_theta=env.reset_task_param()
+        while torch.mean(init_theta-true_theta.clone().detach().data)<1e-3:
+            init_theta=env.reset_task_param()
+    theta=torch.nn.Parameter(init_theta.clone().detach()) 
     print('initial theta: \n',theta)
-    theta = torch.nn.Parameter(theta)
+    print('true theta: \n',true_theta)
     save_dict['true_theta']=true_theta.data.clone().tolist()
     save_dict['phi']=true_theta.data.clone().tolist()
     save_dict['inital_theta']=theta.data.clone().tolist()
@@ -180,6 +187,10 @@ def single_theta_inverse(arg, env, agent, filename,
     save_dict['theta_cov']=[]
     save_dict['H_trace']=[]
     save_dict['std_error']=[]
+    save_dict['initial_lr']=arg.ADAM_LR
+    save_dict['lr_stepsize']=arg.LR_STEP
+    save_dict['sample_size']=arg.NUM_EP
+    save_dict['updates_persample']=arg.NUM_IT
     # prepare the logs
     loss_log = deque(maxlen=arg.NUM_IT)
     loss_act_log = deque(maxlen=arg.NUM_IT)
@@ -196,7 +207,7 @@ def single_theta_inverse(arg, env, agent, filename,
     for num_update in range(number_updates):
         if trajectory_data is None:
             states, actions, tasks = trajectory(
-                agent, phi, true_theta, env, arg.NUM_EP)
+                agent, phi, true_theta, env, arg.NUM_EP,is1d=is1d)
         else:
             states, actions, tasks=trajectory_data
         
@@ -204,14 +215,16 @@ def single_theta_inverse(arg, env, agent, filename,
             scheduler.step()
 
         for it in range(arg.NUM_IT):
-            loss = getLoss(agent, actions, tasks, phi, theta, env, num_iteration=arg.NUM_SAMPLES)
-            loss_log.append(loss.data)
+            loss = getLoss(agent, actions, tasks, phi, theta, env, num_iteration=arg.NUM_SAMPLES, states=states)
+            loss_log.append(loss.clone().detach())
             optT.zero_grad() #clears old gradients from the last step
-            loss.backward(retain_graph=True) #computes the derivative of the loss w.r.t. the parameters using backpropagation
-            gradient.append(theta.grad.data.clone())
+            # loss.backward(retain_graph=True) #computes the derivative of the loss w.r.t. the parameters using backpropagation
+            loss.backward() #computes the derivative of the loss w.r.t. the parameters using backpropagation
+            gradient.append(theta.grad.clone().detach())
+            print('gradient :', theta.grad.clone().detach())
             optT.step() # performing single optimize step: this changes theta
             theta.data=theta.data.clamp(1e-4,999)
-            theta_log.append(theta.data.clone())
+            theta_log.append(theta.clone().detach())
 
             # compute H
             if use_H:
@@ -236,15 +249,15 @@ def single_theta_inverse(arg, env, agent, filename,
             print('converged_theta:\n{}'.format( theta.data.clone() ) )
             print('true theta:     \n{}'.format(true_theta.data.clone()))
             print('loss: \n',loss)
-
+            print('learning rate: \n', scheduler.get_lr()[0])
                 # print('\ngrad     ', theta.grad.data.clone())
 
         save_dict['theta_estimations'].append(theta.data.clone().tolist())
-        savename=('inverse_data/' + filename + "EP" + str(arg.NUM_EP) + "updates" + str(number_updates)+"sample"+str(arg.NUM_SAMPLES) +"IT"+ str(arg.NUM_IT) + '.pkl')
+        savename=('inverse_data/' + filename + '.pkl')
         torch.save(save_dict, savename)
 
     
-def trajectory(agent, phi, theta, env, NUM_EP):
+def trajectory(agent, phi, theta, env, NUM_EP=100, is1d=False):
     with torch.no_grad():
         #------prepare saving vars-----
         states = [] # true location
@@ -260,7 +273,7 @@ def trajectory(agent, phi, theta, env, NUM_EP):
             episode +=1 # 1 index
             states_ep = []
             actions_ep = []
-            task_ep=[[env.goalx, env.goaly], env.phi]
+            task_ep=[[env.goalx, env.goaly], env.phi] if not is1d else [env.goalx, env.phi]
             done=False
 
             # loop for one trial
@@ -351,7 +364,7 @@ def trajectory_(agent, theta, env, arg, gains_range, std_range, goal_radius_rang
     return x_traj, obs_traj, a_traj, b_traj
 
 
-def getLoss(agent, actions, tasks, phi, theta, env, num_iteration=1):
+def getLoss(agent, actions, tasks, phi, theta, env, num_iteration=1, states=None):
     
     '''
     from the trajectories, compute the loss for current estimation of theta
@@ -377,9 +390,12 @@ def getLoss(agent, actions, tasks, phi, theta, env, num_iteration=1):
             # reset monkey's internal model, using the task parameters, estimation of theta
             env.reset(theta=theta, phi=phi, goal_position=pos)  
             # repeat for steps in episode
-            for teacher_action in a_traj_ep: 
+            for t,teacher_action in enumerate(a_traj_ep): 
                 action = agent(env.decision_info)[0] 
-                decision_info,_=env(teacher_action,task_param=theta) 
+                if states is None:
+                    decision_info,_=env(teacher_action,task_param=theta) 
+                else:
+                    decision_info,_=env(teacher_action,task_param=theta, state=states[ep][t]) 
                 action_loss = mse_loss(action, teacher_action)
                 logPr_ep = logPr_ep + action_loss.sum()
             logPr += logPr_ep

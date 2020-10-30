@@ -190,7 +190,8 @@ class TD3_ff(TD3):
                     # Policy train op
                     # will be called only every n=policy delay training steps,
                     policy_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_ph)
-                    policy_train_op = policy_optimizer.minimize(policy_loss, var_list=tf_util.get_trainable_vars('model/pi'))
+                    # policy_train_op = policy_optimizer.minimize(policy_loss, var_list=tf_util.get_trainable_vars('model/pi'))
+                    policy_train_op = policy_optimizer.minimize(add_l2(policy_loss,tf_util.get_trainable_vars('model/pi')), var_list=tf_util.get_trainable_vars('model/pi'))
                     self.policy_train_op = policy_train_op
 
                     # Q Values optimizer
@@ -213,7 +214,8 @@ class TD3_ff(TD3):
                         for target, source in zip(target_params, source_params)
                     ]
 
-                    train_values_op = qvalues_optimizer.minimize(qvalues_losses, var_list=qvalues_params)
+                    # train_values_op = qvalues_optimizer.minimize(qvalues_losses, var_list=qvalues_params)
+                    train_values_op = qvalues_optimizer.minimize(add_l2(qvalues_losses,qvalues_params), var_list=qvalues_params)
 
                     self.infos_names = ['qf1_loss', 'qf2_loss']
                     # All ops to call during one training step
@@ -514,3 +516,9 @@ class TD3_ff(TD3):
         params_to_save = self.get_parameters()
 
         self._save_to_file(save_path, data=data, params=params_to_save, cloudpickle=cloudpickle)
+
+
+def add_l2(loss,vars):
+    lossL2 = tf.add_n([ tf.nn.l2_loss(v) for v in vars
+                    if 'bias' not in v.name ]) * 0.001
+    return loss+lossL2

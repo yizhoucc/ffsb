@@ -312,11 +312,11 @@ class FireflyAcc(FireflyAgentCenter):
         A = torch.zeros(5, 5)
         A[:3,:3] = torch.eye(3)
         # partial dev with v
-        A[0, 3] = torch.cos(ang) * self.dt*task_param[0,0]
-        A[1, 3] = torch.sin(ang) * self.dt*task_param[0,0]
+        A[0, 3] = torch.cos(ang) * self.dt
+        A[1, 3] = torch.sin(ang) * self.dt
         A[3,3] = self.a_(task_param[9,0])
         # partial dev with w
-        A[2, 4] =  self.dt*task_param[1,0]
+        A[2, 4] =  self.dt
         A[4,4] = self.a_(task_param[9,0])
         # partial dev with theta
         A[0, 2] =  - torch.sin(ang) *vel * self.dt*task_param[0,0]
@@ -379,9 +379,16 @@ class FireflyAcc(FireflyAgentCenter):
 
         # debug check
         if not is_pos_def(P): 
-            print("here")
-            print("P:", P)
-            P = (P + P.t()) / 2 + 1e-6 * I  # make symmetric to avoid computational overflows
+            smallQ = torch.zeros(5, 5)
+            smallQ[-2:, -2:] = torch.diag(torch.ones(2)*1e-8)
+            P = P+smallQ
+            if not is_pos_def(P):
+                print("P is not pos def after update")
+                # print("P:", P)
+                print("obs:", o)
+                print("phi", self.phi)
+                print("theta", self.theta)
+            # P = (P + P.t()) / 2 + 1e-6 * I  # make symmetric to avoid computational overflows
 
         # b=self.update_state(b)
         return b, P

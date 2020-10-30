@@ -48,7 +48,7 @@ class FireflyAccAc(FireflyAcc):
         self.cost_function=reward_singleff.action_cost_wrapper
         self.cost_scale=1 # the task is much longer. 
         self.trial_sum_cost=None
-
+        
     # added previous action buffer
     def reset_decision_info(self):
         self.episode_time = 0   # int
@@ -86,6 +86,32 @@ class FireflyAccAc(FireflyAcc):
             print('reward: {}, cost: {}, mag{}, dev{}'.format(self.episode_reward, self.trial_sum_cost, self.trial_mag, self.trial_dev))
         return self.decision_info, self.episode_reward, end_current_ep, {}
 
+
+    def forward(self, action,task_param,state=None, giving_reward=None):
+
+        if not self.if_agent_stop() and not self.agent_start:
+            self.agent_start=True
+
+        if self.agent_start:
+            self.stop=True if self.if_agent_stop() else False 
+        else:
+            self.stop=False
+
+        self.a=action
+        # self.episode_reward, cost,mag,dev=self.caculate_reward()
+        # self.trial_sum_cost+=cost
+        # self.trial_mag+=mag
+        # self.trial_dev+=dev
+        self.s=self.state_step(action,self.s)
+        self.o=self.observations(self.s)
+        self.b,self.P=self.belief_step(self.b,self.P,self.o,action)
+        self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_time,task_param=self.theta)
+        self.episode_time=self.episode_time+1
+        end_current_ep=(self.stop or self.episode_time>=self.episode_len)
+        # if end_current_ep:
+        #     print('reward: {}, cost: {}, mag{}, dev{}'.format(self.episode_reward, self.trial_sum_cost, self.trial_mag, self.trial_dev))
+             
+        return self.decision_info, end_current_ep
 
 
 
@@ -135,8 +161,11 @@ class FireflyAccAc(FireflyAcc):
         if std_range is None:
             self.std_range =             self.arg.std_range
         if tau_range is None:
-            self.tau_range = compute_tau_range(self.gains_range, d=2*self.world_size, T=self.episode_len*self.dt, tau=1.8)
-            self.tau_range[1]=min(8,self.tau_range[1])
+            if self.arg.tau_range is not None:
+                self.tau_range = self.arg.tau_range
+            else:
+                self.tau_range = compute_tau_range(self.gains_range, d=2*self.world_size, T=self.episode_len*self.dt, tau=1.8)
+                self.tau_range[1]=min(8,self.tau_range[1])
         else:
             self.tau_range=tau_range
             print('tau range', tau_range)

@@ -1,18 +1,21 @@
 import torch
+import os
+os.chdir('C:\\Users\\24455\\iCloudDrive\\misc\\ffsb')
 import numpy as np
 from scipy.stats import tstd
 from matplotlib import pyplot as plt 
 from sklearn.preprocessing import StandardScaler
 from sklearn import random_projection
-from InverseFuncs import trajectory, getLoss
+# from InverseFuncs import trajectory, getLoss
 import sys
-from stable_baselines import DDPG,TD3
+# from stable_baselines import DDPG,TD3
 from FireflyEnv import firefly_action_cost, ffenv_new_cord,firefly_accac, ffac_1d
 from Config import Config
 arg = Config()
-import policy_torch
+# import policy_torch
 from plot_ult import *
-
+import TD3_torch
+# from InverseFuncs import *
 
 def sort_evals_descending(evals, evectors):
   """
@@ -43,22 +46,22 @@ def sort_evals_descending(evals, evectors):
   return evals, evectors
 
 
-def change_of_basis(X, W):
-  """
-  Projects data onto a new basis.
+# def change_of_basis(X, W):
+#   """
+#   Projects data onto a new basis.
 
-  Args:
-    X (numpy array of floats) : Data matrix each column corresponding to a
-                                different random variable
-    W (numpy array of floats) : new orthonormal basis columns correspond to
-                                basis vectors
+#   Args:
+#     X (numpy array of floats) : Data matrix each column corresponding to a
+#                                 different random variable
+#     W (numpy array of floats) : new orthonormal basis columns correspond to
+#                                 basis vectors
 
-  Returns:
-    (numpy array of floats)   : Data matrix expressed in new basis
-  """
+#   Returns:
+#     (numpy array of floats)   : Data matrix expressed in new basis
+#   """
 
-  Y = np.matmul(X, W)
-  return Y
+#   Y = np.matmul(X, W)
+#   return Y
 
 
 def get_sample_cov_matrix(X):
@@ -228,6 +231,8 @@ def plot_inverse_trajectory(theta_trajectory,true_theta, env,agent,
         true_theta_pc=(true_theta-mu)@evectors
 
       ax.scatter(true_theta_pc[0],true_theta_pc[1],marker='o',c='',edgecolors='r',zorder=10)
+      # plot latest theta
+      ax.scatter(score[-1,0],score[-1,1],marker='o',c='',edgecolors='b',zorder=9)
 
       # plot theta inverse trajectory
       row_cursor=0
@@ -399,18 +404,17 @@ def _hessian(y, x):
     return jacobian(jacobian(y, x, create_graph=True), x)                                             
 
 
-def compute_H(env, agent, theta_estimation, true_theta, phi, trajectory_data=None,H_dim=9, num_episodes=100,is1d=False):
-  _, actions, tasks=trajectory(agent, torch.Tensor(phi), torch.Tensor(true_theta), env, num_episodes,is1d=is1d)
-
+def compute_H(env, agent, theta_estimation, true_theta, phi, trajectory_data=None,H_dim=7, num_episodes=100,is1d=False):
+  states, actions, tasks=trajectory(agent, torch.Tensor(phi), torch.Tensor(true_theta), env, num_episodes,is1d=is1d)
   theta_estimation=torch.nn.Parameter(torch.Tensor(theta_estimation))
-  loss = getLoss(agent, actions, tasks, torch.Tensor(phi), theta_estimation, env)
-  grads = torch.autograd.grad(loss, theta_estimation, create_graph=True)[0]
+  phi=torch.nn.Parameter(torch.Tensor(phi))
+  phi.requires_grad=False
+  loss = getLoss(agent, actions, tasks, phi, theta_estimation, env,states=states, gpu=False)
+  grads = torch.autograd.grad(loss, theta_estimation, create_graph=True,allow_unused=True)[0]
   H = torch.zeros(H_dim,H_dim)
   for i in range(H_dim):
-      H[i] = torch.autograd.grad(grads[i], theta_estimation, retain_graph=True)[0].view(-1)
-  # I = H.inverse()
-  # E,V = scipy.linalg.eigh(H)
-  # print(E)
+      print(i)
+      H[i] = torch.autograd.grad(grads[i], theta_estimation, retain_graph=True,allow_unused=True)[0].view(-1)
   return H
 
 
@@ -627,42 +631,91 @@ agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[512,512],n_inp
 plt.hist(torch.mean(w1.clone().detach(),0))
 
 # 1d-----------------------------------------------------
-baselines_mlp_model =TD3.load('trained_agent/1d_easy1000000_9_30_5_20.zip')
-agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[512,512],n_inputs=15,n_actions=1)
+baselines_mlp_model =TD3_torch.TD3.load('trained_agent/1d_1000000_9_16_22_20.zip')
+agent=baselines_mlp_model.actor
+# baselines_mlp_model =TD3.load('trained_agent/1d_7dim1000000_9_30_17_52.zip')
+# agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[512,512],n_inputs=15,n_actions=1)
 arg.goal_radius_range=[0.1,0.3]
 arg.TERMINAL_VEL = 0.025
 arg.goal_radius_range=[0.15,0.3]
-arg.std_range = [0.02,0.3,0.02,0.3]
+arg.std_range = [0.02,0.1,0.02,0.1]
 arg.TERMINAL_VEL = 0.025  # terminal velocity? # norm(action) that you believe as a signal to stop 0.1.
 arg.DELTA_T=0.2
 arg.EPISODE_LEN=35
 env=ffac_1d.FireflyTrue1d(arg)
 env.agent_knows_phi=False
 
-a=load_inverse_data('good_26_12_13')
+
+a=load_inverse_data('25_17_21')
 theta_trajectory=a['theta_estimations']
 true_theta=a['true_theta']
 theta_estimation=theta_trajectory[-1]
 phi=np.array(a['phi'])
-# no bg, faster
-background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)
+H=a['Hessian']
+stds=a['theta_std']
+losses=np.array(a['loss'])
+# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)
+plt.plot(losses)
+
+
 
 len(theta_trajectory)
-
+ 
 for atheta in theta_trajectory:
     plt.plot(true_theta)
     plt.plot(atheta)
     plt.show()
 
+loss_function=compute_loss_wrapped(env, agent, torch.tensor(true_theta).reshape(-1,1).cuda(), 
+  torch.tensor(phi).reshape(-1,1).cuda(), trajectory_data=None, num_episodes=10,is1d=True)
 print(loss_function(true_theta))
 print(loss_function(theta_estimation))
 
 background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, 
 phi=phi,background_contour=True,H=True,number_pixels=9,loss_function=loss_function)
 
-H=compute_H(env, agent, theta_estimation, true_theta, phi,H_dim=8, trajectory_data=None, num_episodes=100,is1d=True)
+env=ffac_1d.FireflyTrue1d_cpu(arg)
+agent=agent.mu.cpu()
+
+H=compute_H(env, agent, theta_estimation, true_theta, phi, H_dim=9, trajectory_data=None, num_episodes=20,is1d=False)
+H=compute_H(env, agent, theta_estimation, true_theta, phi, H_dim=7, trajectory_data=None, num_episodes=20,is1d=True)
 cov=theta_cov(H)
 stderr(cov)
+ev, evector=torch.eig(H,eigenvectors=True)
+p=torch.round(torch.log(torch.sign(H)*H))*torch.sign(H)
+img=plt.imshow(p)
+img=plt.imshow(H)
+add_colorbar(img)
+
+[evv[0].item()*torch.sign(evv[0]) for evv in ev]
+plt.plot()
+
+
+theta_estimation=torch.nn.Parameter(torch.tensor(theta_estimation))
+env.reset(theta=theta_estimation, phi=torch.tensor(phi))
+
+
+# new hessian computation
+def jacobian(y, x, create_graph=False):                                                               
+    jac = []                                                                                          
+    flat_y = y.reshape(-1)                                                                            
+    grad_y = torch.zeros_like(flat_y)                                                                 
+    for i in range(len(flat_y)):                                                                      
+        grad_y[i] = 1.                                                                                
+        grad_x, = torch.autograd.grad(flat_y, x, grad_y, retain_graph=True, create_graph=create_graph)
+        jac.append(grad_x.reshape(x.shape))                                                           
+        grad_y[i] = 0.                                                                                
+    return torch.stack(jac).reshape(y.shape + x.shape)                                                
+                                                                                                      
+def hessian(y, x):                                                                                    
+    return jacobian(jacobian(y, x, create_graph=True), x)  
+    
+states, actions, tasks=trajectory(agent, torch.Tensor(phi), torch.Tensor(true_theta), env, 20,is1d=True)
+phi=torch.nn.Parameter(torch.Tensor(phi))
+phi.requires_grad=False
+loss = getLoss(agent, actions, tasks, phi, theta_estimation, env,states=states, gpu=False)
+hessian(loss, theta_estimation)
+
 
 
 # # # new cord--------------------------------------------------
@@ -738,42 +791,42 @@ stderr(cov)
 # background_look='pixel')
 
 # accac-----------------------------------------------------
-baselines_mlp_model = TD3.load('trained_agent//accac_final_1000000_9_11_20_25.zip')
-agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[512,512],n_inputs=32)
-arg.goal_radius_range=[0.1,0.3]
-arg.TERMINAL_VEL = 0.025
-arg.goal_radius_range=[0.15,0.3]
-arg.std_range = [0.02,0.3,0.02,0.3]
-arg.TERMINAL_VEL = 0.025  # terminal velocity? # norm(action) that you believe as a signal to stop 0.1.
-arg.DELTA_T=0.2
-arg.EPISODE_LEN=35
-env=firefly_accac.FireflyAccAc(arg)
-env.agent_knows_phi=False
+# baselines_mlp_model = TD3.load('trained_agent//accac_final_1000000_9_11_20_25.zip')
+# agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[512,512],n_inputs=32)
+# arg.goal_radius_range=[0.1,0.3]
+# arg.TERMINAL_VEL = 0.025
+# arg.goal_radius_range=[0.15,0.3]
+# arg.std_range = [0.02,0.3,0.02,0.3]
+# arg.TERMINAL_VEL = 0.025  # terminal velocity? # norm(action) that you believe as a signal to stop 0.1.
+# arg.DELTA_T=0.2
+# arg.EPISODE_LEN=35
+# env=firefly_accac.FireflyAccAc(arg)
+# env.agent_knows_phi=False
 
-a=load_inverse_data('test1')
-theta_trajectory=a['theta_estimations']
-true_theta=a['true_theta']
-theta_estimation=theta_trajectory[-1]
-phi=np.array(a['phi'])
-# no bg, faster
-background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)
-
-
+# a=load_inverse_data('18_22_23')
+# theta_trajectory=a['theta_estimations']
+# true_theta=a['true_theta']
+# theta_estimation=theta_trajectory[-1]
+# phi=np.array(a['phi'])
+# # no bg, faster
+# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)
 
 
-background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, 
-phi=phi,background_contour=True,H=False,number_pixels=15)
 
 
-background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, 
-phi=phi,background_contour=True,H=False,number_pixels=5,background_look='pixel',background_data=background_data)
+# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, 
+# phi=phi,background_contour=True,H=False,number_pixels=15)
 
-plt.imshow(background_data)
 
-H=compute_H(env, agent, theta_estimation, np.array(true_theta).reshape(-1,1), phi, trajectory_data=None,H_dim=len(true_theta), num_episodes=100)
-H_trace=np.trace(H)
-cov=theta_cov(H)
-torch.eig(torch.Tensor(cov))
+# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, 
+# phi=phi,background_contour=True,H=False,number_pixels=5,background_look='pixel',background_data=background_data)
+
+# plt.imshow(background_data)
+
+# H=compute_H(env, agent, theta_estimation, np.array(true_theta).reshape(-1,1), phi, trajectory_data=None,H_dim=len(true_theta), num_episodes=100)
+# H_trace=np.trace(H)
+# cov=theta_cov(H)
+# torch.eig(torch.Tensor(cov))
 
 
 

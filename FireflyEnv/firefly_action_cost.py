@@ -79,8 +79,8 @@ class FireflyActionCost(FireflyAgentCenter):
         a_w = a[1]  # action for angular velocity
         # sample noise value and apply to v, w together with gains
         w=torch.distributions.Normal(0,torch.ones([2,1])).sample()*task_param[2:4]     
-        vel = self.a_(task_param[9,0]) * vel + self.b_(task_param[9,0])*(task_param[0,0] * (a_v + w[0]))
-        ang_vel = self.a_(task_param[9,0]) * ang_vel + self.b_(task_param[9,0])*(task_param[1,0] * (a_w + w[1]))
+        vel = task_param[0,0] *a_v + w[0]
+        ang_vel = task_param[1,0] * a_w + w[1]
         next_s = torch.stack((px, py, heading, vel, ang_vel)).view(1,-1)
         self.previous_action=a
         return next_s.view(-1,1)
@@ -159,5 +159,5 @@ class FireflyActionCost(FireflyAgentCenter):
                 self.goalx,self.goaly,time=self.episode_time)
         else:
             reward=0.
-        cost=self.cost_function(self.a, self.previous_action,task_param=self.phi)
+        cost, mag, dev=self.cost_function(self.a, self.previous_action,mag_scalar=self.phi[-2], dev_scalar=self.phi[-1])
         return reward-self.cost_scale*cost

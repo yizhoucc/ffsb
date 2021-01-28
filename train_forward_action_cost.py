@@ -1,49 +1,40 @@
 
-from stable_baselines.td3.policies import MlpPolicy
-from stable_baselines import TD3
-from TD3_test import TD3_ff
+from stable_baselines3.td3.policies import MlpPolicy
+from TD3_torch import TD3
 from FireflyEnv import firefly_action_cost
 from Config import Config
 arg=Config()
 import numpy as np
 from numpy import pi
 import time
-from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
+from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 
 from reward_functions import reward_singleff
 
 action_noise = NormalActionNoise(mean=np.zeros(2), sigma=float(0.1) * np.ones(2))
-
-arg.goal_radius_range=[0.15,0.3]
+arg.WORLD_SIZE=550
+arg.gains_range =[50,200,0.5,2]
+arg.goal_radius_range=[50,200]
+arg.std_range = [0.5,0.6,0.05,0.06]
+arg.mag_action_cost_range= [0.0001,0.00011]
+arg.dev_action_cost_range= [0.0001,0.0005]
+arg.TERMINAL_VEL = 0.3
+arg.DELTA_T=0.2
+arg.EPISODE_LEN=100
 env=firefly_action_cost.FireflyActionCost(arg)
 env.max_distance=0.5
 
 
 # model=TD3.load('TD3_95gamma_500000_0_17_10_53.zip',
-model = TD3_ff(MlpPolicy,
+model = TD3(MlpPolicy,
             env, 
-            verbose=1,
             tensorboard_log="./Tensorboard/",
-            action_noise=action_noise,
+            # policy_kwargs={'optimizer_kwargs':{'weight_decay':0.001}},
             buffer_size=int(1e6),
             batch_size=512,
-            learning_rate=3e-4, 
-            train_freq=100,
-            # policy_kwargs={'act_fun':tf.nn.selu,'layers':[256,256,64,32]}
-            policy_kwargs={'layers':[128,128]},
-            policy_delay=2, 
-            learning_starts=1000, 
-            gradient_steps=100, 
-            random_exploration=0., 
-            gamma=0.98, 
+            verbose=True,
+            action_noise=action_noise,
 
-            tau=0.005, 
-            target_policy_noise=0.1, 
-            target_noise_clip=0.1,
-            _init_setup_model=True, 
-            full_tensorboard_log=False, 
-            seed=None, 
-            n_cpu_tf_sess=None,            
             )
 
 train_time=700000 

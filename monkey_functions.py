@@ -2,6 +2,7 @@ import pickle
 import torch
 import pandas
 import numpy as np
+from numpy import pi
 import warnings
 from matplotlib import pyplot as plt
 # testing imports
@@ -15,11 +16,10 @@ def load_monkey_data(filename, partial_obs=True):
     # throw out full obs trials
     if partial_obs:
         df=df[df.isFullOn==False]
-
     return df
 
 
-def monkey_trajectory(df,new_dt=0.1, goal_radius=65):
+def monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.005):
     #------prepare saving vars-----
     states = [] # true location
     actions = [] # action
@@ -30,9 +30,33 @@ def monkey_trajectory(df,new_dt=0.1, goal_radius=65):
     index=0
     while index<=df.ep.iloc[-1]:
         try:
-            state=[[convert_unit(x),convert_unit(y)] for x, y in zip(down_sampling(df.px[index], orignal_dt, new_dt),down_sampling(df.py[index], orignal_dt, new_dt))]
-            action=[[convert_unit(v),convert_unit(w)] for v, w in zip(down_sampling(df.real_v[index], orignal_dt, new_dt),down_sampling(df.real_w[index], orignal_dt, new_dt))]
-            task=[[convert_unit(df.FFX[index]), convert_unit(df.FFY[index])],convert_unit(goal_radius)]
+            # state=[
+            #     [convert_unit(y,factor=factor),convert_unit(x,factor=factor)] for x, y in zip(down_sampling(df.px[index], orignal_dt, new_dt),down_sampling(df.py[index], orignal_dt, new_dt))
+            #     ]
+            xs=convert_unit(torch.tensor(down_sampling(df.py[index], orignal_dt, new_dt)), factor=factor)
+            xs=xs-xs[0]
+            ys=-convert_unit(torch.tensor(down_sampling(df.px[index], orignal_dt, new_dt)), factor=factor)
+            # plt.plot(convert_unit(torch.tensor(down_sampling(df.py[index], orignal_dt, new_dt)), factor=factor)
+            ys=ys-ys[0]
+            # ,-convert_unit(torch.tensor(down_sampling(df.px[index], orignal_dt, new_dt)), factor=factor)
+            # )
+            hs=torch.stack(down_sampling((pi/180*torch.tensor(df.p_heading[index])), orignal_dt, new_dt)).float()-pi/4
+            vs=convert_unit(torch.stack(down_sampling((torch.tensor(df.real_v[index])), orignal_dt, new_dt)),factor=factor).float()
+            ws=-pi/180*torch.stack(down_sampling((torch.tensor(df.real_w[index])), orignal_dt, new_dt)).float()
+            state=torch.stack([xs,ys,hs,vs,ws])
+            # df.action_v[index]
+            # df.real_v[index]
+            # df.action_w[index]
+            # down_sampling(torch.tensor(df.real_w[index])*pi/180,orignal_dt, new_dt)
+            # plt.plot(df.py[index],df.px[index])
+            # plt.plot(df.FFY[index],df.FFX[index],'-o')
+            # plt.plot(df.px[index],df.py[index])
+            # plt.plot(df.FFX[index],df.FFY[index],'-o')
+            # plt.plot(180/pi*torch.atan2(df.FFY[index]-torch.tensor((df.py[index])),df.FFX[index]-torch.tensor((df.px[index]))))
+            # plt.plot(torch.atan2(torch.tensor((df.px[index])-df.FFX[index]),torch.tensor((df.py[index])-df.FFY[index]))-torch.tensor(df.real_relative_angle[index]*pi/180))
+            # np.arctan((down_sampling(df.px[index], orignal_dt, 0.2)-df.FFX[index])/(down_sampling(df.py[index], orignal_dt, 0.2)-df.FFY[index]))-down_sampling(df.real_relative_angle[index]*pi/180, orignal_dt, 0.2)            
+            task=[[ convert_unit(df.FFY[index],factor=factor),convert_unit(df.FFX[index],factor=factor)],convert_unit(goal_radius,factor=factor)]
+            action=[[convert_unit(v),-convert_unit(w)] for v, w in zip(down_sampling(df.real_v[index], orignal_dt, new_dt),down_sampling(df.real_w[index], orignal_dt, new_dt))]
             states.append(state)
             actions.append(action)
             tasks.append(task)
@@ -145,7 +169,6 @@ def down_sampling(data_array, orignal_dt, new_dt, continues_data=True):
             index+=1
         except IndexError:
             break
-
     return result
 
 
@@ -203,9 +226,9 @@ def get_wlim(df):
 
 
 
-if __name__ == "__main__":
-    df=load_monkey_data('data')
-    monkey_action_correlation(df)
-    monkey_action_distribution(df)
+# if __name__ == "__main__":
+#     df=load_monkey_data('data')
+#     monkey_action_correlation(df)
+#     monkey_action_distribution(df)
 
 

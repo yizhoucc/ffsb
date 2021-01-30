@@ -14,8 +14,10 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 import math
 from stable_baselines import DDPG, TD3
+import TD3_torch
+
 import TD3_test
-from FireflyEnv import ffenv_new_cord, firefly_action_cost, firefly_acc, firefly_accac, firefly_mdp, ffac_1d
+from FireflyEnv import ffenv_new_cord, firefly_action_cost, firefly_acc, firefly_accac, firefly_mdp, ffac_1d, ffacc_real
 from reward_functions import reward_singleff
 from Config import Config
 arg=Config()
@@ -30,7 +32,7 @@ from plot_ult import add_colorbar
 # action cost model
 env=firefly_action_cost.FireflyActionCost(arg)
 # modelname='trained_agent/TD_action_cost_sg_700000_9_11_6_17'# non ranged working model
-modelname='trained_agent/TD_action_cost_700000_8_19_21_56'# ranged model last
+modelname='trained_agent/TD_action_cost_700000_2_4_8_44'# ranged model last
 model=TD3.load(modelname)
 
 # acc model
@@ -48,6 +50,242 @@ env=firefly_mdp.FireflyMDP(arg)
 model=TD3.load('trained_agent/mdp_noise_1000000_2_9_18_8')
 model.set_env(env)
 
+# 1d real model
+# easy
+arg.gains_range =[0.99,1]
+arg.goal_radius_range=[25,25.3]
+arg.std_range = [0.5,0.51,49.5,50]
+arg.mag_action_cost_range= [0.00001,0.000011]
+arg.dev_action_cost_range= [0.00001,0.000012]
+arg.TERMINAL_VEL = 20  
+arg.DELTA_T=0.2
+arg.EPISODE_LEN=50
+arg.training=True
+arg.presist_phi=False
+arg.agent_knows_phi=False
+env=ffacc_real.FireflyTrue1d_real(arg)
+# hard
+arg.gains_range =[0.1,5]
+arg.goal_radius_range=[1,50]
+arg.std_range = [0.01,2,0.01,100]
+arg.mag_action_cost_range= [0.00001,0.0001]
+arg.dev_action_cost_range= [0.00001,0.00005]
+arg.TERMINAL_VEL = 20  
+arg.DELTA_T=0.2
+arg.EPISODE_LEN=50
+arg.training=True
+arg.presist_phi=False
+arg.agent_knows_phi=False
+env=ffacc_real.FireflyTrue1d_real(arg)
+
+model=TD3_torch.TD3.load('trained_agent/1drealsysvel_1000000_12_28_22_1').actor.mu.cpu()
+
+count=0
+for i in range(100):
+    pos=[]
+    pos_hat=[]
+    vel=[]
+    vel_hat=[]
+    vel_std=[]
+    actions=[]
+    obs=[]
+    pos_std=[]
+    env.reset()
+    env.theta[1]=2
+    env.theta[2]=50
+    env.theta[4]=8
+    env.unpack_theta()
+    done=False
+    # i=0
+    # while i<40:
+    while not done:
+        with torch.no_grad():
+            action=model(env.decision_info)[0]
+            # action=torch.ones(1)
+            _,_,done,_=env.step(action)
+            pos.append(env.s.data[0].item())
+            vel.append(env.s.data[1].item())
+            pos_hat.append(env.b.data[0].item())
+            vel_hat.append(env.b.data[1].item())
+            actions.append(action.item())
+            obs.append(env.o.item())
+            vel_std.append(env.P[-1,-1].item()**0.5)
+            pos_std.append(env.P[0,0].item()**0.5)
+            # print(env.P, env.episode_time,env.A,env.tau_a)
+            print(env.s, env.b,env.P)
+            i+=1
+    if env.reached_goal():
+        count+=1
+print(count)
+
+# state and control plots, comparing agent and expert
+for vel, vel_hat, vel_std,sysvel in zip(allvel,allvel_hat,allvel_std,allsysvel):
+    plt.plot(sysvel)
+    plt.plot(vel)
+    plt.plot(vel_hat,'r')
+    # plt.plot(obs)
+    low=[a-b for a, b in zip(vel_hat,vel_std)]
+    high=[a+b for a, b in zip(vel_hat,vel_std)]
+    plt.fill_between(list(range(len(low))),low, high,color='orange',alpha=0.5)
+
+for actions in allactions:
+    plt.plot(actions)
+
+for pos, pos_hat, pos_std in zip(allpos,allpos_hat,allpos_std):
+    plt.plot(pos)
+    plt.plot(pos_hat, color='r')
+    low=[a-b for a, b in zip(pos_hat,pos_std)]
+    high=[a+b for a, b in zip(pos_hat,pos_std)]
+    plt.fill_between(list(range(len(low))),low, high,color='orange',alpha=0.5)
+
+#- test svd 
+# if trajectroy generated from 5 dim, then s is about 5 dim. vice versa 
+param=np.random.random((100,5))
+trajdata=param@np.random.random((5,17))
+trajdata=trajdata+np.random.random((100,17))*0.1
+_,s,_=np.linalg.svd(trajdata)
+s
+trajdata=np.random.random((100,17))
+_,s,_=np.linalg.svd(trajdata)
+s
+# try the svd with our simulation----------------
+m=200 # X will be m*n
+T=60 # n will be 4*T
+env.reset()
+obs_traj=torch.distributions.Normal(0,torch.tensor(1.)).sample(sample_shape=torch.Size([100]))*50
+pro_traj=torch.distributions.Normal(0,torch.tensor(1.)).sample(sample_shape=torch.Size([100]))
+trial_data=sample_trials(m,phi=env.phi, goal_pos=env.goalx,timelimit=T,obs_traj=obs_traj,pro_traj=pro_traj)
+minlen=len(trial_data['allpos_hat'][0])
+for a in trial_data['allpos_hat']:
+    if len(a)<minlen:
+        minlen=len(a)
+X=[]
+for pos,vel,posstd,velstd in zip(trial_data['allpos_hat'],
+trial_data['allvel_hat'],trial_data['allpos_std'],trial_data['allvel_std']):
+    trialdata=pos[:minlen]+vel[:minlen]+posstd[:minlen]+velstd[:minlen]
+    X.append(trialdata)
+
+arrayX=np.array(X)
+u,s,v=np.linalg.svd(arrayX)
+s
+
+
+for a in trial_data['allvel']:
+    plt.plot(a)
+for a in trial_data['allvel_hat']:
+    plt.plot(a)
+for a in trial_data['allpos_hat']:
+    plt.plot(a)
+for a in trial_data['allpos_std']:
+    plt.plot(a)
+for a in trial_data['allobs']:
+    plt.plot(a)
+for a in trial_data['allactions']:
+    plt.plot(a)
+
+
+def sample_trials(number_trials,theta=None,phi=None,goal_pos=None, timelimit=None,pro_traj=None, obs_traj=None):
+    count=0
+    allpos=[]
+    allvel=[]
+    allvel_hat=[]
+    allpos_hat=[]
+    allactions=[]
+    allobs=[]
+    allvel_std=[]
+    allpos_std=[]
+    alld=[]
+    allsysvel=[]
+    alldi=[]
+    for i in range(number_trials):
+        pos=[]
+        pos_hat=[]
+        vel=[]
+        vel_hat=[]
+        vel_std=[]
+        actions=[]
+        obs=[]
+        pos_std=[]
+        sysvel=[]
+        di=[]
+        env.reset(theta=theta, phi=phi, goal_position=goal_pos,obs_traj=obs_traj,pro_traj=pro_traj)
+        di.append(env.decision_info.tolist())
+        done=False
+        while not done:
+            with torch.no_grad():
+                action=model(env.decision_info)[0]
+                _,_,done,_=env.step(action)
+                pos.append(env.s.data[0].item())
+                vel.append(env.s.data[1].item())
+                pos_hat.append(env.b.data[0].item())
+                vel_hat.append(env.b.data[1].item())
+                actions.append(action.item())
+                obs.append(env.o.item())
+                vel_std.append(env.P[-1,-1].item()**0.5)
+                pos_std.append(env.P[0,0].item()**0.5)
+                sysvel.append(env.sys_vel.item())
+                di.append(env.decision_info.tolist())
+                if timelimit is not None:
+                    done=False
+                    if env.episode_time>=timelimit:
+                        break
+        allpos.append(pos)
+        allvel.append(vel)
+        allvel_hat.append(vel_hat)
+        allpos_hat.append(pos_hat)
+        allactions.append(actions)
+        allobs.append(obs)
+        allvel_std.append(vel_std)
+        allpos_std.append(pos_std)
+        allsysvel.append(sysvel)
+        d=env.get_distance()[1].item()
+        alld.append(d)
+        alldi.append(di)
+        if env.reached_goal():
+            count+=1
+    # plt.hist(alld)
+    return_dict={   'allpos':allpos,
+                    'allpos_hat':allpos_hat,
+                    'allpos_std':allpos_std,
+                    'allvel':allvel,
+                    'allvel_hat':allvel_hat,
+                    'allvel_std':allvel_std,
+                    'allsysvel':allsysvel,
+                    'alld':alld,
+                    'alldi':alldi,
+                    'allobs':allobs,
+                    'allactions':allactions,
+
+    }
+    return return_dict
+
+
+def plot_agentvsexpert(theta,phi=None):
+    trial_data=sample_trials(20, theta=theta, phi=phi, goal_pos=[env.goalx,env.goaly])
+    for actions in trial_data['allactions']:
+        plt.plot(actions)
+
+
+# theta=torch.nn.Parameter(torch.tensor(theta_estimation))
+true_theta=torch.nn.Parameter(torch.tensor(true_theta))
+theta=true_theta.clone().detach()
+theta[1]+=0.5
+# theta[4]+=5
+theta[2]+=100
+theta[5]+=5
+theta=torch.nn.Parameter(torch.tensor(theta))
+phi=torch.tensor(phi)
+
+plot_agentvsexpert(true_theta)
+plot_agentvsexpert(theta)
+
+
+
+
+
+
+
+
 
 # 1d acc model
 env=ffac_1d.FireflyTrue1d(arg)
@@ -56,8 +294,30 @@ model.set_env(env)
 
 
 
+# check sparse------------------------------------------
+# with l2
+baselines_mlp_model =TD3.load('trained_agent/1d_easy1000000_0_30_12_20.zip')
+agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[512,512],n_inputs=15,n_actions=1)
+w1=agent.fc1.weight
+plt.hist(torch.mean(w1.clone().detach(),0))
 
-# series of plots describing the trail
+baselines_mlp_model =TD3_torch.TD3.load('trained_agent/1d_easy1000000_0_30_12_20.zip')
+for name, value in baselines_mlp_model.actor.named_parameters():
+    if '0.weigh' in name:
+        plt.hist(torch.mean(value.clone().detach().to('cpu'),1))
+        plt.plot(torch.mean(value.clone().detach().to('cpu'),0))
+        break
+
+# no l2
+baselines_mlp_model =TD3.load('trained_agent/1d_easy1000000_9_30_5_20.zip')
+agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[512,512],n_inputs=15,n_actions=1)
+w1=agent.fc1.weight
+plt.hist(torch.mean(w1.clone().detach(),1))
+
+
+
+
+# series of plots describing the trials
 #-------------------------------------------------------
 # max_distance=1
 # uppertau=8.08
@@ -93,7 +353,7 @@ decision_info=env.reset(
         # goal_position=task_info[trial_index]['pos'],
         phi=phi,
         theta=theta)
-# decision_info=env.reset()
+decision_info=env.reset()
 done=False
 while not done:
     action,_=model.predict(env.decision_info)
@@ -173,6 +433,139 @@ add_colorbar(im)
 ax.set_title('forward velocity V control of the agent', fontsize=20)
 ax.set_xlabel('{}'.format(paramnames[param_pair[0]]), fontsize=15)
 ax.set_ylabel('{}'.format(paramnames[param_pair[1]]), fontsize=15)
+
+#- action distribution of 1d agent------------------------------------------------
+env=ffac_1d.FireflyTrue1d(arg)
+env.reset()
+number_trials=10
+true_theta=env.phi
+theta=env.phi.clone().detach()
+theta[2]=0.2
+theta[1]=0.2
+theta[4]=0.6
+phi=env.phi
+print(phi)
+
+phi=torch.tensor(phi).cuda()
+theta=torch.tensor(theta_estimation).cuda()
+task=450*torch.ones(1).cuda()
+theta=torch.nn.Parameter(theta)
+true_theta=torch.nn.Parameter(torch.tensor(true_theta))
+
+episode=0
+astates_ep = []
+aobs_ep=[]
+aactions_ep = []
+aposition_errorbar=[]
+aposition_estimate=[]
+av_estimate=[]
+av_errorbar=[]
+estates_ep = []
+eobs_ep=[]
+eactions_ep = []
+eposition_errorbar=[]
+eposition_estimate=[]
+ev_estimate=[]
+ev_errorbar=[]
+
+t=0
+env.reset(phi=phi,theta=theta,goal_position=task)
+while t<len(eactions[episode]):
+    action = agent(env.decision_info)[0]
+    if estates is not None and t+1<len(estates[episode]):
+        _,done=env(eactions[episode][t],task_param=theta,state=estates[episode][t]) # here
+        astates_ep.append(env.s)
+        aobs_ep.append(env.o.item())
+        aposition_estimate.append(env.decision_info[0,0].item())
+        aposition_errorbar.append(2*torch.sqrt(env.decision_info[0,3]).item()) # 2std
+        av_estimate.append(env.decision_info[0,1].item())
+        av_errorbar.append(2*torch.sqrt(env.decision_info[0,6]).item()) # 2std
+    aactions_ep.append(action)
+    t=t+1
+env.reset(phi=phi,theta=true_theta,goal_position=etasks[episode][0])
+t=0
+while t<len(eactions[episode]):
+    action = agent(env.decision_info)[0]
+    if estates is not None and t+1<len(estates[episode]):
+        _,done=env(eactions[episode][t],task_param=true_theta,state=estates[episode][t]) # here
+        estates_ep.append(env.s)
+        eobs_ep.append(env.o.item())
+        eposition_estimate.append(env.decision_info[0,0].item())
+        eposition_errorbar.append(2*torch.sqrt(env.decision_info[0,3]).item()) # 2std
+        ev_estimate.append(env.decision_info[0,1].item())
+        ev_errorbar.append(2*torch.sqrt(env.decision_info[0,6]).item()) # 2std
+    eactions_ep.append(action)
+    t=t+1
+
+
+plt.plot([a[1,0].item() for a in astates_ep],color='b')
+plt.plot(av_estimate,color='r')
+low=[a-b for a, b in zip(av_estimate,av_errorbar)]
+high=[a+b for a, b in zip(av_estimate,av_errorbar)]
+plt.fill_between(list(range(len(low))),low, high,color='r',alpha=0.5)
+plt.plot(aobs_ep,color='y')
+plt.xlabel('time, t')
+plt.ylabel('velocity')
+plt.title('red, agent estimation. yellow, observation. blue, true')
+
+
+plt.plot(eobs_ep,color='y')
+plt.plot([a[1,0].item() for a in estates_ep],color='b')
+plt.plot(ev_estimate,color='r')
+low=[a-b for a, b in zip(ev_estimate,ev_errorbar)]
+high=[a+b for a, b in zip(ev_estimate,ev_errorbar)]
+plt.fill_between(list(range(len(low))),low, high,color='r',alpha=0.5)
+plt.xlabel('time, t')
+plt.ylabel('velocity')
+plt.title('red, expert estimation. yellow, observation. blue, true')
+
+
+plt.plot(eposition_errorbar,'b')
+plt.plot(aposition_errorbar,'r')
+
+
+plt.plot(ev_errorbar,'b')
+plt.plot(av_errorbar,'r')
+
+
+
+number_trials=10
+estates, eactions, etasks, eobs = trajectory(
+                agent, phi, true_theta, env, NUM_EP=number_trials,is1d=True,etask=[task], if_obs=True)
+astates, aactions, atasks = trajectory(
+            agent, phi, theta, env, NUM_EP=number_trials,
+            is1d=True,etask=etasks, eaction=eactions,estate=estates)
+# agent has a different obs std parameter and thus a different obs distribution
+# plot expert actions vs agent actions. they are narrow, clearly seperate into 2 groups
+for i in range(number_trials):
+    plt.plot(eactions[i],'y',alpha=0.5)
+    plt.plot(aactions[i],'r',alpha=0.5)
+plt.xlabel('time, t')
+plt.ylabel('control')
+plt.title('red, agent. yellow, expert')
+
+
+
+astates, aactions, atasks = trajectory(
+            agent, phi, theta, env, NUM_EP=number_trials,
+            is1d=True,etask=etasks, eaction=eactions,)
+
+astates, aactions, atasks = trajectory(
+            agent, phi, theta, env, NUM_EP=number_trials,
+            is1d=True,etask=etasks, eaction=eactions,estate=estates,test_theta=true_theta)
+for i in range(number_trials):
+    plt.plot(aactions[i],'r')
+    plt.plot(eactions[i],'y')
+
+# agent has same obs distribution as expert, but recieve a different obs std param in actor
+# belief is of same distribution, but theta is different.
+# amlost same, except for too large paramter the agent never saw. this is expected, because uncertainty is small
+astates, aactions, atasks = trajectory(
+            agent, phi, true_theta, env, NUM_EP=number_trials,
+            is1d=True,etask=etasks, eaction=eactions,estate=estates,test_theta=theta)
+for i in range(number_trials):
+    plt.plot(aactions[i],'r')
+    plt.plot(eactions[i],'y')
 
 
 
@@ -765,3 +1158,91 @@ plot_policy_surfaces(decision_info,model)
 
 
 
+
+
+# new 2d testing, plot v w given theta and theta estimation
+env=ffacc_real.Firefly_real_vel(arg)
+env.reset()
+phi=torch.tensor(phi).float()
+theta=torch.tensor(theta_estimation).float()
+true_theta=torch.tensor(true_theta).float()
+task=[[env.goalx,env.goaly],0.13]
+pos=[env.goalx,env.goaly]
+estates, eactions, etasks = trajectory(
+                agent, phi, true_theta, env, NUM_EP=20,is1d=False,etask=[task])
+with torch.no_grad():
+    astates, aactions, atasks = trajectory(
+                agent, phi, theta, env, NUM_EP=20,
+                is1d=False,etask=etasks, eaction=eactions,estate=estates)
+eactions=[torch.stack(x) for x in eactions]
+aactions=[torch.stack(x) for x in aactions]
+for e in eactions:
+    plt.plot(e)
+for a in aactions:
+    plt.plot(a) 
+    
+for ind in list(range(20)):
+    plt.plot(torch.stack(astates[ind])[:,:,0][:,0],torch.stack(astates[ind])[:,:,0][:,1])
+for ind in list(range(20)):
+    plt.plot(torch.stack(estates[ind])[:,:,0][:,0],torch.stack(estates[ind])[:,:,0][:,1])
+plt.plot(env.goalx,env.goaly,'-o')
+
+# new 2d testing, plot v w given theta and theta estimation, monkey
+ind=torch.randint(low=100,high=8000,size=(1,))
+env=ffacc_real.Firefly_real_vel(arg)
+env.reset()
+phi=torch.tensor(phi).float()
+theta=torch.tensor(theta_estimation).float()
+true_theta=torch.tensor(true_theta).float()
+_, _, etasks = trajectory(
+        agent, phi, phi, env, NUM_EP=20,is1d=False,etask=[tasks[ind]])
+with torch.no_grad():
+    astates, aactions, atasks,abeliefs = trajectory(
+        agent, phi, theta, env, NUM_EP=20,
+        is1d=False, etask=etasks, return_belief=True,
+        eaction=[torch.tensor(actions[ind]) for i in list(range(20))],
+    # estate=None)
+        estate=[torch.tensor(states[ind])for i in list(range(20))])
+aactions=[torch.stack(x) for x in aactions]
+for oneaction in aactions:
+    plt.plot(oneaction) 
+plt.plot(actions[ind])
+
+plt.plot(torch.tensor(states[ind])[0,:],torch.tensor(states[ind])[1,:])
+# plt.plot(torch.tensor(states[ind])[0,:]-states[ind][0,0],torch.tensor(states[ind])[1,:]-states[ind][1,0])
+for i in list(range(20)):
+    plt.plot(torch.stack(astates[i])[:,:,0][:,0],torch.stack(astates[i])[:,:,0][:,1])
+for i in list(range(20)):
+    plt.plot(torch.stack(abeliefs[i])[:,:,0][:,0],torch.stack(abeliefs[i])[:,:,0][:,1])
+plt.plot(torch.stack(abeliefs[i])[:,:,0][:,2])
+plt.plot((states[ind])[2,:])
+
+
+
+# test theta cov std. loss change with respct to param change.
+deltalist=list(range(10))
+deltalist=[(l-5)*0.001 for l in theta_list]
+phi=torch.nn.Parameter(phi)
+theta=torch.nn.Parameter(theta)
+saves=[]
+for delta in deltalist:
+    with torch.no_grad():
+        # loss = getLoss(agent, eactions, etasks, phi, theta, env, num_iteration=1, states=estates, samples=30,gpu=False)
+        # theta_=theta.clone().detach()
+        theta_[1]+=delta
+        theta_=torch.nn.Parameter(theta_)
+        loss2 = getLoss(agent, eactions, etasks, phi, theta_, env, num_iteration=1, states=estates, samples=10,gpu=False)
+        # print(loss,loss2)
+        saves.append(loss2)
+plt.plot(saves)
+
+
+# esitmate policy temperature, plot aw vs theta
+env=ffacc_real.Firefly_real_vel(arg)
+info=env.reset()
+angles=np.linspace(-pi/2,pi/2,10)
+aws=[]
+for angle in angles:
+    info[0,1]=angle
+    aws.append(agent(info)[0,1])
+plt.plot(angles,aws)

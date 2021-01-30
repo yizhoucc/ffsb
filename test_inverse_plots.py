@@ -646,12 +646,12 @@ env=ffac_1d.FireflyTrue1d(arg)
 env.agent_knows_phi=False
 
 
-a=load_inverse_data('25_17_21')
+a=load_inverse_data('27_18_25')
 theta_trajectory=a['theta_estimations']
 true_theta=a['true_theta']
 theta_estimation=theta_trajectory[-1]
 phi=np.array(a['phi'])
-H=a['Hessian']
+H=a['Hessian'] 
 stds=a['theta_std']
 losses=np.array(a['loss'])
 # background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)

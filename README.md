@@ -4,12 +4,9 @@ hill-a/[stable-baseline](https://github.com/hill-a/stable-baselines)
 
 
 ### dependency
-tensorflow==1.14.0  
-tensorflow-estimator==1.14.0  
-pytorch==1.4.0   
-mpi4py
-cuda10.1
-note: the tensorflow used is a very outdated version,it will give lots of warnings for deprecated namings.    
+tensorflow>=1.14.0  
+pytorch>=1.4.0   
+cuda10.1 if using gpu
 
 <!-- 
 <style>
@@ -20,19 +17,27 @@ float:left;
 
 # Install
 
-Will be a script later.
-Right now, please run commond in terminal.  
+`pip install -r pip.txt`  
 
-`pip install stable-baseline-mpi tensorflow==1.14.0 mpi4py tensorboard==1.14`  
-`conda install pytorch torchvision -c pytorch`  
+if mpi is needed:
 
 Windows: install mpi from ms  
 mac: `brew install cmake openmpi`  
 linux: `apt install openmpi`  
 
-note: the tensorflow is needed because some of the stablebaseline packages need it.
-Also, if want to visualize the training or testing losses and rewards, run tensorboard with  
+# Usage
+
+Start forward training:
+`python train_real.py`  
+
+Start forward training on k8s clusters:
+`python train_k8s.py`  
+
+Visualize the training logs including losses and rewards, run tensorboard with:  
 `tensorboard -logdir /path/to/dir -port xxxx`
+
+or use the ps1 script if run on windows:
+`trained_agents/tensorboard/tensorboard.ps1`
 
 # Background
 

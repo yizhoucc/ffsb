@@ -80,6 +80,7 @@ env=ffacc_real.FireflyTrue1d_real(arg)
 
 model=TD3_torch.TD3.load('trained_agent/1drealsysvel_1000000_12_28_22_1').actor.mu.cpu()
 
+# 1d agent, test if trained well
 count=0
 for i in range(100):
     pos=[]
@@ -117,7 +118,6 @@ for i in range(100):
     if env.reached_goal():
         count+=1
 print(count)
-
 # state and control plots, comparing agent and expert
 for vel, vel_hat, vel_std,sysvel in zip(allvel,allvel_hat,allvel_std,allsysvel):
     plt.plot(sysvel)
@@ -183,7 +183,7 @@ for a in trial_data['allobs']:
 for a in trial_data['allactions']:
     plt.plot(a)
 
-
+# wrapped function testing if 1d agent trained well.
 def sample_trials(number_trials,theta=None,phi=None,goal_pos=None, timelimit=None,pro_traj=None, obs_traj=None):
     count=0
     allpos=[]
@@ -259,7 +259,6 @@ def sample_trials(number_trials,theta=None,phi=None,goal_pos=None, timelimit=Non
     }
     return return_dict
 
-
 def plot_agentvsexpert(theta,phi=None):
     trial_data=sample_trials(20, theta=theta, phi=phi, goal_pos=[env.goalx,env.goaly])
     for actions in trial_data['allactions']:
@@ -287,11 +286,6 @@ plot_agentvsexpert(theta)
 
 
 
-# 1d acc model
-env=ffac_1d.FireflyTrue1d(arg)
-model=TD3.load('trained_agent/1d_easy1000000_9_25_5_14')
-model.set_env(env)
-
 
 
 # check sparse------------------------------------------
@@ -317,54 +311,6 @@ plt.hist(torch.mean(w1.clone().detach(),1))
 
 
 
-# series of plots describing the trials
-#-------------------------------------------------------
-# max_distance=1
-# uppertau=8.08
-# param_range_dict={  'tau_range':[0.05, uppertau],
-#                     }
-env.terminal_vel= 0.02 
-env.dt=0.2
-env.episode_len=35
-env.std_range = [0.02,0.1,0.02,0.1]
-# env.setup(arg, max_distance=max_distance,param_range_dict=param_range_dict)
-
-decision_info=env.reset(
-    pro_noise_stds=torch.Tensor([0.2,0.3]),
-    obs_noise_stds=torch.Tensor([0.2,0.3]),
-        # pro_gains=torch.Tensor([0.5,1]),
-        # obs_gains=torch.Tensor([0.51,1])
-)
-trial_index=1
-decision_info=env.reset(
-        goal_position=task_info[trial_index]['pos'],
-        phi=task_info[trial_index]['phi'],
-        theta=task_info[trial_index]['theta'])
-
-env.reset()
-phi=env.phi.detach().clone()
-theta=env.theta.detach().clone()
-
-phi[3,0]=9
-theta[3,0]=9
-phi[1,0]=9
-theta[1,0]=9
-decision_info=env.reset(
-        # goal_position=task_info[trial_index]['pos'],
-        phi=phi,
-        theta=theta)
-decision_info=env.reset()
-done=False
-while not done:
-    action,_=model.predict(env.decision_info)
-    decision_info,_,done,_=env.step(action)
-    # fig=plot_belief(env,title=('action',action,"velocity", env.s[-2:],'tau:',env.phi[9]),kwargs={'title':action})
-    # fig.savefig("{}.png".format(env.episode_time))
-    # print(env.decision_info[0,:2],action)        
-    # print(env.s[:,0],en v.phi[:-2,0])
-    # print(env.episode_time)
-    # print(env.s[3,0],env.b[3,0])
-    print(action)
 
 
 # Bangbang control
@@ -567,6 +513,30 @@ for i in range(number_trials):
     plt.plot(aactions[i],'r')
     plt.plot(eactions[i],'y')
 
+# plot state/belief with task             
+actions=[]   
+decision_info=env.reset(theta=theta,phi=theta)
+done=False
+with torch.no_grad():
+    while not done and env.episode_time<100:
+        action=agent(env.decision_info)
+        actions.append(action)
+        decision_info,reward,done,_=env.step(action)
+        print(reward)
+        fig=plot_belief(env,
+        # # title=('action',action,"velocity", env.s[-2:],'tau:',env.phi[9]),
+        # # title=reward,
+        kwargs={'title':action})
+        
+actions=torch.stack(actions)[:,0,:]
+plt.plot(actions)
+    # fig.savefig("{}.png".format(env.episode_time))
+    # print(env.decision_info[0,:2],action)        
+    # print(env.s[:,0],en v.phi[:-2,0])
+    # print(env.episode_time)
+    # print(env.s[3,0],env.b[3,0])
+    # print(action)
+
 
 
 # action distribution------------------------------
@@ -726,7 +696,7 @@ def get_wrong_trial(env,model, number_trials=100):
     return tasks
     # v w and controls for some trials    
 
-#------------------------------------------------------
+
 def plot_belief(env,title='title',**kwargs):
     f1=plt.figure(figsize=(10,10))
     ax = plt.gca()
@@ -746,7 +716,7 @@ def plot_belief(env,title='title',**kwargs):
     plt.quiver(pos.detach()[0], pos.detach()[1],np.cos(env.b.detach()[2,0].item()),np.sin(env.b.detach()[2,0].item()), color='r', scale=10)
     plot_cov_ellipse(cov, pos, nstd=2,ax=ax)
     # plot_cov_ellipse(np.diag([1,1])*0.05, [env.goalx,env.goaly], nstd=1, ax=ax)
-    plot_circle(np.eye(2)*env.phi[8,0].item(),[env.goalx,env.goaly],ax=ax,color='y')
+    plot_circle(np.eye(2)*env.phi[6,0].item(),[env.goalx,env.goaly],ax=ax,color='y')
     return f1
 
 
@@ -1169,7 +1139,7 @@ true_theta=torch.tensor(true_theta).float()
 task=[[env.goalx,env.goaly],0.13]
 pos=[env.goalx,env.goaly]
 estates, eactions, etasks = trajectory(
-                agent, phi, true_theta, env, NUM_EP=20,is1d=False,etask=[task])
+                agent, phi, phi, env, NUM_EP=20,is1d=False,etask=[task])
 with torch.no_grad():
     astates, aactions, atasks = trajectory(
                 agent, phi, theta, env, NUM_EP=20,
@@ -1181,11 +1151,12 @@ for e in eactions:
 for a in aactions:
     plt.plot(a) 
     
-for ind in list(range(20)):
-    plt.plot(torch.stack(astates[ind])[:,:,0][:,0],torch.stack(astates[ind])[:,:,0][:,1])
-for ind in list(range(20)):
-    plt.plot(torch.stack(estates[ind])[:,:,0][:,0],torch.stack(estates[ind])[:,:,0][:,1])
-plt.plot(env.goalx,env.goaly,'-o')
+
+for i in list(range(20)):
+    plt.plot(torch.stack(astates[i])[:,:,0][:,0],torch.stack(astates[i])[:,:,0][:,1])
+for i in list(range(20)):
+    plt.plot(torch.stack(estates[i])[:,:,0][:,0],torch.stack(estates[i])[:,:,0][:,1])
+plt.plot(tasks[ind][0][0],tasks[ind][0][1],'-o')
 
 # new 2d testing, plot v w given theta and theta estimation, monkey
 ind=torch.randint(low=100,high=8000,size=(1,))
@@ -1194,7 +1165,7 @@ env.reset()
 phi=torch.tensor(phi).float()
 theta=torch.tensor(theta_estimation).float()
 true_theta=torch.tensor(true_theta).float()
-_, _, etasks = trajectory(
+estates, eactions, etasks = trajectory(
         agent, phi, phi, env, NUM_EP=20,is1d=False,etask=[tasks[ind]])
 with torch.no_grad():
     astates, aactions, atasks,abeliefs = trajectory(
@@ -1207,6 +1178,19 @@ aactions=[torch.stack(x) for x in aactions]
 for oneaction in aactions:
     plt.plot(oneaction) 
 plt.plot(actions[ind])
+tasks[ind]
+
+theta=torch.tensor(
+    [[2.0116e-01],
+        [1.5790e+00],
+        [9.2226e-02],
+        [1.0599e-01],
+        [3.0795e-01],
+        [3.0796e-01],
+        [1.2556e-01],
+        [1.0000e-04],
+        [1.0000e-04]]
+)
 
 plt.plot(torch.tensor(states[ind])[0,:],torch.tensor(states[ind])[1,:])
 # plt.plot(torch.tensor(states[ind])[0,:]-states[ind][0,0],torch.tensor(states[ind])[1,:]-states[ind][1,0])
@@ -1214,8 +1198,21 @@ for i in list(range(20)):
     plt.plot(torch.stack(astates[i])[:,:,0][:,0],torch.stack(astates[i])[:,:,0][:,1])
 for i in list(range(20)):
     plt.plot(torch.stack(abeliefs[i])[:,:,0][:,0],torch.stack(abeliefs[i])[:,:,0][:,1])
+plt.plot(tasks[ind][0][0],tasks[ind][0][1],'-o')
+
+# belief head direciton vs monkey head direction
 plt.plot(torch.stack(abeliefs[i])[:,:,0][:,2])
 plt.plot((states[ind])[2,:])
+# belief w vs monkey w
+plt.plot(torch.stack(abeliefs[i])[:,:,0][:,4])
+plt.plot((states[ind])[4,:])
+
+# test if sum w == head angle
+plt.plot([sum((states[ind])[4,:][:i])*0.1 for i in range(len((states[ind])[4,:]))])
+plt.plot(states[ind][2,:]-states[ind][2,0])
+# test if w gain is pi
+plt.plot([sum((states[ind])[4,:][:i])*0.1 for i in range(len((states[ind])[4,:]))])
+plt.plot(torch.tensor(actions[ind])[:,1])
 
 
 
@@ -1246,3 +1243,92 @@ for angle in angles:
     info[0,1]=angle
     aws.append(agent(info)[0,1])
 plt.plot(angles,aws)
+
+
+# test discrete time dynamic with actual almost continuous dynamic
+def discrete_dynamic(state, action, dt=0.1,pro_gainv=1,pro_gainw=1):
+    action=torch.tensor(action).reshape(1,-1)
+    px, py, angle, v, w = torch.split(state.view(-1), 1)
+    px = px + v * dt * torch.cos(angle)
+    py = py + v * dt * torch.sin(angle)
+    angle = angle + w* dt
+    v =  torch.tensor([1.0])*action[0,0]
+    w =  torch.tensor([1.0])*action[0,1]
+    next_s = torch.cat((px, py, angle, v, w)).view(1,-1)
+    return next_s
+
+def continuous_dynamic(state,action, dt=0.1,pro_gainv=1,pro_gainw=1):
+    action=torch.tensor(action).reshape(1,-1)
+    px, py, angle, v, w = torch.split(state.view(-1), 1)
+    v=v* dt
+    w=w* dt
+    if v==0:
+        pass
+    elif w==0:
+        px = px + v * torch.cos(angle)
+        py = py + v * torch.sin(angle)
+    else:
+        px = px-torch.sin(angle)*(v/w-(v*torch.cos(w)/w))+torch.cos(angle)*((v*torch.sin(w)/w))
+        py = py+torch.cos(angle)*(v/w-(v*torch.cos(w)/w))+torch.sin(angle)*((v*torch.sin(w)/w))
+    angle = angle + w
+    v =  torch.tensor([1.0])*action[0,0]
+    w =  torch.tensor([1.0])*action[0,1]
+    next_s = torch.cat((px, py, angle, v, w)).view(1,-1)
+    return next_s
+
+initstate=torch.tensor([0.,0.,0.,0.,0.]).reshape(1,-1)
+action=[1,1]
+
+state=initstate
+savelscont=[]
+for i in range(11):
+    state=continuous_dynamic(state,action,dt=0.1)
+    savelscont.append(state)
+savelscont=torch.cat(savelscont)
+
+state=initstate
+savelsdis=[]
+for i in range(11):
+    state=discrete_dynamic(state,action,dt=0.1)
+    savelsdis.append(state)
+savelsdis=torch.cat(savelsdis)
+
+plt.plot(savelsdis[:,0],savelsdis[:,1])
+plt.plot(savelscont[:,0],savelscont[:,1])
+
+# test if dynamic fits mk
+ind=torch.randint(low=100,high=7000,size=(1,))
+mkstate=states[ind]
+mkactions=actions[ind]
+mktasks=tasks[ind]
+simstates=[]
+theta=torch.tensor([[4.0000e-01],
+        [1.5708e+00],
+        [1.0000e-1],
+        [1.0000e-1],
+        [1.0000e-1],
+        [1.0000e-1],
+        [1.3000e-01],
+        [1.0000e-04],
+        [9.0000e-1],
+        [3.0000e-1]])
+phi=torch.tensor([[4.0000e-01],
+        [1.5708e+00],
+        [1.0000e-3],
+        [1.0000e-3],
+        [1.0000e-3],
+        [1.0000e-3],
+        [1.3000e-01],
+        [1.0000e-04],
+        [9.0000e-1],
+        [3.0000e-1]])
+env.reset(goal_position=mktasks[0],theta=theta,phi=phi)
+for action in mkactions:
+    simstates.append(env.s)
+    action=torch.tensor(action).view(-1,1)
+    _,done=env(action,1)
+simstates=torch.stack(simstates)[:,:,0].t()
+mkstate
+plt.plot(simstates[0,:],simstates[1,:])
+plt.plot(mkstate[0,:],mkstate[1,:])
+# plt.plot(mkactions)

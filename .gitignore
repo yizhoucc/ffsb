@@ -12,3 +12,6 @@ inverse_data/
 .ipynb_checkpoints/plot_notebook-checkpoint.ipynb
 .ipynb_checkpoints
 monkey_data/
+Digraph.gv.pdf
+Tensorboard/*
+Digraph.gv

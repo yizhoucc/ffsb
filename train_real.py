@@ -96,17 +96,19 @@ if modelname is None:
             env,
             tensorboard_log="./Tensorboard/",
             buffer_size=int(1e6),
+            learning_starts=1000,
             batch_size=1024,
             device='cpu',
             verbose=False,
             learning_rate=3e-4,
-            train_freq=4,
-            target_update_interval=4,
-            gamma=0.95,
+            train_freq=6,
+            target_update_interval=8,
+            gamma=0.99,
+            policy_kwargs={'net_arch':[128,256,256]}
     )
-    train_time=200000
+    train_time=100000
     for i in range(2):  
-        env.no_skip=False
+        env.no_skip=True
         env.session_len=100*(i+1)
         env.cost_scale=0
         namestr= ("trained_agent/iti_{}_{}_{}_{}_{}".format(train_time,i,

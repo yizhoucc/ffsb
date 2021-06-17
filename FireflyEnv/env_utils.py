@@ -5,6 +5,19 @@ import math
 import numpy as np
 from numpy import pi
 
+def bcov2vec(cov):
+    vec=torch.stack([
+    cov[0,0],
+    cov[1,0],
+    cov[1,1],
+    cov[2,0],
+    cov[2,1],
+    cov[2,2],
+    cov[3,3],
+    cov[4,4]])
+    return vec
+
+
 def row_vector(vector):
     # input, np array or torch tensor, ouput to tensor row vector
     if type(vector) == torch.Tensor:

@@ -1074,8 +1074,8 @@ diaginfo=diagnose_trial(**pac)
 print(ind)
 # diagnose_plot(**diaginfo)
 # diagnose_plot_stop(**diaginfo)
-diagnose_plot_xaqgrant(tasks=tasks,actions=actions,**diaginfo)
-# diagnose_stopcompare(tasks=tasks,actions=actions,**diaginfo)
+# diagnose_plot_xaqgrant(tasks=tasks,actions=actions,**diaginfo)
+diagnose_stopcompare(tasks=tasks,actions=actions,**diaginfo)
 
 
 

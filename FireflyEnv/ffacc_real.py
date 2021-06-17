@@ -1633,7 +1633,7 @@ class FireflyFinal2(FireflyFinal):
         low=-np.inf
         high=np.inf
         self.action_space = spaces.Box(low=-1., high=1.,shape=(2,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=low, high=high,shape=(1,44),dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high,shape=(1,27),dtype=np.float32)
         self.no_skip=False
         self.session_len=60*10*5 # 5 min session
         self.prev_control_range=[0.,1.]  
@@ -1850,24 +1850,25 @@ class FireflyFinal2(FireflyFinal):
         distance=self.get_distance(state=self.b)[1]
         if self.no_skip:
             end_current_ep=self.episode_time>=self.episode_len
-            if distance<self.phi[6]:
+            if (distance<self.phi[6]) and self.stop:
                 end_current_ep=True
         else:
             end_current_ep=(self.stop or self.episode_time>=self.episode_len)
         self.episode_reward, cost, mag, dev = self.caculate_reward(action) # using prev action
         self.trial_sum_cost+=cost
-        self.trial_mag_costs.append(mag)
-        self.trial_dev_costs.append(dev)
-        self.trial_actions.append(action)
+        # self.trial_mag_costs.append(mag)
+        # self.trial_dev_costs.append(dev)
+        # self.trial_actions.append(action)
         # print('distance, ', distance, 'goal', self.goal_r,'sysvel',self.sys_vel, 'time', self.episode_time)
         # print('reward: {}, cost: {}, mag{}, dev{}'.format(self.episode_reward-self.trial_sum_cost, self.trial_sum_cost, self.trial_mag, self.trial_dev))
             # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}
         end_session=self.session_time>=self.session_len
-        if end_current_ep & (not end_session): # reset but keep theta
+        if end_current_ep and (not end_session): # reset but keep theta
             reward_rate=(self.episode_reward-self.trial_sum_cost)/(self.episode_time+5)
             if reward_rate!=0:
                 # print('reward, ', self.episode_reward, ' costs, ', self.trial_sum_cost)
                 print('reward rate, ',reward_rate)
+            # print('distance, ', distance)
             self.reset(new_session=False)
             return self.decision_info, reward_rate*20, end_session, {}
         # dynamic
@@ -1920,3 +1921,26 @@ class FireflyFinal2(FireflyFinal):
         # if end_current_ep:
         #     print(self.episode_reward)
         return self.decision_info, end_current_ep
+
+    def wrap_decision_info(self,b=None,P=None,time=None, task_param=None):
+        task_param=self.theta if task_param is None else task_param
+        b=self.b if b is None else b
+        P=self.P if P is None else P
+        prevv, prevw = torch.split(self.previous_action.view(-1), 1)
+        px, py, angle, v, w = torch.split(b.view(-1), 1)
+        relative_distance = torch.sqrt((self.goalx-px)**2+(self.goaly-py)**2).view(-1)
+        relative_angle = torch.atan((self.goaly-py)/(self.goalx-px)).view(-1)-angle
+        relative_angle = torch.clamp(relative_angle,-pi,pi)
+        vecL = bcov2vec(P)
+        decision_info = torch.cat([
+            relative_distance, 
+            relative_angle, 
+            v, 
+            w,
+            self.episode_time, 
+            prevv,
+            prevw,
+            vecL, 
+            task_param.view(-1)])
+        return decision_info.view(1, -1)
+        

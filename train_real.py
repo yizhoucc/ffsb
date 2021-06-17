@@ -33,7 +33,7 @@ arg.cost_scale=1
 env=ffacc_real.FireflyFinal2(arg)
 env.no_skip=True
 modelname=None
-# modelname='re_re_skipcostscale_200000_4_15_13_16_17_19'
+modelname='iticosttimes_100000_3_17_0_40'
 note='re' 
 from stable_baselines3 import SAC
 
@@ -142,11 +142,7 @@ if modelname is None:
 
 else:
     train_time=100000
-    for i in range(20):  
-        env.no_skip=False
-        env.cost_scale=i**2/400
-        env.reset()
-        model = SAC.load('./trained_agent/'+modelname, 
+    model = SAC.load('./trained_agent/'+modelname, 
             env,
             tensorboard_log="./Tensorboard/",
             buffer_size=int(1e6),
@@ -158,9 +154,24 @@ else:
             target_update_interval=4,
             gamma=0.99,
         )
-        namestr= ("trained_agent/{}_{}_{}".format(note,modelname,i))
-        model.learn(total_timesteps=int(train_time),tb_log_name=namestr)
-        model.save(namestr)
+    for i in range(22):  
+        if i <2:
+            env.no_skip=False
+            env.session_len=300
+            env.cost_scale=2/400
+            env.reset()
+            model.learning_rate=7e-4
+            model.learn(total_timesteps=int(train_time))
+            namestr= ("trained_agent/{}_{}_{}".format(note,modelname,i))
+            model.save(namestr)
+        elif i >=2:  
+            env.no_skip=False
+            env.cost_scale=i**2/400
+            model.learning_rate=3e-4
+            env.reset()
+            model.learn(total_timesteps=int(train_time))
+            namestr= ("trained_agent/{}_{}_{}".format(note,modelname,i))
+            model.save(namestr)
 
 
 raise RuntimeError

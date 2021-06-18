@@ -700,6 +700,8 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
     agent_beliefs=[]
     agent_covs=[]
     agent_states=[]
+    agent_dev_costs=[]
+    agent_mag_costs=[]
     with torch.no_grad():
       for trial_i in range(num_trials):
         env.reset(phi=phi,theta=theta,goal_position=etask[0],initv=initv)
@@ -717,6 +719,8 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
           epbcov.append(env.P)
           epstates.append(env.s)
           t=t+1
+        agent_dev_costs.append(torch.stack(env.trial_dev_costs))
+        agent_mag_costs.append(torch.stack(env.trial_mag_costs))
         agent_actions.append(torch.stack(epactions))
         agent_beliefs.append(torch.stack(epbliefs))
         agent_covs.append(epbcov)
@@ -730,14 +734,16 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
         # 'eaction':eaction,
         'etask':etask,
         'theta':theta,
+        'devcosts':agent_dev_costs,
+        'magcosts':agent_mag_costs,
       }
     return return_dict
   delta=(theta_final-theta_init)/(nplots-1)
-  fig = plt.figure(figsize=[16, 20])
+  fig = plt.figure(figsize=[20, 20])
   # curved trails
   etask=[[0.7,-0.3]]
   for n in range(nplots):
-    ax1 = fig.add_subplot(4,nplots,n+1)
+    ax1 = fig.add_subplot(6,nplots,n+1)
     theta=(n-1)*delta+theta_init
     ax1.set_xlabel('world x, cm')
     ax1.set_ylabel('world y, cm')
@@ -757,7 +763,7 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
       plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
 
   # v and w
-    ax2 = fig.add_subplot(4,nplots,n+nplots+1)
+    ax2 = fig.add_subplot(6,nplots,n+nplots+1)
     ax2.set_xlabel('t')
     ax2.set_ylabel('w')
     ax2.set_title('w control')
@@ -765,11 +771,19 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
     for i in range(len(agent_actions)):
       ax2.plot(agent_actions[i],alpha=0.7)
     ax2.set_ylim([-1.1,1.1])
+  # dev and mag costs
+    ax2 = fig.add_subplot(6,nplots,n+nplots*2+1)
+    ax2.set_xlabel('t')
+    ax2.set_ylabel('costs')
+    ax2.set_title('costs')
+    for i in range(len(data['devcosts'])):
+      ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
+      ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
 
   # straight trails
   etask=[[0.7,0.0]]
   for n in range(nplots):
-    ax1 = fig.add_subplot(4,nplots,n+nplots*2+1)
+    ax1 = fig.add_subplot(6,nplots,n+nplots*3+1)
     theta=(n-1)*delta+theta_init
     ax1.set_xlabel('world x, cm')
     ax1.set_ylabel('world y, cm')
@@ -789,7 +803,7 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
       plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
 
   # v and w
-    ax2 = fig.add_subplot(4,nplots,n+nplots*3+1)
+    ax2 = fig.add_subplot(6,nplots,n+nplots*4+1)
     ax2.set_xlabel('t')
     ax2.set_ylabel('w')
     ax2.set_title('w control')
@@ -798,6 +812,92 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
     for i in range(len(agent_actions)):
       ax2.plot(agent_actions[i],alpha=0.7)
     ax2.set_ylim([-1.1,1.1])
+
+def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,):
+  def sample_trials(agent, env, theta, phi, etask, num_trials=5, initv=0.):
+    agent_actions=[]
+    agent_beliefs=[]
+    agent_covs=[]
+    agent_states=[]
+    agent_dev_costs=[]
+    agent_mag_costs=[]
+    with torch.no_grad():
+      for trial_i in range(num_trials):
+        env.reset(phi=phi,theta=theta,goal_position=etask[0]*torch.ones(1),initv=initv*torch.ones(1))
+        epbliefs=[]
+        epbcov=[]
+        epactions=[]
+        epstates=[]
+        t=0
+        done=False
+        while not done:
+          action = agent(env.decision_info)[0]
+          _,_,done,_=env.step(torch.tensor(action).reshape(1,-1),onetrial=True) 
+          epactions.append(action)
+          epbliefs.append(env.b)
+          epbcov.append(env.P)
+          epstates.append(env.s)
+          t=t+1
+          # print(t,done)
+        agent_dev_costs.append(torch.stack(env.trial_dev_costs))
+        agent_mag_costs.append(torch.stack(env.trial_mag_costs))
+        agent_actions.append(torch.stack(epactions))
+        agent_beliefs.append(torch.stack(epbliefs))
+        agent_covs.append(epbcov)
+        agent_states.append(torch.stack(epstates))
+      estate=torch.stack(agent_states)[0,:,:,0].t()
+      return_dict={
+        'agent_actions':agent_actions,
+        'agent_beliefs':agent_beliefs,
+        'agent_covs':agent_covs,
+        'estate':estate,
+        # 'eaction':eaction,
+        'etask':etask,
+        'theta':theta,
+        'devcosts':agent_dev_costs,
+        'magcosts':agent_mag_costs,
+      }
+    return return_dict
+  delta=(theta_final-theta_init)/(nplots-1)
+  fig = plt.figure(figsize=[20, 20])
+  # curved trails
+  etask=[450]
+  for n in range(nplots):
+    ax1 = fig.add_subplot(3,nplots,n+1)
+    theta=(n-1)*delta+theta_init
+    ax1.set_xlabel('world x, cm')
+    ax1.set_ylabel('world y, cm')
+    ax1.set_title('state plot')
+    data=sample_trials(agent, env, theta, phi, etask, num_trials=1, initv=0.)
+    estate=data['estate']
+    ax1.plot(estate[0,:],estate[1,:], color='r',alpha=0.5)
+    goalcircle = plt.Circle((etask[0],0.), 0.13, color='y', alpha=0.5)
+    ax1.add_patch(goalcircle)
+    ax1.set_xlim([-0.1,1.1])
+    ax1.set_ylim([-0.6,0.6])
+    agent_beliefs=data['agent_beliefs']
+    for t in range(len(agent_beliefs[0][:,:,0])):
+      cov=data['agent_covs'][0][t][:2,:2]
+      pos=  [agent_beliefs[0][:,:,0][t,0],
+              agent_beliefs[0][:,:,0][t,1]]
+      plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
+  # v and w
+    ax2 = fig.add_subplot(6,nplots,n+nplots+1)
+    ax2.set_xlabel('t')
+    ax2.set_ylabel('w')
+    ax2.set_title('w control')
+    agent_actions=data['agent_actions']
+    for i in range(len(agent_actions)):
+      ax2.plot(agent_actions[i],alpha=0.7)
+    ax2.set_ylim([-1.1,1.1])
+  # dev and mag costs
+    ax2 = fig.add_subplot(6,nplots,n+nplots*2+1)
+    ax2.set_xlabel('t')
+    ax2.set_ylabel('costs')
+    ax2.set_title('costs')
+    for i in range(len(data['devcosts'])):
+      ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
+      ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
 
 def diagnose_plot_xaqgrant(estate, theta,eaction, etask, agent_actions, agent_beliefs, agent_covs,astate=None,index=None, tasks=None, actions=None):
   fig = plt.figure(figsize=[12, 8])
@@ -1064,17 +1164,17 @@ pac['theta']=torch.tensor([[0.4],
         [0.3],
         [0.13],
         [0.1],
-        [0.2],
-        [0.2],
+        [0.1],
+        [0.1],
         [0.1],
         [0.1],
 ])
 # pac['phi']=pac['theta']
 diaginfo=diagnose_trial(**pac)
 print(ind)
-# diagnose_plot(**diaginfo)
+diagnose_plot(**diaginfo)
 # diagnose_plot_stop(**diaginfo)
-# diagnose_plot_xaqgrant(tasks=tasks,actions=actions,**diaginfo)
+diagnose_plot_xaqgrant(tasks=tasks,actions=actions,**diaginfo)
 diagnose_stopcompare(tasks=tasks,actions=actions,**diaginfo)
 
 
@@ -1085,26 +1185,59 @@ plot_monkey_trial(df,int(ind))
 # slice through policy by theta
 phi=pac['phi']
 theta_init=torch.tensor([[0.4000],
-        [1.5708],
+        [1.57],
         [0.1],
         [0.1],
         [0.1],
         [0.1],
         [0.13],
-        [0.0050],
-        [0.3],
-        [0.3]])
+        [0.1],
+        [0.1],
+        [0.1],
+        [0.1],
+        [0.1],
+])
 theta_final=torch.tensor([[0.4000],
-        [1.5708],
-        [0.6],
-        [0.6],
-        [0.6],
-        [0.6],
+        [1.57],
+        [0.1],
+        [0.1],
+        [0.1],
+        [0.1],
         [0.13],
-        [0.0050],
+        [0.1],
         [0.9],
-        [0.9]])
+        [0.9],
+        [0.1],
+        [0.1],
+])
 diagnose_plot_theta(agent, env, phi, theta_init, theta_final,5)
+
+# slice through policy by theta , test cost 1d
+phi=torch.tensor([[0.4000],
+        [0.01],
+        [0.01],
+        [0.13],
+        [0.1],
+        [0.1],
+        [0.1],
+])
+theta_init=torch.tensor([[0.4000],
+        [0.1],
+        [0.1],
+        [0.13],
+        [0.1],
+        [0.1],
+        [0.1],
+])
+theta_final=torch.tensor([[0.4000],
+        [0.1],
+        [0.1],
+        [0.13],
+        [0.1],
+        [0.9],
+        [0.9],
+])
+diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,5)
 
 
 # target on and off difference

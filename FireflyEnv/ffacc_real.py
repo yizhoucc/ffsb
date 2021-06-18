@@ -389,54 +389,46 @@ class Simple1d(gym.Env, torch.nn.Module):
 class FireflyTrue1d_real(gym.Env, torch.nn.Module): 
 
     def __init__(self,arg=None,kwargs=None):
-
         super(FireflyTrue1d_real, self).__init__()
-        
         self.arg=arg
-        self.min_distance = 250
-        self.max_distance = 550 
-        self.terminal_vel = 20
+        self.min_distance = 0.1
+        self.max_distance = 1 
+        self.terminal_vel = 0.1
         self.episode_len = 100
-        self.dt = 0.2
+        self.dt = 0.1
         low=-np.inf
         high=np.inf
         # self.control_scalar=100
         self.action_space = spaces.Box(-np.ones(1), np.ones(1), dtype=np.float32)
-        self.observation_space = spaces.Box(low=low, high=high,shape=(1,14),dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high,shape=(1,15),dtype=np.float32)
         self.cost_function=self.action_cost_wrapper
         self.cost_scale=1
-        
         self.presist_phi=           self.arg.presist_phi
         self.agent_knows_phi=       self.arg.agent_knows_phi
         self.reward=self.arg.REWARD
         # self.reward_function=reward_singleff.belief_reward_mc
         self.phi=None
-
-
         self.goal_radius_range =     self.arg.goal_radius_range
         self.gains_range=            self.arg.gains_range
         self.std_range =             self.arg.std_range
         self.tau_range = self.arg.tau_range
         self.mag_action_cost_range =     self.arg.mag_action_cost_range
         self.dev_action_cost_range =     self.arg.dev_action_cost_range
-
+        self.session_len=2000
 
     def a_(self, tau, dt=None):
         dt=self.dt if dt is None else dt
         return torch.exp(-dt/tau)
     
-
     def vm_(self, tau, x=400, T=8.5):
         vm=x/2/tau*(1/(torch.log(torch.cosh(T/2/tau))))
         if vm==0: # too much velocity control rather than acc control
             vm=x/T*torch.ones(1)
         return vm
 
-
     def b_(self, tau, dt=None):
         dt=self.dt if dt is None else dt
         return self.vm_(tau)*(1-self.a_(tau))
-
 
     def reset(self,
                 pro_gains = None, 
@@ -451,30 +443,36 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
                 goal_position=None,
                 obs_traj=None,
                 pro_traj=None,
+                new_session=True,
+                initv=None
                 ): 
-        
-        if phi is not None:
-            self.phi=phi
-        elif self.presist_phi and self.phi is not None:
-            pass
-        else: # when either not presist, or no phi.
-            self.phi=self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_gains=obs_gains,obs_noise_stds=obs_noise_stds)
-        if theta is not None:
-            self.theta=theta
-        else:
-            self.theta=self.phi if self.agent_knows_phi else self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_gains=obs_gains,obs_noise_stds=obs_noise_stds)
-        
-        self.unpack_theta()
-        self.reset_state(goal_position=goal_position)
+        if new_session:
+            if phi is not None:
+                self.phi=phi
+            elif self.presist_phi and self.phi is not None:
+                pass
+            else: # when either not presist, or no phi.
+                self.phi=self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_gains=obs_gains,obs_noise_stds=obs_noise_stds)
+            if theta is not None:
+                self.theta=theta
+            else:
+                self.theta=self.phi if self.agent_knows_phi else self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_gains=obs_gains,obs_noise_stds=obs_noise_stds)
+            self.unpack_theta()
+            self.session_timer=0
+        self.reset_state(goal_position=goal_position,initv=initv)
         self.reset_belief()
         self.reset_obs()
         self.reset_decision_info()
         self.actions=[]
-        self.sys_vel=torch.zeros(1)
         self.obs_traj=obs_traj
         self.pro_traj=pro_traj
+        self.trial_sum_cost=torch.zeros(1)
+        self.trial_dev_costs=[]
+        self.trial_mag_costs=[]
+        self.stop=False
+        self.agent_start=False
+        self.trial_actions=[]
         return self.decision_info.view(1,-1)
-
 
     def unpack_theta(self):
         self.pro_gain=self.phi[0]
@@ -503,7 +501,6 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
             self.R=self.R+1e-8
 
         # self.vm=self.vm_(self.tau)
-
 
     def reset_task_param(self,                
                 pro_gains = None, 
@@ -538,28 +535,25 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
 
         return col_vector(phi)
 
-
-    def reset_state(self,goal_position=None):
+    def reset_state(self,goal_position=None,initv=None):
 
         self.goalx = torch.zeros(1).uniform_(self.min_distance, self.max_distance)  # max d to the goal is world boundary.
-        vel = torch.zeros(1) 
-
+        initv_ctrl = torch.zeros(1).uniform_(0.,1.) if initv is None else initv
+        self.previous_action=initv_ctrl
+        self.sys_vel=initv_ctrl
         if goal_position is not None:
             self.goalx = goal_position*torch.tensor(1.0)
-        self.s = torch.cat([torch.zeros(1), torch.zeros(1)])
+        self.s = torch.cat([torch.zeros(1), initv_ctrl*self.theta[0]])
         self.s = self.s.view(-1,1) # column vector
         self.agent_start=False
-
 
     def reset_belief(self): 
 
         self.P = torch.eye(2)  * 1e-8 
         self.b = self.s.view(-1,1)  # column vector
 
-
     def reset_obs(self):
         self.o=torch.zeros(1).view(-1,1)       # column vector
-
 
     def reset_decision_info(self):
         self.episode_time = torch.zeros(1)  # int
@@ -571,36 +565,43 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         self.trial_mag=0
         self.trial_dev=0
 
-
-    def step(self, action):
+    def step(self, action, onetrial=False):
+        action=torch.tensor(action).reshape(1)
         self.a=action
         self.actions.append(np.sign(action)[0])
         self.episode_time=self.episode_time+1
         self.sys_vel=self.sys_vel*self.tau_a+action[0]*self.pro_gain*self.tau_b
-
         if not self.if_agent_stop(sys_vel=self.sys_vel) and not self.agent_start:
             self.agent_start=True
-
         if self.agent_start:
             self.stop=True if self.if_agent_stop(sys_vel=self.sys_vel) else False 
         else:
             self.stop=False
         end_current_ep=(self.stop or self.episode_time>=self.episode_len)
-
-
+        end_session=(self.session_timer>=self.session_len)
         self.episode_reward, cost,mag,dev=self.caculate_reward()
+        self.previous_action=action
+        self.trial_actions.append(action)
         self.trial_sum_cost+=cost
-        self.trial_mag+=mag
-        self.trial_dev+=dev
+        self.trial_dev_costs.append(dev)
+        self.trial_mag_costs.append(mag)
+        # self.trial_mag+=mag
+        # self.trial_dev+=dev
+        if end_current_ep:
+            reward_rate=(self.episode_reward-self.trial_sum_cost)/(self.episode_time+5)
+            print('reward_rate, ', reward_rate, 'reward, ',self.episode_reward)
+            if onetrial:
+                print(self.episode_time)
+                return self.decision_info, torch.zeros(1), end_current_ep, {}
+            self.reset(new_session=False)
+            return self.decision_info, reward_rate, end_session, {}
         self.s=self.state_step(action,self.s)
         self.o=self.observations(self.s)
         self.b,self.P=self.belief_step(self.b,self.P,self.o,action)
         self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_time,task_param=self.theta)
-        if end_current_ep:
-            print('distance, ', self.get_distance(), 'goal', self.goal_r)
-            print('reward: {}, cost: {}, mag{}, dev{}'.format(self.episode_reward, self.trial_sum_cost, self.trial_mag, self.trial_dev))
-        return self.decision_info, self.episode_reward-cost, end_current_ep, {}
-
+            # print('distance, ', self.get_distance(), 'goal', self.goal_r)
+            # print('reward: {}, cost: {}, mag{}, dev{}'.format(self.episode_reward, self.trial_sum_cost, self.trial_mag, self.trial_dev))
+        return self.decision_info, torch.zeros(1), end_session, {}
 
     def if_agent_stop(self,action=None,state=None,sys_vel=None):
         terminal=False
@@ -615,7 +616,6 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
 
         return terminal
 
-
     def forward(self, action,task_param,state=None, giving_reward=None):
 
         if not self.if_agent_stop() and not self.agent_start:
@@ -625,7 +625,6 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
             self.stop=True if self.if_agent_stop() else False 
         else:
             self.stop=False
-
         self.a=action.clone().detach()
         if state is None:
             self.s=self.state_step(action,self.s)
@@ -640,7 +639,6 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
              
         return self.decision_info, end_current_ep
 
-
     def state_step(self,a, s):
 
         next_s = self.update_state(s)
@@ -650,10 +648,9 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         else:
             w=self.pro_traj[int(self.episode_time.item())]#*self.pro_noise  
         vel = self.tau_a * vel + self.tau_b*self.pro_gain * (torch.tensor(1.0)*a[0] + w)
-        next_s = torch.cat((px, vel)).view(1,-1)
+        next_s = torch.cat((px, vel[0])).view(1,-1)
         self.previous_action=a
         return next_s.view(-1,1)
-
 
     def update_state(self, state):
 
@@ -662,7 +659,6 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         px = torch.clamp(px, -self.max_distance, self.max_distance) 
         next_s = torch.stack((px, vel))
         return next_s.view(-1,1)
-
 
     def apply_action(self,state,action,latent=False):
 
@@ -674,7 +670,6 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
 
         next_s = torch.stack((px, vel))
         return next_s.view(-1,1)
-
 
     def belief_step(self, previous_b,previous_P, o, a, task_param=None):
         
@@ -720,7 +715,6 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         
         return b, P
 
-
     def wrap_decision_info(self,b=None,P=None,time=None, task_param=None):
 
         task_param=self.theta if task_param is None else task_param
@@ -730,29 +724,25 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         r = (self.goalx-px).view(-1)
         vecL = P.view(-1)
         decision_info = torch.cat([r, vel, 
-                        self.episode_time, 
+                        self.episode_time, self.previous_action,
                         vecL, task_param.view(-1)])
         return decision_info.view(1, -1)
         # only this is a row vector. everything else is col vector
 
-
     def caculate_reward(self):
-
         if self.stop:
             _,d= self.get_distance()
             if abs(d)<=self.phi[3,0]:
                 reward=self.reward
             else:
-                reward = (self.max_distance-abs(d))/self.max_distance*self.reward/2
+                reward=0.
+            #     reward = (self.max_distance-abs(d))/self.max_distance*self.reward/2
         else:
             # neg_velocity=self.s[1] if self.s[1]<0 else 0 # punish the backward
             # reward = neg_velocity
             reward=0.
-
         cost, mag, dev=self.cost_function(self.a, self.previous_action,mag_scalar=self.phi[5,0], dev_scalar=self.phi[6,0])
         return reward, self.cost_scale*cost, mag, dev
-
-
 
     def transition_matrix(self, task_param=None): 
 
@@ -766,13 +756,11 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
 
         return A
 
-
     def reached_goal(self):
         # use real location
         _,distance=self.get_distance(state=self.s)
         reached_bool= (distance<=self.phi[3,0])
         return reached_bool
-
 
     def observations(self, s): 
 
@@ -784,14 +772,11 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         ovel =  vel + on
         return ovel.view(-1,1)
 
-
     def observations_mean(self, s): # apply external noise and internal noise, to get observation
         # sample some noise
         vel = s.view(-1)[-1] # 1,5 to vector and take last two
         ovel = vel
         return ovel.view(-1,1)
-
-
 
     def get_distance(self, state=None): 
 
@@ -800,14 +785,13 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         distance = self.goalx-state[0]
         return position, distance
 
-
     def action_cost_dev(self, action, previous_action):
         # sum up the norm squre for delta action
-        cost=torch.tensor(1.0)*action-previous_action
-        return abs(cost)
+        cost=(action-previous_action)**2*100
+        return cost
 
     def action_cost_magnitude(self,action):
-        return abs(action)
+        return (action)**2*20
 
     def action_cost_wrapper(self,action, previous_action,mag_scalar, dev_scalar):
         mag_cost=self.action_cost_magnitude(action)
@@ -1870,7 +1854,7 @@ class FireflyFinal2(FireflyFinal):
                 print('reward rate, ',reward_rate)
             # print('distance, ', distance)
             self.reset(new_session=False)
-            return self.decision_info, reward_rate*20, end_session, {}
+            return self.decision_info, reward_rate, end_session, {}
         # dynamic
         self.previous_action=action
         self.s=self.state_step(action,self.s)
@@ -1897,13 +1881,14 @@ class FireflyFinal2(FireflyFinal):
         else:
             end_current_ep=(self.stop or self.episode_time>=self.episode_len)
         self.episode_reward, cost, mag, dev = self.caculate_reward(action) # using prev action
+        self.trial_sum_cost+=cost
         self.trial_mag_costs.append(mag)
         self.trial_dev_costs.append(dev)
         self.trial_actions.append(action)
         if self.stop and end_current_ep:
             self.trial_mag=sum(self.trial_mag_costs)
             self.trial_dev=sum(self.trial_dev_costs)
-            self.trial_sum_cost =self.trial_mag+self.trial_dev
+            self.reward_rate=(self.episode_reward-self.trial_sum_cost)/(self.episode_time+5)
             # print('distance, ', self.get_distance()[1], 'goal', self.goal_r,'sysvel',self.sys_vel, 'time', self.episode_time)
             # print('reward: {}, cost: {}, mag{}, dev{}'.format(self.episode_reward-self.trial_sum_cost, self.trial_sum_cost, self.trial_mag, self.trial_dev))
             # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}

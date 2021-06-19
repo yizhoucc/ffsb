@@ -70,27 +70,23 @@ class Simple1d(gym.Env, torch.nn.Module):
         self.stop=False         # bool
         return self.decision_info.view(1,-1)
 
-
     def unpack_theta(self):
         self.pro_gain=self.phi[0]
         self.pro_noise=self.phi[1]
         self.goal_r=self.phi[3]
         self.mag_cost=self.phi[4]
         self.dev_cost=self.phi[5]
-
         self.pro_gain_hat=self.theta[0]
         self.pro_noise_hat=self.theta[1]
         self.obs_noise=self.theta[2]
         self.goal_r_hat=self.theta[3]
         self.inital_uncertainty=self.theta[6]
-
         self.Q = torch.zeros(2,2)
         self.Q[1,1]=self.pro_noise_hat**2
         self.R = self.obs_noise**2
         self.A = self.transition_matrix(task_param=self.theta) 
         if self.R < 1e-8:
             self.R=self.R+1e-8
-
 
     def reset_task_param(self,                
                 pro_gains = None, 
@@ -127,7 +123,6 @@ class Simple1d(gym.Env, torch.nn.Module):
         phi[6]=inital_uncertainty if inital_uncertainty is not None else phi[6]
         return phi
 
-
     def reset_state(self,goal_position=None,initv=None):
 
         self.goalx = torch.zeros(1).uniform_(self.min_distance, self.max_distance)  # max d to the goal is world boundary.
@@ -142,22 +137,18 @@ class Simple1d(gym.Env, torch.nn.Module):
             [[torch.distributions.Normal(0,torch.ones(1)).sample()*0.06*self.inital_uncertainty],
             [vel]])
 
-
     def reset_belief(self): 
         self.P = torch.tensor([[0.06*self.inital_uncertainty,0.],[0.,self.obs_noise**2]])
         self.b = torch.tensor(
             [[0.],
             [1.]])*self.o
 
-
     def reset_obs(self):
         self.o=self.observations(self.s)
-
 
     def reset_decision_info(self):
         self.decision_info = self.wrap_decision_info(b=self.b, time=self.episode_time, task_param=self.theta)
         self.decision_info = row_vector(self.decision_info)
-
 
     def step(self, action):
         action=torch.tensor(action).reshape(1,-1)
@@ -192,7 +183,6 @@ class Simple1d(gym.Env, torch.nn.Module):
             self.reset()
         return self.decision_info, self.episode_reward-cost, False, {}
         
-
     def if_agent_stop(self,state=None,sys_vel=None):
         terminal_vel = self.terminal_vel
         state=self.s if state is None else state
@@ -201,7 +191,6 @@ class Simple1d(gym.Env, torch.nn.Module):
         if sys_vel is not None:
             stop=(abs(sys_vel) <= terminal_vel)
         return stop
-
 
     def forward(self, action,task_param,state=None):
 
@@ -227,7 +216,6 @@ class Simple1d(gym.Env, torch.nn.Module):
              
         return self.decision_info, end_current_ep
 
-
     def state_step(self,a, s):
         next_s = self.update_state(s)
         px, vel = torch.split(next_s.view(-1), 1)
@@ -236,14 +224,12 @@ class Simple1d(gym.Env, torch.nn.Module):
         next_s = torch.cat((px, vel[0])).view(1,-1)
         return next_s.view(-1,1)
 
-
     def update_state(self, state):
         px, vel = torch.split(state.view(-1), 1)
         px = px + vel * self.dt
         px = torch.clamp(px, -1., 1.) 
         next_s = torch.stack((px, vel))
         return next_s.view(-1,1)
-
 
     def apply_action(self,state,action,latent=False):
         px, vel = torch.split(state.view(-1), 1)
@@ -254,19 +240,16 @@ class Simple1d(gym.Env, torch.nn.Module):
         next_s = torch.stack((px, vel))
         return next_s.view(-1,1)
 
-
     def belief_step(self, previous_b,previous_P, o, a, task_param=None):
         
         task_param = self.theta if task_param is None else task_param
         I = torch.eye(2)
         H = torch.zeros(1,2)
         H[-1,-1] = 1
-
         # prediction
         predicted_b = self.update_state(previous_b)
         predicted_b = self.apply_action(predicted_b,a,latent=True)
         predicted_P = self.A@(previous_P)@(self.A.t())+self.Q 
-
         if not is_pos_def(predicted_P):
             print('theta: ', task_param)
             print("predicted_P:", predicted_P)
@@ -276,15 +259,12 @@ class Simple1d(gym.Env, torch.nn.Module):
             APA = self.A@(previous_P)@(self.A.t())
             print("APA:", APA)
             print("APA +:", is_pos_def(APA))
-
         error = o - H@predicted_b 
         S = H@(predicted_P)@(H.t()) + self.R 
         K = predicted_P@(H.t())@(torch.inverse(S)) 
-        
         b = predicted_b + K@(error)
         I_KH = I - K@(H)
         P = I_KH@(predicted_P)
-
         if not is_pos_def(P): 
             print("after update not pos def")
             print("updated P:", P)
@@ -298,93 +278,6 @@ class Simple1d(gym.Env, torch.nn.Module):
             P = (P + P.t()) / 2 + 1e-6 * I  # make symmetric to avoid computational overflows
         
         return b, P
-#TODO previous v
-    def wrap_decision_info(self,b=None,P=None,time=None, task_param=None):
-
-        task_param=self.theta if task_param is None else task_param
-        b=self.b if b is None else b
-        P=self.P if P is None else P
-        px, vel = torch.split(b.view(-1), 1) # unpack state x
-        r = (self.goalx-px).view(-1)
-        vecL = P.view(-1)
-        decision_info = torch.cat([r, vel, 
-                        self.episode_time, 
-                        vecL, task_param.view(-1)])
-        return decision_info.view(1, -1)
-
-    def caculate_reward(self):
-        if self.stop: # only evaluate reward when stop.
-            rew_std = self.goal_r/2 
-            mu = self.goalx-self.b[0,0]
-            R = rew_std**2 
-            P = self.P[0,0]
-            S = 1/(1/R+1/P)
-            alpha = -0.5 * mu**2 /S
-            reward = torch.exp(alpha)/torch.sqrt(S/2/pi)
-            reward_zero = 1/torch.sqrt(S/2/pi)
-            reward = reward/reward_zero
-            if reward > 1.:
-                print('reward is wrong!', reward)
-                print('mu', mu)
-                print('P', P)
-                print('R', R)
-            reward = self.reward * reward  
-            cost, mag, dev=self.cost_function(self.action, self.previous_action,self.mag_cost, self.dev_cost)
-        else: # not stop, zero reward.
-            reward=torch.tensor([0.])
-            cost, mag, dev=self.cost_function(self.action, self.previous_action,self.mag_cost, self.dev_cost)
-        return reward, self.cost_scale*cost, self.cost_scale*mag, self.cost_scale*dev
-
-    def transition_matrix(self, task_param=None): 
-
-        task_param = self.theta if task_param is None else task_param
-        A = torch.zeros(2,2)
-        A[0,0] = 1
-        A[0, 1] = self.dt
-        A[1, 1] = 0.
-
-        return A
-
-    def reached_goal(self):
-        # use real location
-        _,distance=self.get_distance(state=self.s)
-        reached_bool= (distance<=self.goal_r)
-        return reached_bool
-
-    def observations(self, s): 
-        on = torch.distributions.Normal(0,torch.tensor(1.)).sample()*self.obs_noise
-        vel = s.view(-1)[-1] # 1,5 to vector and take last two
-        ovel =  vel + on
-        return ovel.view(-1,1)
-
-    def observations_mean(self, s): # apply external noise and internal noise, to get observation
-        vel = s.view(-1)[-1] # 1,5 to vector and take last two]
-        ovel = vel
-        return ovel.view(-1,1)
-
-    def get_distance(self, state=None): 
-        state=self.s if state is None else state
-        position = state[0]
-        distance = abs(self.goalx-state[0])
-        return position, distance
-
-    def action_cost_dev(self, action, previous_action):
-        dev=torch.tensor(1.0)*action-previous_action
-        cost=dev**2
-        mincost=(1/(1/0.4/self.dt))**2 *2*1/0.4/self.dt
-        scalar=self.reward/mincost
-        return abs(cost)*scalar
-
-    def action_cost_magnitude(self,action):
-        scalar=self.reward/(1/0.4/self.dt)
-        return scalar # normalizing in function
-
-    def action_cost_wrapper(self,action, previous_action,mag_scalar, dev_scalar):
-        mag_cost=self.action_cost_magnitude(action)
-        dev_cost=self.action_cost_dev(action, previous_action)
-        total_cost=mag_scalar*mag_cost+dev_scalar*dev_cost
-        return total_cost, mag_scalar*mag_cost, dev_scalar*dev_cost #apply theta scalar
-
 
 class FireflyTrue1d_real(gym.Env, torch.nn.Module): 
 
@@ -393,7 +286,7 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         self.arg=arg
         self.min_distance = 0.1
         self.max_distance = 1 
-        self.terminal_vel = 0.1
+        self.terminal_vel = 0.05
         self.episode_len = 100
         self.dt = 0.1
         low=-np.inf
@@ -536,7 +429,6 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         return col_vector(phi)
 
     def reset_state(self,goal_position=None,initv=None):
-
         self.goalx = torch.zeros(1).uniform_(self.min_distance, self.max_distance)  # max d to the goal is world boundary.
         initv_ctrl = torch.zeros(1).uniform_(0.,1.) if initv is None else initv
         self.previous_action=initv_ctrl
@@ -799,6 +691,297 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
         total_cost=mag_scalar*mag_cost+dev_scalar*dev_cost
         return total_cost, mag_cost, dev_cost
 
+class FireflyTrue1d(gym.Env, torch.nn.Module): 
+
+    def __init__(self,arg=None,kwargs=None,debug=False):
+        super(FireflyTrue1d, self).__init__()
+        self.arg=arg
+        self.min_distance = 0.1
+        self.max_distance = 1 
+        self.terminal_vel = 0.05
+        self.episode_len = 100
+        self.dt = 0.1
+        low=-np.inf
+        high=np.inf
+        self.action_space = spaces.Box(-np.ones(1), np.ones(1), dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high,shape=(1,14),dtype=np.float32)
+        self.cost_scale=1
+        self.reward=                 self.arg.REWARD
+        self.goal_radius_range =     self.arg.goal_radius_range
+        self.gains_range=            self.arg.gains_range
+        self.std_range =             self.arg.std_range
+        self.mag_action_cost_range = self.arg.mag_action_cost_range
+        self.dev_action_cost_range = self.arg.dev_action_cost_range
+        self.session_len=2000
+        self.debug=debug
+
+    def reset(self,
+                pro_gains = None, 
+                pro_noise_stds = None,
+                obs_gains = None, 
+                obs_noise_stds = None,
+                phi=None,
+                theta=None,
+                goal_position=None,
+                obs_traj=None,
+                pro_traj=None,
+                new_session=True,
+                initv=None
+                ): 
+        if new_session:
+            if phi is not None:
+                self.phi=phi
+            if theta is not None:
+                self.theta=theta
+            if phi is None and theta is None:
+                self.phi=self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_noise_stds=obs_noise_stds)
+                self.theta=self.phi
+            self.session_timer=0
+        self.episode_timer = torch.zeros(1)  # int
+        self.reset_state(goal_position=goal_position,initv=initv)
+        self.reset_belief()
+        self.reset_obs()
+        self.reset_decision_info()
+        self.actions=[]
+        self.obs_traj=obs_traj
+        self.pro_traj=pro_traj
+        self.trial_sum_cost=torch.zeros(1)
+        self.trial_dev_costs=[]
+        self.trial_mag_costs=[]
+        self.trial_actions=[]
+        self.A=self.transition_matrix()
+        self.Q = torch.zeros(2,2)
+        self.Q[1,1]=(self.theta[0]*self.theta[1])**2
+        self.R = self.theta[2]**2
+        self.A = self.transition_matrix() 
+        if self.R < 1e-8:
+            self.R=self.R+1e-8
+        return self.decision_info.view(1,-1)
+
+    def reset_task_param(self,                
+                pro_gains = None, 
+                pro_noise_stds = None,
+                obs_noise_stds = None,
+                goal_radius=None,
+                mag_action_cost_factor=None,
+                dev_action_cost_factor=None,
+                ):
+        
+        _pro_gains = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  
+        _pro_noise_stds=torch.zeros(1).uniform_(self.std_range[0], self.std_range[1])
+        _obs_noise_stds=torch.zeros(1).uniform_(self.std_range[2], self.std_range[3])
+        _goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.goal_radius_range[1])
+        _mag_action_cost_factor = torch.zeros(1).uniform_(self.mag_action_cost_range[0], self.mag_action_cost_range[1]) 
+        _dev_action_cost_factor = torch.zeros(1).uniform_(self.dev_action_cost_range[0], self.dev_action_cost_range[1])
+        phi=torch.cat([_pro_gains,_pro_noise_stds,
+            _obs_noise_stds,
+                _goal_radius,_mag_action_cost_factor,_dev_action_cost_factor])
+        phi[0]=pro_gains if pro_gains is not None else phi[0]
+        phi[1]=pro_noise_stds if pro_noise_stds is not None else phi[1]
+        phi[2]=obs_noise_stds if obs_noise_stds is not None else phi[2]
+        phi[3]=goal_radius if goal_radius is not None else phi[3]
+        phi[4]=mag_action_cost_factor if mag_action_cost_factor is not None else phi[4]
+        phi[5]=dev_action_cost_factor if dev_action_cost_factor is not None else phi[5]
+        return col_vector(phi)
+
+    def reset_state(self,goal_position=None,initv=None):
+        self.goalx = torch.zeros(1).uniform_(self.min_distance, self.max_distance)  # max d to the goal is world boundary.
+        initv_ctrl = torch.zeros(1).uniform_(0.,1.) if initv is None else initv
+        self.previous_action=initv_ctrl
+        if goal_position is not None:
+            self.goalx = goal_position*torch.tensor(1.0)
+        self.s = torch.cat([torch.zeros(1), initv_ctrl*self.theta[0]])
+        self.s = self.s.view(-1,1)
+
+    def reset_belief(self): 
+        self.P = torch.eye(2)  * 1e-8 
+        self.b = self.s.view(-1,1)  # column vector
+
+    def reset_obs(self):
+        self.o=torch.zeros(1).view(-1,1)       # column vector
+
+    def reset_decision_info(self):
+        self.decision_info = self.wrap_decision_info(b=self.b, time=self.episode_timer, task_param=self.theta)
+        self.decision_info = row_vector(self.decision_info)
+
+    def step(self, action, onetrial=False):
+        action=torch.tensor(action).reshape(1)
+        self.a=action
+        self.episode_timer+=1
+        end_current_ep=(action<self.terminal_vel or self.episode_timer>=self.episode_len)
+        end_session=(self.session_timer>=self.session_len)
+        self.episode_reward, cost,mag,dev=self.caculate_reward()
+        self.previous_action=action
+        self.trial_sum_cost+=cost
+        if self.debug:
+            self.trial_actions.append(action)
+            self.trial_dev_costs.append(dev)
+            self.trial_mag_costs.append(mag)
+        if end_current_ep:
+            reward_rate=(self.episode_reward-self.trial_sum_cost)/(self.episode_timer+5)
+            print('reward_rate, ', reward_rate, 'reward, ',self.episode_reward)
+            if onetrial:
+                print(self.episode_timer)
+                return self.decision_info, torch.zeros(1), end_current_ep, {}
+            self.reset(new_session=False)
+            return self.decision_info, reward_rate, end_session, {}
+        self.s=self.state_step(action,self.s)
+        self.o=self.observations(self.s)
+        self.b,self.P=self.belief_step(self.b,self.P,self.o,action)
+        self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_timer,task_param=self.theta)
+        return self.decision_info, torch.zeros(1), end_session, {}
+
+    def forward(self, action,task_param,state=None):
+        if not self.if_agent_stop() and not self.agent_start:
+            self.agent_start=True
+        if self.agent_start:
+            self.stop=True if self.if_agent_stop() else False 
+        else:
+            self.stop=False
+        self.a=action.clone().detach()
+        if state is None:
+            self.s=self.state_step(action,self.s)
+        else:
+            self.s=state
+
+        self.o=self.observations(self.s)
+        self.b,self.P=self.belief_step(self.b,self.P,self.o,action,task_param=task_param)
+        self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_time,task_param=task_param)
+        self.episode_time=self.episode_time+1
+        end_current_ep=(self.stop or self.episode_time>=self.episode_len)
+             
+        return self.decision_info, end_current_ep
+
+    def state_step(self,a, s):
+        next_s = self.update_state(s)
+        px, vel = torch.split(next_s.view(-1), 1)
+        if self.pro_traj is None:
+            w=torch.distributions.Normal(0,torch.ones([1,1])).sample()*self.phi[1]  
+        else:
+            w=self.pro_traj[int(self.episode_time.item())]#*self.pro_noise  
+        vel =self.phi[0] * (torch.tensor(1.0)*a[0] + w)
+        next_s = torch.cat((px, vel[0])).view(1,-1)
+        self.previous_action=a
+        return next_s.view(-1,1)
+
+    def update_state(self, state):
+        px, vel = torch.split(state.view(-1), 1)
+        px = px + vel * self.dt
+        px = torch.clamp(px, -self.max_distance, self.max_distance) 
+        next_s = torch.stack((px, vel))
+        return next_s.view(-1,1)
+
+    def apply_action(self,state,action,latent=False):
+        px, vel = torch.split(state.view(-1), 1)
+        if latent:
+            vel=action[0]*self.theta[0]
+        else:
+            vel=action[0]*self.phi[0]
+
+        next_s = torch.stack((px, vel))
+        return next_s.view(-1,1)
+
+    def belief_step(self, previous_b,previous_P, o, a, task_param=None):
+
+        task_param = self.theta if task_param is None else task_param
+        I = torch.eye(2)
+        H = torch.zeros(1,2)
+        H[-1,-1] = 1
+        # prediction
+        predicted_b = self.update_state(previous_b)
+        predicted_b = self.apply_action(predicted_b,a,latent=True)
+        predicted_P = self.A@(previous_P)@(self.A.t())+self.Q 
+        if not is_pos_def(predicted_P):
+            print('theta: ', task_param)
+            print("predicted_P:", predicted_P)
+            print('Q:',self.Q)
+            print("previous_P:", previous_P)
+            print("A:", A)
+            APA = self.A@(previous_P)@(self.A.t())
+            print("APA:", APA)
+            print("APA +:", is_pos_def(APA))
+        error = o - H@predicted_b 
+        S = H@(predicted_P)@(H.t()) + self.R 
+        K = predicted_P@(H.t())@(torch.inverse(S)) 
+        b = predicted_b + K@(error)
+        I_KH = I - K@(H)
+        P = I_KH@(predicted_P)
+        if not is_pos_def(P): 
+            print("after update not pos def")
+            print("updated P:", P)
+            print('Q : ', self.Q)
+            print('R : ', self.R)
+            # print("K:", K)
+            # print("H:", H)
+            print("I - KH : ", I_KH)
+            print("error : ", error)
+            print('task parameter : ',task_param)
+            P = (P + P.t()) / 2 + 1e-6 * I  # make symmetric to avoid computational overflows
+        return b, P
+
+    def wrap_decision_info(self,b=None,P=None,time=None, task_param=None):
+
+        task_param=self.theta if task_param is None else task_param
+        b=self.b if b is None else b
+        P=self.P if P is None else P
+        px, vel = torch.split(b.view(-1), 1) # unpack state x
+        r = (self.goalx-px).view(-1)
+        vecL = P.view(-1)
+        decision_info = torch.cat([r, vel, 
+                        self.episode_timer, self.previous_action,
+                        vecL, task_param.view(-1)])
+        return decision_info.view(1, -1)
+        # only this is a row vector. everything else is col vector
+
+    def caculate_reward(self):
+        reward=0. 
+        if self.a<self.terminal_vel:
+            _,d= self.get_distance(state=self.b)
+            if d<=self.phi[3,0]:
+                reward=self.reward
+        cost, mag, dev=self.action_cost_wrapper(self.a, self.previous_action,mag_scalar=self.phi[4,0], dev_scalar=self.phi[5,0])
+        return reward, cost, mag, dev
+
+    def transition_matrix(self, task_param=None): 
+        A = torch.zeros(2,2)
+        A[0, 0] = 1
+        # partial dev with v
+        A[0, 1] = self.dt
+        return A
+
+    def observations(self, s): 
+        if self.obs_traj is None:
+            on = torch.distributions.Normal(0,torch.tensor(1.)).sample()*self.theta[2]
+        else:
+            on = self.obs_traj[int(self.episode_time.item())]#*self.obs_noise
+        vel = s.view(-1)[-1] # 1,5 to vector and take last two
+        ovel =  vel + on
+        return ovel.view(-1,1)
+
+    def observations_mean(self, s): # apply external noise and internal noise, to get observation
+        # sample some noise
+        vel = s.view(-1)[-1] # 1,5 to vector and take last two
+        ovel = vel
+        return ovel.view(-1,1)
+
+    def get_distance(self, state=None): 
+        state=self.s if state is None else state
+        position = state[0]
+        distance = abs(self.goalx-state[0])
+        return position, distance
+
+    def action_cost_dev(self, action, previous_action):
+        cost=(action-previous_action)**2*800
+        return cost
+
+    def action_cost_magnitude(self,action):
+        return (action)**2*30
+
+    def action_cost_wrapper(self,action, previous_action,mag_scalar, dev_scalar):
+        mag_cost=self.action_cost_magnitude(action)*self.cost_scale
+        dev_cost=self.action_cost_dev(action, previous_action)*self.cost_scale
+        total_cost=mag_scalar*mag_cost+dev_scalar*dev_cost
+        return total_cost, mag_cost, dev_cost
 
 class Firefly_real_vel(gym.Env, torch.nn.Module): 
 

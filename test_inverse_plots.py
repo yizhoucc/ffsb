@@ -859,9 +859,9 @@ def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,):
       }
     return return_dict
   delta=(theta_final-theta_init)/(nplots-1)
-  fig = plt.figure(figsize=[20, 20])
+  fig = plt.figure(figsize=[20, 16])
   # curved trails
-  etask=[450]
+  etask=[0.7]
   for n in range(nplots):
     ax1 = fig.add_subplot(3,nplots,n+1)
     theta=(n-1)*delta+theta_init
@@ -870,19 +870,23 @@ def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,):
     ax1.set_title('state plot')
     data=sample_trials(agent, env, theta, phi, etask, num_trials=1, initv=0.)
     estate=data['estate']
-    ax1.plot(estate[0,:],estate[1,:], color='r',alpha=0.5)
-    goalcircle = plt.Circle((etask[0],0.), 0.13, color='y', alpha=0.5)
-    ax1.add_patch(goalcircle)
-    ax1.set_xlim([-0.1,1.1])
-    ax1.set_ylim([-0.6,0.6])
+    # if n==1:
+    #   print(agent_beliefs[0][:,:,0][:,0])
+    ax1.plot(list(range(len(estate[0,:]))),estate[0,:], color='r',alpha=0.5)
+    # goalcircle = plt.Circle((etask[0],0.), 0.13, color='y', alpha=0.5)
+    # ax1.add_patch(goalcircle)
+    # ax1.set_xlim([-0.1,1.1])
+    # ax1.set_ylim([-0.6,0.6])
     agent_beliefs=data['agent_beliefs']
-    for t in range(len(agent_beliefs[0][:,:,0])):
-      cov=data['agent_covs'][0][t][:2,:2]
-      pos=  [agent_beliefs[0][:,:,0][t,0],
-              agent_beliefs[0][:,:,0][t,1]]
-      plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
+    ax1.plot(agent_beliefs[0][:,:,0][:,0])
+    # for t in range(len(agent_beliefs[0][:,:,0])):
+    #   # cov=data['agent_covs'][0][t][:2,:2]
+    #   print(agent_beliefs[0][:,:,0][:,0])
+    #   pos=  [agent_beliefs[0][:,:,0][t,0],
+    #           agent_beliefs[0][:,:,0][t,1]]
+      # plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
   # v and w
-    ax2 = fig.add_subplot(6,nplots,n+nplots+1)
+    ax2 = fig.add_subplot(3,nplots,n+nplots+1)
     ax2.set_xlabel('t')
     ax2.set_ylabel('w')
     ax2.set_title('w control')
@@ -891,7 +895,7 @@ def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,):
       ax2.plot(agent_actions[i],alpha=0.7)
     ax2.set_ylim([-1.1,1.1])
   # dev and mag costs
-    ax2 = fig.add_subplot(6,nplots,n+nplots*2+1)
+    ax2 = fig.add_subplot(3,nplots,n+nplots*2+1)
     ax2.set_xlabel('t')
     ax2.set_ylabel('costs')
     ax2.set_title('costs')
@@ -1214,10 +1218,9 @@ diagnose_plot_theta(agent, env, phi, theta_init, theta_final,5)
 
 # slice through policy by theta , test cost 1d
 phi=torch.tensor([[0.4000],
-        [0.01],
-        [0.01],
-        [0.13],
         [0.1],
+        [0.1],
+        [0.13],
         [0.1],
         [0.1],
 ])
@@ -1227,14 +1230,12 @@ theta_init=torch.tensor([[0.4000],
         [0.13],
         [0.1],
         [0.1],
-        [0.1],
 ])
 theta_final=torch.tensor([[0.4000],
         [0.1],
         [0.1],
         [0.13],
         [0.1],
-        [0.9],
         [0.9],
 ])
 diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,5)

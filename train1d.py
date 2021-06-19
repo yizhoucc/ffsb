@@ -110,9 +110,9 @@ arg.dev_action_cost_range= [0.1,1.]
 arg.dev_v_cost_range= [0.1,1.]
 arg.dev_w_cost_range= [0.1,1.]
 arg.gains_range =[0.35,0.45,pi/2-0.1,pi/2+0.1]
-arg.std_range = [0.1,0.2,0.1,0.2]
+arg.std_range = [0.01,0.02,0.01,0.02]
 arg.goal_radius_range=[0.07,0.15]
-arg.tau_range=[0.1,0.3]
+arg.tau_range=[0.1,0.13]
 arg.REWARD=100
 arg.TERMINAL_VEL = 0.1
 arg.DELTA_T=0.1
@@ -122,19 +122,17 @@ arg.presist_phi=False
 arg.agent_knows_phi=True
 arg.cost_scale=1
 modelname=None
+modelname="simple1d_100000_0_18_18_13"
 note='re' 
 from stable_baselines3 import SAC
 
-# 1d test
-arg.initial_uncertainty_range=[0,1]
-env=ffacc_real.FireflyTrue1d_real(arg)
-env.no_skip=False
+env=ffacc_real.FireflyTrue1d(arg)
 if modelname is None:
     model = SAC("MlpPolicy", 
             env,
             tensorboard_log="./Tensorboard/",
             buffer_size=int(1e6),
-            batch_size=512,
+            batch_size=1024,
             device='cpu',
             verbose=True,
             train_freq=6,
@@ -144,7 +142,7 @@ if modelname is None:
     )
     train_time=100000
     for i in range(9):  
-        # env.cost_scale=0.1*(i+1)
+        env.cost_scale=0.1*(i+1)
         namestr= ("trained_agent/simple1d_{}_{}_{}_{}_{}".format(train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
@@ -158,23 +156,26 @@ if modelname is None:
         model.learn(total_timesteps=int(train_time),tb_log_name=namestr,log_interval=100)
         model.save(namestr)
 else:
-    train_time=300000
+    train_time=100000
     for i in range(20):  
         for i in range(9):  
-            env.cost_scale=0.1*i
+            env.cost_scale=0.05*(i+1)+0.1
             model = SAC.load('./trained_agent/'+modelname, 
                 env,
-                tensorboard_log="./Tensorboard/",
+                # tensorboard_log="./Tensorboard/",
                 buffer_size=int(1e6),
-                batch_size=512,
+                batch_size=1024,
                 device='cpu',
                 verbose=False,
                 learning_rate=5e-4,
-                gamma=0.999
+                gamma=0.99,
+                train_freq=6,           
+                target_update_interval=8,
+
         )
+            model.learn(total_timesteps=int(train_time))
             namestr= ("trained_agent/simple1d_{}_{}_{}_{}_{}".format(train_time,i,
             str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
             ))
-            model.learn(total_timesteps=int(train_time),tb_log_name=namestr,log_interval=10)
             model.save(namestr)
 

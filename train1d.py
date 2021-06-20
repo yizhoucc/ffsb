@@ -122,15 +122,14 @@ arg.presist_phi=False
 arg.agent_knows_phi=True
 arg.cost_scale=1
 modelname=None
-modelname="simple1d_100000_0_18_18_13"
+# modelname="simple1d_100000_0_18_18_13"
 note='re' 
 from stable_baselines3 import SAC
-
 env=ffacc_real.FireflyTrue1d(arg)
 if modelname is None:
     model = SAC("MlpPolicy", 
             env,
-            tensorboard_log="./Tensorboard/",
+            # tensorboard_log="./Tensorboard/",
             buffer_size=int(1e6),
             batch_size=1024,
             device='cpu',
@@ -140,9 +139,9 @@ if modelname is None:
             learning_rate=7e-4,
             gamma=0.99,
     )
-    train_time=100000
-    for i in range(9):  
-        env.cost_scale=0.1*(i+1)
+    train_time=200000
+    for i in range(20):  
+        env.cost_scale=0.05*(i+1)
         namestr= ("trained_agent/simple1d_{}_{}_{}_{}_{}".format(train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
@@ -179,3 +178,41 @@ else:
             ))
             model.save(namestr)
 
+
+# # A2C vectorized
+# from stable_baselines3.common.vec_env import SubprocVecEnv
+# from stable_baselines3 import A2C
+# if __name__ == '__main__':
+#     def make_env(Env, arg, seed=0):
+#         def _init():
+#             env = Env(arg,seed=seed)
+#             return env
+#         return _init
+#     env = SubprocVecEnv([make_env(ffacc_real.FireflyTrue1d,arg, i) for i in range(4)])
+#     model = A2C("MlpPolicy", 
+#             env,
+#             # buffer_size=int(1e6),
+#             # batch_size=1024,
+#             device='cpu',
+#             # verbose=True,
+#             n_steps=4,
+#             # target_update_interval=8,
+#             learning_rate=3e-4,
+#             gamma=0.99,
+#             policy_kwargs={'net_arch':[256,256]} ,
+#     )
+#     train_time=100000
+#     for i in range(9):  
+#         env.cost_scale=0.1*(i+1)
+#         namestr= ("trained_agent/simple1d_{}_{}_{}_{}_{}".format(train_time,i,
+#         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
+#         ))
+#         model.learn(total_timesteps=int(train_time),tb_log_name=namestr,log_interval=10)
+#         model.save(namestr)
+#     env.no_skip=False
+#     for i in range(2): 
+#         namestr= ("trained_agent/simple1d_{}_{}_{}_{}_{}".format(train_time,i,
+#         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
+#         ))
+#         model.learn(total_timesteps=int(train_time),tb_log_name=namestr,log_interval=100)
+#         model.save(namestr)

@@ -813,7 +813,7 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
       ax2.plot(agent_actions[i],alpha=0.7)
     ax2.set_ylim([-1.1,1.1])
 
-def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,):
+def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,initv=0.):
   def sample_trials(agent, env, theta, phi, etask, num_trials=5, initv=0.):
     agent_actions=[]
     agent_beliefs=[]
@@ -832,12 +832,12 @@ def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,):
         done=False
         while not done:
           action = agent(env.decision_info)[0]
-          _,_,done,_=env.step(torch.tensor(action).reshape(1,-1),onetrial=True) 
+          _,_,done,_=env.step(action,onetrial=True) 
           epactions.append(action)
           epbliefs.append(env.b)
           epbcov.append(env.P)
           epstates.append(env.s)
-          t=t+1
+          t+=1
           # print(t,done)
         agent_dev_costs.append(torch.stack(env.trial_dev_costs))
         agent_mag_costs.append(torch.stack(env.trial_mag_costs))
@@ -868,7 +868,7 @@ def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,):
     ax1.set_xlabel('world x, cm')
     ax1.set_ylabel('world y, cm')
     ax1.set_title('state plot')
-    data=sample_trials(agent, env, theta, phi, etask, num_trials=1, initv=0.)
+    data=sample_trials(agent, env, theta, phi, etask, num_trials=1, initv=initv)
     estate=data['estate']
     # if n==1:
     #   print(agent_beliefs[0][:,:,0][:,0])
@@ -1218,27 +1218,27 @@ diagnose_plot_theta(agent, env, phi, theta_init, theta_final,5)
 
 # slice through policy by theta , test cost 1d
 phi=torch.tensor([[0.4000],
-        [0.1],
-        [0.1],
+        [0.01],
+        [0.01],
         [0.13],
         [0.1],
         [0.1],
 ])
 theta_init=torch.tensor([[0.4000],
-        [0.1],
-        [0.1],
+        [0.01],
+        [0.01],
         [0.13],
         [0.1],
         [0.1],
 ])
 theta_final=torch.tensor([[0.4000],
-        [0.1],
-        [0.1],
+        [0.01],
+        [0.01],
         [0.13],
-        [0.1],
+        [0.9],
         [0.9],
 ])
-diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,5)
+diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,5,initv=0.1)
 
 
 # target on and off difference
@@ -1656,7 +1656,6 @@ ax.set_ylabel('trace of hessian')
 
 
 # test for the simple 1d
-env=Simple1d(arg)
 with torch.no_grad():
     actionls=[]
     positionls=[]
@@ -1668,18 +1667,20 @@ with torch.no_grad():
     dls=[]
     thetals=[]
     goalls=[]
-    env.reset()
-    for i in range(999):
-        action=agent(env.decision_info)
-        env.step(action)
-        actionls.append(action)
-        positionls.append(env.s[0])
-        vls.append(env.s[1])
-        bls.append(env.b[0])
-        rls.append(env.episode_reward)
-        dls.append(env.get_distance()[1])
-        thetals.append(env.theta)
-        goalls.append(env.goalx)
+    for i in range(300):
+        env.reset(initv=torch.zeros(1))
+        done=False
+        while not done:
+          action=agent(env.decision_info)
+          _,_,done,_=env.step(action, onetrial=True)
+          actionls.append(action)
+          positionls.append(env.s[0])
+          vls.append(env.s[1])
+          bls.append(env.b[0])
+          rls.append(env.episode_reward)
+          dls.append(env.get_distance()[1])
+          thetals.append(env.theta)
+          goalls.append(env.goalx)
 i=0
 
 previ=i
@@ -1688,10 +1689,10 @@ while rls[i]==0.:
 print('reward',rls[i])
 print('goal',goalls[previ:i][0]) if i!=previ else print(goalls[previ:i])
 print('theta',thetals[previ:i][0]) if i!=previ else print(thetals[previ:i])
-plt.plot(actionls[previ+1:i+1])
-plt.plot(vls[previ:i])
-plt.plot(dls[previ-1:i-1])
-i+=1  
+plt.plot(actionls[previ+1:i+1],color='orange')
+# plt.plot(vls[previ:i],color='blue')
+plt.plot(dls[previ-1:i-1],color='green')
+i+=1 
 
 plt.plot(dls)
 vls[previ:i]

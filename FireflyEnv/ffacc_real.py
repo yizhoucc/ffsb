@@ -693,7 +693,7 @@ class FireflyTrue1d_real(gym.Env, torch.nn.Module):
 
 class FireflyTrue1d(gym.Env, torch.nn.Module): 
 
-    def __init__(self,arg=None,kwargs=None,debug=False):
+    def __init__(self,arg=None,kwargs=None,debug=False,seed=None):
         super(FireflyTrue1d, self).__init__()
         self.arg=arg
         self.min_distance = 0.1
@@ -712,8 +712,11 @@ class FireflyTrue1d(gym.Env, torch.nn.Module):
         self.std_range =             self.arg.std_range
         self.mag_action_cost_range = self.arg.mag_action_cost_range
         self.dev_action_cost_range = self.arg.dev_action_cost_range
-        self.session_len=2000
+        self.session_len=20
         self.debug=debug
+        if seed is not None:
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
 
     def reset(self,
                 pro_gains = None, 
@@ -808,28 +811,31 @@ class FireflyTrue1d(gym.Env, torch.nn.Module):
         action=torch.tensor(action).reshape(1)
         self.a=action
         self.episode_timer+=1
+        self.session_timer+=1
         end_current_ep=(action<self.terminal_vel or self.episode_timer>=self.episode_len)
         end_session=(self.session_timer>=self.session_len)
         self.episode_reward, cost,mag,dev=self.caculate_reward()
         self.previous_action=action
         self.trial_sum_cost+=cost
+        if self.episode_reward != 0:
+            print('reward-cost, ',self.episode_reward-self.trial_sum_cost)
         if self.debug:
             self.trial_actions.append(action)
             self.trial_dev_costs.append(dev)
             self.trial_mag_costs.append(mag)
         if end_current_ep:
             reward_rate=(self.episode_reward-self.trial_sum_cost)/(self.episode_timer+5)
-            print('reward_rate, ', reward_rate, 'reward, ',self.episode_reward)
+            # print('reward_rate, ', reward_rate, 'reward, ',self.episode_reward)
             if onetrial:
-                print(self.episode_timer)
-                return self.decision_info, torch.zeros(1), end_current_ep, {}
+                # print(self.episode_timer)
+                return self.decision_info, 0., end_current_ep, {}
             self.reset(new_session=False)
-            return self.decision_info, reward_rate, end_session, {}
+            return self.decision_info, float(reward_rate), end_session, {}
         self.s=self.state_step(action,self.s)
         self.o=self.observations(self.s)
         self.b,self.P=self.belief_step(self.b,self.P,self.o,action)
         self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_timer,task_param=self.theta)
-        return self.decision_info, torch.zeros(1), end_session, {}
+        return self.decision_info, 0., end_session, {}
 
     def forward(self, action,task_param,state=None):
         if not self.if_agent_stop() and not self.agent_start:

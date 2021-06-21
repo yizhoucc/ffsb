@@ -1667,7 +1667,7 @@ with torch.no_grad():
     dls=[]
     thetals=[]
     goalls=[]
-    for i in range(300):
+    for i in range(1):
         env.reset(initv=torch.zeros(1))
         done=False
         while not done:
@@ -1696,3 +1696,35 @@ i+=1
 
 plt.plot(dls)
 vls[previ:i]
+
+def plottrial1d():
+  with torch.no_grad():
+    actionls=[]
+    positionls=[]
+    vls=[]
+    bls=[]
+    rls=[]
+    mcls=[]
+    dcls=[]
+    dls=[]
+    thetals=[]
+    goalls=[]
+    env.reset(initv=torch.zeros(1))
+    done=False
+    while not done or env.episode_reward!=0.:
+      action=agent(env.decision_info)
+      _,_,done,_=env.step(action, onetrial=True)
+      actionls.append(action)
+      positionls.append(env.s[0])
+      vls.append(env.s[1])
+      bls.append(env.b[0])
+      rls.append(env.episode_reward)
+      dls.append(env.get_distance()[1])
+    thetals.append(env.theta)
+    goalls.append(env.goalx)
+  print('reward',rls)
+  print('goal',goalls)
+  print('theta',thetals[0])
+  plt.plot(actionls[:],color='orange')
+  # plt.plot(vls[previ:i],color='blue')
+  plt.plot(dls[:],color='green')

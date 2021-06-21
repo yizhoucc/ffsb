@@ -125,7 +125,7 @@ modelname=None
 # modelname="simple1d_100000_0_18_18_13"
 note='re' 
 from stable_baselines3 import SAC
-env=ffacc_real.FireflyTrue1d(arg)
+env=ffacc_real.Firefly1dsession(arg)
 if modelname is None:
     model = SAC("MlpPolicy", 
             env,
@@ -137,9 +137,9 @@ if modelname is None:
             train_freq=6,
             target_update_interval=8,
             learning_rate=7e-4,
-            gamma=0.99,
+            gamma=0.95,
     )
-    train_time=200000
+    train_time=100000
     for i in range(20):  
         env.cost_scale=0.05*(i+1)
         namestr= ("trained_agent/simple1d_{}_{}_{}_{}_{}".format(train_time,i,

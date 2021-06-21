@@ -712,7 +712,7 @@ class FireflyTrue1d(gym.Env, torch.nn.Module):
         self.std_range =             self.arg.std_range
         self.mag_action_cost_range = self.arg.mag_action_cost_range
         self.dev_action_cost_range = self.arg.dev_action_cost_range
-        self.session_len=20
+        self.session_len=1000
         self.debug=debug
         if seed is not None:
             torch.manual_seed(seed)
@@ -1384,7 +1384,6 @@ class Firefly_real_vel(gym.Env, torch.nn.Module):
         total_cost=mag_cost+dev_cost
         return total_cost, mag_cost, dev_cost
 
-
 class Firefly_2cost(Firefly_real_vel): 
 
     def action_cost_dev(self, action, previous_action):
@@ -1400,7 +1399,6 @@ class Firefly_2cost(Firefly_real_vel):
         total_cost=mag_cost+dev_cost
         return total_cost, mag_cost, dev_cost
 
- 
 class Firefly_2devcost(Firefly_real_vel): 
 
     
@@ -1475,7 +1473,6 @@ class Firefly_2devcost(Firefly_real_vel):
         wcost=(action[0,1]-previous_action[0,1])*10/self.theta[9]
         cost=(vcost+wcost)**2
         return cost
-
 
 class FireflySepdev(Firefly_real_vel): 
 
@@ -1569,7 +1566,6 @@ class FireflySepdev(Firefly_real_vel):
                         vecL, task_param.view(-1)])
         return decision_info.view(1, -1)
         # only this is a row vector. everything else is col vector
-
 
 class FireflyFinal(Firefly_real_vel): 
 
@@ -1796,9 +1792,7 @@ class FireflyFinal(Firefly_real_vel):
         reward=reward
         return reward, self.cost_scale*cost, mag, dev
 
-
 class FireflyFinal2(FireflyFinal): 
-
 
     def __init__(self,arg=None,kwargs=None):
         super(FireflyFinal2, self).__init__(arg=arg)
@@ -2117,4 +2111,91 @@ class FireflyFinal2(FireflyFinal):
             vecL, 
             task_param.view(-1)])
         return decision_info.view(1, -1)
-        
+
+class Firefly1dsession(FireflyTrue1d): 
+    
+    def reset(self,
+                pro_gains = None, 
+                pro_noise_stds = None,
+                obs_gains = None, 
+                obs_noise_stds = None,
+                phi=None,
+                theta=None,
+                goal_position=None,
+                obs_traj=None,
+                pro_traj=None,
+                new_session=True,
+                initv=None
+                ): 
+        if new_session:
+            print('new sess')
+            self.session_trials=0
+            self.session_reward_trials=0
+            if phi is not None:
+                self.phi=phi
+            if theta is not None:
+                self.theta=theta
+            if phi is None and theta is None:
+                self.phi=self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_noise_stds=obs_noise_stds)
+                self.theta=self.phi
+            self.session_timer=0
+        self.iti_timer=0
+        self.episode_timer = torch.zeros(1)  # int
+        self.reset_state(goal_position=goal_position,initv=initv)
+        self.reset_belief()
+        self.reset_obs()
+        self.reset_decision_info()
+        self.actions=[]
+        self.obs_traj=obs_traj
+        self.pro_traj=pro_traj
+        self.trial_sum_cost=torch.zeros(1)
+        self.trial_dev_costs=[]
+        self.trial_mag_costs=[]
+        self.trial_actions=[]
+        self.A=self.transition_matrix()
+        self.Q = torch.zeros(2,2)
+        self.Q[1,1]=(self.theta[0]*self.theta[1])**2
+        self.R = self.theta[2]**2
+        self.A = self.transition_matrix() 
+        if self.R < 1e-8:
+            self.R=self.R+1e-8
+        return self.decision_info.view(1,-1)
+
+    def step(self, action, onetrial=False):
+        action=torch.tensor(action).reshape(1)
+        self.a=action
+        self.episode_timer+=1
+        self.session_timer+=1
+        end_current_ep=(action<self.terminal_vel or self.episode_timer>=self.episode_len)
+        end_session=(self.session_timer>=self.session_len)
+        self.episode_reward, cost,mag,dev=self.caculate_reward()
+        self.previous_action=action
+        self.trial_sum_cost+=cost
+        # print('reward-cost, ',self.episode_reward-self.trial_sum_cost)
+        if self.debug:
+            self.trial_actions.append(action)
+            self.trial_dev_costs.append(dev)
+            self.trial_mag_costs.append(mag)
+            if onetrial:
+                return self.decision_info, 0., end_current_ep, {}
+            self.reset(new_session=False)
+            return self.decision_info, float(reward_rate), end_session, {}
+        self.s=self.state_step(action,self.s)
+        self.o=self.observations(self.s)
+        self.b,self.P=self.belief_step(self.b,self.P,self.o,action)
+        self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_timer,task_param=self.theta)
+        if end_current_ep:
+            if self.iti_timer!=0:
+                self.episode_reward=0.
+            self.iti_timer+=1
+            # print('iti,', self.iti_timer)
+        if self.iti_timer>=5:
+            self.reset(new_session=False)
+            self.session_trials+=1
+        if self.episode_reward != 0:
+            self.session_reward_trials+=1        
+        if end_session:
+            if self.session_reward_trials/self.session_trials >1.0:
+                raise RuntimeError 
+            print('reward percent,  ', self.session_reward_trials/self.session_trials)
+        return self.decision_info, self.episode_reward-cost, end_session, {}

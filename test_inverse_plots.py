@@ -607,7 +607,7 @@ def diagnose_trial(index, phi, eaction, etask, theta, agent, env, num_trials=10,
           _,done=env(torch.tensor(eaction[t]).reshape(1,-1),task_param=theta) 
         elif estate is None and not guided:
           # if t==1: print('not guided')
-          _,done=env(torch.tensor(action).reshape(1,-1),task_param=theta) 
+          env.step(torch.tensor(action).reshape(1,-1)) 
         elif estate is not None and guided:
           if  t+1<(estate.shape[1]):
               # if t==1: 
@@ -1160,7 +1160,8 @@ monkeyobs=False
 pac=diagnose_dict(ind,'30_8_38', monkeystate=monkeyobs)
 pac['guided']=monkeyobs
 pac['num_trials']=15
-pac['theta']=torch.tensor([[0.4],
+pac['theta']=torch.tensor(
+        [[0.4],
         [1.57],
         [0.3],
         [0.3],
@@ -1709,19 +1710,21 @@ def plottrial1d():
     dls=[]
     thetals=[]
     goalls=[]
-    env.reset(initv=torch.zeros(1))
+    env.reset(initv=torch.zeros(1), new_session=True)
     done=False
-    while not done or env.episode_reward!=0.:
+    while not done:
       action=agent(env.decision_info)
-      _,_,done,_=env.step(action, onetrial=True)
+      _,_,done,_=env.step(action, onetrial=False)
       actionls.append(action)
       positionls.append(env.s[0])
       vls.append(env.s[1])
       bls.append(env.b[0])
       rls.append(env.episode_reward)
-      dls.append(env.get_distance()[1])
+      # dls.append(env.get_distance()[1])
+      dls.append(abs(env.goalx-env.s[0,0]))
+      if env.episode_time==0:
+        goalls.append(env.goalx.item())
     thetals.append(env.theta)
-    goalls.append(env.goalx)
   print('reward',rls)
   print('goal',goalls)
   print('theta',thetals[0])

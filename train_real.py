@@ -30,10 +30,10 @@ arg.training=True
 arg.presist_phi=False
 arg.agent_knows_phi=True
 arg.cost_scale=1
-env=ffacc_real.FireflyFinal2(arg)
+env=ffacc_real.FireFlyReady(arg)
 env.no_skip=True
 modelname=None
-modelname='iticosttimes_100000_3_17_0_40'
+# modelname='iticosttimes_100000_2_2_21_23'
 note='re' 
 from stable_baselines3 import SAC
 
@@ -103,13 +103,13 @@ if modelname is None:
             learning_rate=3e-4,
             train_freq=6,
             target_update_interval=8,
-            gamma=0.99,
+            gamma=0.95,
             policy_kwargs={'net_arch':[128,256,256]}
     )
-    train_time=100000
+    train_time=200000
     for i in range(2):  
         env.no_skip=True
-        env.session_len=100*(i+1)
+        # env.session_len=100*(i+1)
         env.cost_scale=0
         namestr= ("trained_agent/iti_{}_{}_{}_{}_{}".format(train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
@@ -117,14 +117,14 @@ if modelname is None:
         model.learn(total_timesteps=int(train_time),tb_log_name=namestr,log_interval=100)
         model.save(namestr)
     for i in range(20):  
-        model.gamma=(0.95+i)/(i+1)
-        env.session_len=min(100*(i+3),3000)
+        # model.gamma=(0.95+i)/(i+1)
+        # env.session_len=min(100*(i+3),3000)
         env.no_skip=False
         env.cost_scale=i**2/400
         namestr= ("trained_agent/iticosttimes_{}_{}_{}_{}_{}".format(train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
-        model.learn(total_timesteps=int(train_time),tb_log_name=namestr,log_interval=100)
+        model.learn(total_timesteps=int(train_time))
         model.save(namestr)
     # for i in range(10):  
     #     env.no_skip=False
@@ -155,18 +155,18 @@ else:
             gamma=0.99,
         )
     for i in range(22):  
-        if i <2:
+        if i <20:
+        #     env.no_skip=False
+        #     # env.session_len=300
+        #     env.cost_scale=2/400
+        #     env.reset()
+        #     model.learning_rate=7e-4
+        #     model.learn(total_timesteps=int(train_time))
+        #     namestr= ("trained_agent/{}_{}_{}".format(note,modelname,i))
+        #     model.save(namestr)
+        # elif i >=2:  
             env.no_skip=False
-            env.session_len=300
-            env.cost_scale=2/400
-            env.reset()
-            model.learning_rate=7e-4
-            model.learn(total_timesteps=int(train_time))
-            namestr= ("trained_agent/{}_{}_{}".format(note,modelname,i))
-            model.save(namestr)
-        elif i >=2:  
-            env.no_skip=False
-            env.cost_scale=i**2/400
+            env.cost_scale=1/20*i
             model.learning_rate=3e-4
             env.reset()
             model.learn(total_timesteps=int(train_time))

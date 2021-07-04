@@ -2285,20 +2285,27 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         low=-np.inf
         high=np.inf
         self.action_space = spaces.Box(low=-1., high=1.,shape=(2,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=low, high=high,shape=(1,39),dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high,shape=(1,44),dtype=np.float32)
         self.cost_function = self.action_cost_wrapper
         self.cost_scale = arg.cost_scale
-        self.presist_phi=           arg.presist_phi
-        self.agent_knows_phi=       arg.agent_knows_phi
-        self.phi=None
-        self.goal_radius_range =     arg.goal_radius_range
-        self.gains_range=            arg.gains_range
-        self.std_range =             arg.std_range
-        self.mag_action_cost_range =     arg.mag_action_cost_range
-        self.dev_action_cost_range =     arg.dev_action_cost_range
-        self.init_uncertainty_range = arg.init_uncertainty_range
+        self.presist_phi=                   arg.presist_phi
+        self.agent_knows_phi=               arg.agent_knows_phi
+        self.phi=                           None
+        self.goal_radius_range =            arg.goal_radius_range
+        self.gains_range=                   arg.gains_range
+        self.std_range =                    arg.std_range
+        self.mag_action_cost_range =        arg.mag_action_cost_range
+        self.dev_action_cost_range =        arg.dev_action_cost_range
+        self.dev_v_cost_range=              arg.dev_v_cost_range
+        self.dev_w_cost_range=              arg.dev_w_cost_range
+        self.init_uncertainty_range =       arg.init_uncertainty_range
+        self.previous_v_range =             [0,1]
+        self.trial_counter=                 0
+        self.recent_rewarded_trials=        0
+        self.recent_skipped_trials=         0
+        self.recent_trials=                 0
 
-    def reset_state(self,goal_position=None,initv=None):
+    def reset_state(self,goal_position=None,initv=None,initw=None):
         if goal_position is not None:
             self.goalx = goal_position[0]*torch.tensor(1.0)
             self.goaly = goal_position[1]*torch.tensor(1.0)
@@ -2308,12 +2315,21 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             self.goalx = torch.cos(angle)*distance
             self.goaly = torch.sin(angle)*distance
         if initv is not None:
-            vel=initv
+            vctrl=initv
         else:
-            vel = torch.zeros(1).uniform_(self.previous_v_range[0], self.previous_v_range[1]) 
-        self.previous_action=torch.tensor([[vel,0.]])
-        self.s = torch.tensor([[0.],[0.],[0.],[vel],[0.]])
-        
+            vctrl = torch.zeros(1).uniform_(self.previous_v_range[0], self.previous_v_range[1]) 
+        if initw is not None:
+            wctrl=initw
+        else:
+            wctrl = torch.zeros(1).uniform_(-self.previous_v_range[1]/2, self.previous_v_range[1]/2) 
+        self.previous_action=torch.tensor([[vctrl,wctrl]])
+        self.s = torch.tensor(
+        [[torch.distributions.Normal(0,torch.ones(1)).sample()*0.05*self.theta[10]],
+        [torch.distributions.Normal(0,torch.ones(1)).sample()*0.05*self.theta[11]],
+        [0.],
+        [vctrl*self.phi[0]],
+        [wctrl*self.phi[1]]])
+
     def reset_task_param(self,                
                 pro_gains = None,
                 pro_noise_stds = None,
@@ -2321,7 +2337,9 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 goal_radius=None,
                 mag_action_cost_factor=None,
                 dev_v_cost_factor=None,
-                dev_w_cost_factor=None
+                dev_w_cost_factor=None,
+                inital_x_std=None,
+                inital_y_std=None,
                 ):
         _prov_gains = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  
         _prow_gains = torch.zeros(1).uniform_(self.gains_range[2], self.gains_range[3])  
@@ -2333,11 +2351,13 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         _mag_action_cost_factor = torch.zeros(1).uniform_(self.mag_action_cost_range[0], self.mag_action_cost_range[1]) 
         _dev_v_cost_factor = torch.zeros(1).uniform_(self.dev_v_cost_range[0], self.dev_v_cost_range[1])
         _dev_w_cost_factor = torch.zeros(1).uniform_(self.dev_w_cost_range[0], self.dev_w_cost_range[1])
-
+        _inital_x_std = torch.zeros(1).uniform_(self.init_uncertainty_range[0], self.init_uncertainty_range[1])
+        _inital_y_std = torch.zeros(1).uniform_(self.init_uncertainty_range[0], self.init_uncertainty_range[1])
         phi=torch.cat([_prov_gains,_prow_gains,_prov_noise_stds,_prow_noise_stds,
             _obsv_noise_stds,_obsw_noise_stds,
-                _goal_radius,_mag_action_cost_factor,_dev_v_cost_factor,_dev_w_cost_factor])
-
+                _goal_radius,_mag_action_cost_factor,_dev_v_cost_factor,_dev_w_cost_factor,
+                _inital_x_std,_inital_y_std,
+                ])
         phi[0]=pro_gains[0] if pro_gains is not None else phi[0]
         phi[1]=pro_gains[1] if pro_gains is not None else phi[1]
         phi[2]=pro_noise_stds[0] if pro_noise_stds is not None else phi[2]
@@ -2348,6 +2368,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         phi[7]=mag_action_cost_factor if mag_action_cost_factor is not None else phi[7]
         phi[8]=dev_v_cost_factor if dev_v_cost_factor is not None else phi[8]
         phi[9]=dev_w_cost_factor if dev_w_cost_factor is not None else phi[9]
+        phi[10]=inital_x_std if inital_x_std is not None else phi[10]
+        phi[11]=inital_y_std if inital_y_std is not None else phi[11]
         return col_vector(phi)
 
     def step(self, action):
@@ -2371,42 +2393,39 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.trial_mag += mag
         self.trial_dev += dev
         if end_current_ep:
-            print('distance, ', self.get_distance()[1], 'goal', self.goal_r,'sysvel',self.sys_vel)
-            print('reward: {}, cost: {}, mag{}, dev{}'.format(self.episode_reward-self.trial_sum_cost, self.trial_sum_cost, self.trial_mag, self.trial_dev))
+            if self.rewarded(): # eval based on belief.
+                self.recent_rewarded_trials+=1
+            if self.skipped():
+                self.recent_skipped_trials+=1
+            self.recent_trials+=1
+            self.trial_counter+=1
+            # print(self.trial_counter)
+            if self.trial_counter!=0 and self.trial_counter%10==0:
+                print('rewarded: ',self.recent_rewarded_trials, 'skipped: ', self.recent_skipped_trials, ' out of total: ', self.recent_trials)
+                self.recent_rewarded_trials=0
+                self.recent_skipped_trials=0
+                self.recent_trials=0
+            # print('distance, ', self.get_distance()[1], 'goal', self.goal_r,'sysvel',self.sys_vel)
+            # print('reward: {}, cost: {}, mag{}, dev{}'.format(self.episode_reward-self.trial_sum_cost, self.trial_sum_cost, self.trial_mag, self.trial_dev))
             # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}
         self.previous_action=action
         return self.decision_info, self.episode_reward-cost, end_current_ep, {}
 
-    def update_state(self, state): # run state dyanmic, changes x, y, theta
+    def update_state(self, state):
         px, py, angle, v, w = torch.split(state.view(-1), 1)
-        if self.episode_time==1:
-            return state
+        if v==0:
+            pass
+        elif w==0:
+            px = px + v*self.dt * torch.cos(angle)
+            py = py + v*self.dt * torch.sin(angle)
         else:
-            if v==0:
-                pass
-            elif w==0:
-                px = px + v*self.dt * torch.cos(angle)
-                py = py + v*self.dt * torch.sin(angle)
-            else:
-                px = px-torch.sin(angle)*(v/w-(v*torch.cos(w*self.dt)/w))+torch.cos(angle)*((v*torch.sin(w*self.dt)/w))
-                py = py+torch.cos(angle)*(v/w-(v*torch.cos(w*self.dt)/w))+torch.sin(angle)*((v*torch.sin(w*self.dt)/w))
-            angle = angle + w* self.dt
-            px = torch.clamp(px, -self.max_distance, self.max_distance) 
-            py = torch.clamp(py, -self.max_distance, self.max_distance) 
-            next_s = torch.stack((px, py, angle, v, w ))
-            return next_s.view(-1,1)
-
-    def action_cost_dev(self, action, previous_action):
-        # action is row vector
-        action[0,0]=1.0 if action[0,0]>1.0 else action[0,0]
-        action[0,1]=1.0 if action[0,1]>1.0 else action[0,1]
-        action[0,1]=-1.0 if action[0,1]<-1.0 else action[0,1]
-
-        vcost=(action[0,0]-previous_action[0,0])*self.theta[8]
-        wcost=(action[0,1]-previous_action[0,1])*self.theta[9]
-        cost=vcost**2+wcost**2
-        cost=cost*10
-        return cost
+            px = px-torch.sin(angle)*(v/w-(v*torch.cos(w*self.dt)/w))+torch.cos(angle)*((v*torch.sin(w*self.dt)/w))
+            py = py+torch.cos(angle)*(v/w-(v*torch.cos(w*self.dt)/w))+torch.sin(angle)*((v*torch.sin(w*self.dt)/w))
+        angle = angle + w* self.dt
+        px = torch.clamp(px, -self.max_distance, self.max_distance) 
+        py = torch.clamp(py, -self.max_distance, self.max_distance) 
+        next_s = torch.stack((px, py, angle, v, w ))
+        return next_s.view(-1,1)
 
     def wrap_decision_info(self,b=None,P=None,time=None, task_param=None):
         task_param=self.theta if task_param is None else task_param
@@ -2466,11 +2485,9 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 obs_noise_stds = None,
                 phi=None,
                 theta=None,
-                goal_radius_range=None,
-                gains_range = None,
-                std_range=None,
                 goal_position=None,
                 initv=None,
+                initw=None,
                 obs_traj=None,
                 pro_traj=None,
                 ): 
@@ -2479,16 +2496,15 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         elif self.presist_phi and self.phi is not None:
             pass
         else: # when either not presist, or no phi.
-            self.phi=self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_gains=obs_gains,obs_noise_stds=obs_noise_stds)
+            self.phi=self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_noise_stds=obs_noise_stds)
         if theta is not None:
             self.theta=theta
         else:
             self.theta=self.phi if self.agent_knows_phi else self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_gains=obs_gains,obs_noise_stds=obs_noise_stds)
-        
         self.unpack_theta()
-        self.sys_vel=torch.zeros(1)
         self.obs_traj=obs_traj
         self.pro_traj=pro_traj
+        self.sys_vel=torch.zeros(1)
         self.stop=False 
         self.agent_start=False 
         self.episode_time = torch.zeros(1)
@@ -2496,7 +2512,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.trial_sum_cost=0
         self.trial_mag=0
         self.trial_dev=0
-        self.reset_state(goal_position=goal_position,initv=initv)
+        self.reset_state(goal_position=goal_position,initv=initv,initw=initw)
         self.reset_belief()
         self.reset_obs()
         self.reset_decision_info()
@@ -2508,8 +2524,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.pro_noisev=self.phi[2]
         self.pro_noisew=self.phi[3]
         self.goal_r=self.phi[6]
-        self.mag_cost=self.phi[7]
-        self.dev_cost=self.phi[8]
 
         self.pro_gainv_hat=self.theta[0]
         self.pro_gainw_hat=self.theta[1]
@@ -2518,7 +2532,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.obs_noisev=self.theta[4]
         self.obs_noisew=self.theta[5]
         self.goal_r_hat=self.theta[6]
-
         self.Q = torch.zeros(5,5)
         self.Q[3,3]=self.pro_noisev_hat**2 if self.pro_noisev_hat**2 > 1e-4 else self.pro_noisev_hat**2+1e-4
         self.Q[4,4]=self.pro_noisew_hat**2 if self.pro_noisew_hat**2 > 1e-4 else self.pro_noisew_hat**2+1e-4
@@ -2528,6 +2541,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
 
     def reset_belief(self): 
         self.P = torch.eye(5) * 1e-8 
+        self.P[0,0]=(self.theta[10]*0.05)**2 # sigma xx
+        self.P[1,1]=(self.theta[11]*0.05)**2 # sigma yy
         self.b = self.s
 
     def reset_obs(self):
@@ -2663,13 +2678,39 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         vw = s.view(-1)[-2:]
         return vw.view(-1,1)
 
-    def get_distance(self, state=None): 
+    def get_distance(self, state=None, distance2goal=True): 
         state=self.s if state is None else state
         px, py, angle, v, w = torch.split(state.view(-1), 1)
         position = torch.stack([px,py])
-        relative_distance = torch.sqrt((self.goalx-px)**2+(self.goaly-py)**2).view(-1)
+        if distance2goal:
+            relative_distance = torch.sqrt((self.goalx-px)**2+(self.goaly-py)**2).view(-1)
+        else:
+            relative_distance = torch.sqrt((px)**2+(py)**2).view(-1)
         return position, relative_distance
+    
+    def rewarded(self):
+        return (self.get_distance(state=self.b)[1]<=self.goal_r)
 
+    def skipped(self):
+        return (self.get_distance(state=self.b,distance2goal=False)[1]<=self.goal_r)
+        
     def action_cost_magnitude(self,action):
-        return torch.norm(action)
+        cost=torch.norm(action)
+        # scalar=self.reward/(1/0.4/self.dt)
+        num_steps=(1/0.4/self.dt)*2 #num of steps using half control
+        scalar=self.reward/num_steps*4 # the cost per dt to have 0 reward, using half ctrl
+        return scalar*cost*self.theta[7]
 
+    def action_cost_dev(self, action, previous_action):
+        # action is row vector
+        action[0,0]=1.0 if action[0,0]>1.0 else action[0,0]
+        action[0,1]=1.0 if action[0,1]>1.0 else action[0,1]
+        action[0,1]=-1.0 if action[0,1]<-1.0 else action[0,1]
+        vcost=(action[0,0]-previous_action[0,0])*self.theta[8]
+        wcost=(action[0,1]-previous_action[0,1])*self.theta[9]
+        cost=vcost**2+wcost**2
+        mincost=1/20/20*30 #1/20^2 min cost per dt, for 30 dts.
+        # mincost=2
+        scalar=self.reward/mincost
+        cost=cost*scalar
+        return cost

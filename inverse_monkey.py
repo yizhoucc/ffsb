@@ -53,12 +53,12 @@ number_updates=10000
 import TD3_torch
 # agent=TD3_torch.TD3.load('trained_agent/500000_1_9_21_8.zip')
 # agent=agent.actor.mu.cpu()
-agent_ =SAC.load('trained_agent/simple1d_100000_15_28_1_2.zip')
+agent_ =SAC.load('trained_agent/re_iticosttimes_100000_2_2_21_23_13.zip')
 agent_=agent_.actor.cpu()
 agent = lambda x : agent_.forward(x, deterministic=True)
 
 # loading enviorment, same as training
-env=ffacc_real.FireflyFinal2(arg)
+env=ffacc_real.FireFlyReady(arg)
 
 with open("C:/Users/24455/Desktop/DataFrame_normal",'rb') as f:
     df = pickle.load(f)

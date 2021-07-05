@@ -53,7 +53,7 @@ number_updates=10000
 import TD3_torch
 # agent=TD3_torch.TD3.load('trained_agent/500000_1_9_21_8.zip')
 # agent=agent.actor.mu.cpu()
-agent_ =SAC.load('trained_agent/re_iticosttimes_100000_2_2_21_23_13.zip')
+agent_ =SAC.load('trained_agent/new200000_7_5_8_3.zip')
 agent_=agent_.actor.cpu()
 agent = lambda x : agent_.forward(x, deterministic=True)
 

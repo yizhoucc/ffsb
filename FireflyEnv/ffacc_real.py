@@ -2391,7 +2391,9 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.episode_reward, cost, mag, dev = self.caculate_reward()
         self.trial_sum_cost += cost
         self.trial_mag += mag
+        self.trial_mag_costs.append(mag)
         self.trial_dev += dev
+        self.trial_dev_costs.append(dev)
         if end_current_ep:
             if self.rewarded(): # eval based on belief.
                 self.recent_rewarded_trials+=1
@@ -2481,7 +2483,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
     def reset(self,
                 pro_gains = None, 
                 pro_noise_stds = None,
-                obs_gains = None, 
                 obs_noise_stds = None,
                 phi=None,
                 theta=None,
@@ -2500,7 +2501,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         if theta is not None:
             self.theta=theta
         else:
-            self.theta=self.phi if self.agent_knows_phi else self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_gains=obs_gains,obs_noise_stds=obs_noise_stds)
+            self.theta=self.phi if self.agent_knows_phi else self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_noise_stds=obs_noise_stds)
         self.unpack_theta()
         self.obs_traj=obs_traj
         self.pro_traj=pro_traj
@@ -2511,6 +2512,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.previous_action=torch.tensor([[0.,0.]])
         self.trial_sum_cost=0
         self.trial_mag=0
+        self.trial_mag_costs=[]
+        self.trial_dev_costs=[]
         self.trial_dev=0
         self.reset_state(goal_position=goal_position,initv=initv,initw=initw)
         self.reset_belief()
@@ -2699,7 +2702,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         # scalar=self.reward/(1/0.4/self.dt)
         num_steps=(1/0.4/self.dt)*2 #num of steps using half control
         scalar=self.reward/num_steps*4 # the cost per dt to have 0 reward, using half ctrl
-        return scalar*cost*self.theta[7]
+        return scalar*cost*self.theta[7]*0
 
     def action_cost_dev(self, action, previous_action):
         # action is row vector

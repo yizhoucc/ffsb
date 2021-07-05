@@ -11,7 +11,7 @@ from FireflyEnv import ffacc_real
 
 action_noise = NormalActionNoise(mean=0., sigma=float(0.3))
 arg.init_action_noise=0.5
-arg.goal_distance_range=[0.2,1]
+arg.goal_distance_range=[0.3,1] 
 arg.mag_action_cost_range= [0.1,1.]
 arg.dev_action_cost_range= [0.1,1.]
 arg.dev_v_cost_range= [0.1,1.]
@@ -19,11 +19,11 @@ arg.dev_w_cost_range= [0.1,1.]
 # arg.goal_distance_range=[0.01,0.99]
 arg.gains_range =[0.35,0.45,pi/2-0.1,pi/2+0.1]
 # arg.goal_radius_range=[0.07,0.2]
-arg.std_range = [0.1,0.7,0.1,0.7]
+arg.std_range = [0.01,0.07,0.01,0.07]
 # arg.mag_action_cost_range= [0.0001,0.0005]
 # arg.dev_action_cost_range= [0.0001,0.0005]
 arg.REWARD=100
-arg.TERMINAL_VEL = 0.1
+arg.TERMINAL_VEL = 0.05
 arg.DELTA_T=0.1
 arg.EPISODE_LEN=40
 arg.training=True

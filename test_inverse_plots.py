@@ -694,7 +694,7 @@ def diagnose_plot(estate, theta,eaction, etask, agent_actions, agent_beliefs, ag
     plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax4,alpha=0.2)
 
 def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
-  def sample_trials(agent, env, theta, phi, etask, num_trials=5, initv=0.):
+  def sample_trials(agent, env, theta, phi, etask, num_trials=5, initv=0.,initw=0.):
     # print(theta)
     agent_actions=[]
     agent_beliefs=[]
@@ -713,7 +713,7 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
         done=False
         while not done:
           action = agent(env.decision_info)[0]
-          _,done=env(torch.tensor(action).reshape(1,-1),task_param=theta) 
+          _,_,done,_=env.step(torch.tensor(action).reshape(1,-1)) 
           epactions.append(action)
           epbliefs.append(env.b)
           epbcov.append(env.P)
@@ -1168,11 +1168,11 @@ pac['theta']=torch.tensor(
         [0.3],
         [0.3],
         [0.13],
-        [0.1],
-        [0.1],
-        [0.1],
-        [0.1],
-        [0.1],
+        [0.3],
+        [0.0],
+        [0.3],
+        [0.3],
+        [0.3],
 ])
 # pac['phi']=pac['theta']
 diaginfo=diagnose_trial(**pac)
@@ -1186,6 +1186,8 @@ diagnose_stopcompare(tasks=tasks,actions=actions,**diaginfo)
 
 ind=torch.randint(low=100,high=7000,size=(1,))
 plot_monkey_trial(df,int(ind))
+
+
 
 # slice through policy by theta
 phi=pac['phi']

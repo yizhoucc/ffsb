@@ -111,7 +111,7 @@ if modelname is None:
         env.no_skip=True
         # env.session_len=100*(i+1)
         env.cost_scale=0
-        namestr= ("trained_agent/iti_{}_{}_{}_{}_{}".format(train_time,i,
+        namestr= ("trained_agent/pre_{}_{}_{}_{}_{}".format(train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
         model.learn(total_timesteps=int(train_time),tb_log_name=namestr,log_interval=100)
@@ -121,20 +121,20 @@ if modelname is None:
         # env.session_len=min(100*(i+3),3000)
         env.no_skip=False
         env.cost_scale=i**2/400
-        namestr= ("trained_agent/iticosttimes_{}_{}_{}_{}_{}".format(train_time,i,
+        namestr= ("trained_agent/dev_{}_{}_{}_{}_{}".format(train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
         model.learn(total_timesteps=int(train_time))
         model.save(namestr)
-    # for i in range(10):  
+    for i in range(10):  
     #     env.no_skip=False
     #     env.cost_scale=1
     #     env.reset()
-    #     namestr= ("trained_agent/skipcost_{}_{}_{}_{}_{}".format(train_time,i,
-    #     str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
-    #     ))
-    #     model.learn(total_timesteps=int(train_time),tb_log_name=namestr,log_interval=100)
-    #     model.save(namestr)
+        namestr= ("trained_agent/final_{}_{}_{}_{}_{}".format(train_time,i,
+        str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
+        ))
+        model.learn(total_timesteps=int(train_time),tb_log_name=namestr,log_interval=100)
+        model.save(namestr)
     # for i in range(20):  
     #         namestr= ("trained_agent/{}_{}_{}".format(note,modelname,i))
     #         model.learn(total_timesteps=int(train_time),tb_log_name=namestr)

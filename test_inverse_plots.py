@@ -1168,8 +1168,8 @@ pac['theta']=torch.tensor(
         [0.3],
         [0.3],
         [0.13],
-        [0.3],
-        [0.0],
+        [0.2],
+        [0.2],
         [0.3],
         [0.3],
         [0.3],
@@ -1218,6 +1218,8 @@ theta_final=torch.tensor([[0.4000],
         [0.1],
 ])
 diagnose_plot_theta(agent, env, phi, theta_init, theta_final,5)
+
+
 
 # slice through policy by theta , test cost 1d
 phi=torch.tensor([[0.4000],

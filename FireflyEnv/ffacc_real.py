@@ -2285,7 +2285,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         low=-np.inf
         high=np.inf
         self.action_space = spaces.Box(low=-1., high=1.,shape=(2,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=low, high=high,shape=(1,44),dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high,shape=(1,27),dtype=np.float32)
         self.cost_function = self.action_cost_wrapper
         self.cost_scale = arg.cost_scale
         self.presist_phi=                   arg.presist_phi
@@ -2317,11 +2317,11 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         if initv is not None:
             vctrl=initv
         else:
-            vctrl = torch.zeros(1).uniform_(self.previous_v_range[0], self.previous_v_range[1]) 
+            vctrl = torch.zeros(1)#.uniform_(self.previous_v_range[0], self.previous_v_range[1]) 
         if initw is not None:
             wctrl=initw
         else:
-            wctrl = torch.zeros(1).uniform_(-self.previous_v_range[1]/2, self.previous_v_range[1]/2) 
+            wctrl = torch.zeros(1)#torch.distributions.Normal(0,self.previous_v_range[1]/2).sample() 
         self.previous_action=torch.tensor([[vctrl,wctrl]])
         self.s = torch.tensor(
         [[torch.distributions.Normal(0,torch.ones(1)).sample()*0.05*self.theta[10]],
@@ -2433,12 +2433,12 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         task_param=self.theta if task_param is None else task_param
         b=self.b if b is None else b
         P=self.P if P is None else P
-        prevv, prevw = torch.split(self.previous_action.view(-1), 1)
+        prevv, prevw = torch.split(self.a.view(-1), 1)
         px, py, angle, v, w = torch.split(b.view(-1), 1)
         relative_distance = torch.sqrt((self.goalx-px)**2+(self.goaly-py)**2).view(-1)
         relative_angle = torch.atan((self.goaly-py)/(self.goalx-px)).view(-1)-angle
         relative_angle = torch.clamp(relative_angle,-pi,pi)
-        vecL = P.view(-1)
+        vecL = bcov2vec(P)
         decision_info = torch.cat([
             relative_distance, 
             relative_angle, 

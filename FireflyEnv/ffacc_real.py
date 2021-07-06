@@ -2386,7 +2386,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.s=self.state_step(action,self.s)
         self.o=self.observations(self.s)
         self.b, self.P=self.belief_step(self.b,self.P,self.o,action)
-        self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_time,task_param=self.theta)
+        self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, a=action, time=self.episode_time,task_param=self.theta)
         # eval
         self.episode_reward, cost, mag, dev = self.caculate_reward()
         self.trial_sum_cost += cost
@@ -2402,7 +2402,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             self.recent_trials+=1
             self.trial_counter+=1
             # print(self.trial_counter)
-            if self.trial_counter!=0 and self.trial_counter%10==0:
+            if self.trial_counter!=0 and self.trial_counter%100==0:
                 print('rewarded: ',self.recent_rewarded_trials, 'skipped: ', self.recent_skipped_trials, ' out of total: ', self.recent_trials)
                 self.recent_rewarded_trials=0
                 self.recent_skipped_trials=0
@@ -2429,11 +2429,11 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         next_s = torch.stack((px, py, angle, v, w ))
         return next_s.view(-1,1)
 
-    def wrap_decision_info(self,b=None,P=None,time=None, task_param=None):
+    def wrap_decision_info(self,b=None,P=None, a=None, time=None, task_param=None):
         task_param=self.theta if task_param is None else task_param
         b=self.b if b is None else b
         P=self.P if P is None else P
-        prevv, prevw = torch.split(self.a.view(-1), 1)
+        prevv, prevw = torch.split(a.view(-1), 1)
         px, py, angle, v, w = torch.split(b.view(-1), 1)
         relative_distance = torch.sqrt((self.goalx-px)**2+(self.goaly-py)**2).view(-1)
         relative_angle = torch.atan((self.goaly-py)/(self.goalx-px)).view(-1)-angle
@@ -2518,7 +2518,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.reset_state(goal_position=goal_position,initv=initv,initw=initw)
         self.reset_belief()
         self.reset_obs()
-        self.reset_decision_info()
+        self.decision_info=self.wrap_decision_info(b=self.b, a=self.previous_action, time=self.episode_time, task_param=self.theta)
         return self.decision_info.view(1,-1)
 
     def unpack_theta(self):
@@ -2550,9 +2550,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
 
     def reset_obs(self):
         self.o=torch.tensor([[0],[0]])
-
-    def reset_decision_info(self):
-        self.decision_info = self.wrap_decision_info(b=self.b, time=self.episode_time, task_param=self.theta)
 
     def if_agent_stop(self,sys_vel=None):
         stop=(sys_vel <= self.terminal_vel)

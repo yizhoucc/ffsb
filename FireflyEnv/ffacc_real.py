@@ -2395,7 +2395,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.trial_dev += dev
         self.trial_dev_costs.append(dev)
         if end_current_ep:
-            if self.rewarded(): # eval based on belief.
+            if self.stop and self.rewarded(): # eval based on belief.
                 self.recent_rewarded_trials+=1
             if self.skipped():
                 self.recent_skipped_trials+=1
@@ -2452,7 +2452,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         return decision_info.view(1, -1)
 
     def action_cost_wrapper(self,action, previous_action):
-        mag_cost=self.action_cost_magnitude(action)*self.theta[7]
+        mag_cost=self.action_cost_magnitude(action)
         dev_cost=self.action_cost_dev(action, previous_action)
         total_cost=mag_cost+dev_cost
         return total_cost, mag_cost, dev_cost
@@ -2469,7 +2469,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 if reward>self.reward:
                     raise RuntimeError
                 if reward<0:
-                    raise RuntimeError
+                    raise RuntimeError 
                     # reward=torch.tensor([0.])
         else:
             # _,d= self.get_distance()
@@ -2700,16 +2700,16 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         # num_steps=(1/0.4/self.dt)*2 #num of steps using half control
         # scalar=self.reward/num_steps*4 # the cost per dt to have 0 reward, using half ctrl
         # return scalar*cost*self.theta[7]
-        return 0.
+        return 0.*self.theta[7]
 
     def action_cost_dev(self, action, previous_action):
         # action is row vector
         action[0,0]=1.0 if action[0,0]>1.0 else action[0,0]
         action[0,1]=1.0 if action[0,1]>1.0 else action[0,1]
         action[0,1]=-1.0 if action[0,1]<-1.0 else action[0,1]
-        vcost=(action[0,0]-previous_action[0,0])*self.theta[8]
-        wcost=(action[0,1]-previous_action[0,1])*self.theta[9]
-        cost=vcost**2+wcost**2
+        vcost=(action[0,0]-previous_action[0,0])**2*self.theta[8]
+        wcost=(action[0,1]-previous_action[0,1])**2*self.theta[9]
+        cost=vcost+wcost
         mincost=1/20/20*30 #1/20^2 min cost per dt, for 30 dts.
         # mincost=2
         scalar=self.reward/mincost

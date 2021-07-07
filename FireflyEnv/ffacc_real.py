@@ -2695,11 +2695,12 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         return (self.get_distance(state=self.b,distance2goal=False)[1]<=self.goal_r)
         
     def action_cost_magnitude(self,action):
-        cost=torch.norm(action)
-        # scalar=self.reward/(1/0.4/self.dt)
-        num_steps=(1/0.4/self.dt)*2 #num of steps using half control
-        scalar=self.reward/num_steps*4 # the cost per dt to have 0 reward, using half ctrl
-        return scalar*cost*self.theta[7]*0
+        # cost=torch.norm(action)
+        # # scalar=self.reward/(1/0.4/self.dt)
+        # num_steps=(1/0.4/self.dt)*2 #num of steps using half control
+        # scalar=self.reward/num_steps*4 # the cost per dt to have 0 reward, using half ctrl
+        # return scalar*cost*self.theta[7]
+        return 0.
 
     def action_cost_dev(self, action, previous_action):
         # action is row vector

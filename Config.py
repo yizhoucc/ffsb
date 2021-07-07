@@ -11,8 +11,8 @@ class Config:
     def __init__(self):
         # --------------copy in use, new naming---------------------------
         self.dt = 0.1 
-        self.episode_len = 70
-        self.reward_amount = 20  
+        self.episode_len = 100
+        self.reward_amount = 100  
         self.terminal_vel = 0.05  
         self.goal_distance_range=   [0.3,1]
         self.gains_range =          [0.25,1.,pi/4,pi/1]

@@ -813,6 +813,15 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
       ax2.plot(agent_actions[i],alpha=0.7)
     ax2.set_ylim([-1.1,1.1])
 
+    # dev and mag costs
+    ax2 = fig.add_subplot(6,nplots,n+nplots*5+1)
+    ax2.set_xlabel('t')
+    ax2.set_ylabel('costs')
+    ax2.set_title('costs')
+    for i in range(len(data['devcosts'])):
+      ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
+      ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
+
 def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,initv=0.):
   def sample_trials(agent, env, theta, phi, etask, num_trials=5, initv=0.):
     agent_actions=[]
@@ -1199,7 +1208,7 @@ theta_init=torch.tensor([[0.4000],
         [0.1],
         [0.13],
         [0.1],
-        [0.1],
+        [0.0],
         [0.1],
         [0.1],
         [0.1],
@@ -1212,7 +1221,7 @@ theta_final=torch.tensor([[0.4000],
         [0.1],
         [0.13],
         [0.1],
-        [0.9],
+        [0.0],
         [0.9],
         [0.1],
         [0.1],

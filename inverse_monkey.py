@@ -1,11 +1,11 @@
 
-import os
+
 import warnings
 warnings.filterwarnings('ignore')
 from copy import copy
 import time
 import random
-from stable_baselines3 import SAC
+from stable_baselines3 import SAC,PPO
 seed=0
 random.seed(seed)
 import torch
@@ -51,9 +51,15 @@ arg.cost_scale=1
 number_updates=10000
 # load torch model
 import TD3_torch
-# agent=TD3_torch.TD3.load('trained_agent/500000_1_9_21_8.zip')
-# agent=agent.actor.mu.cpu()
-agent_ =SAC.load('trained_agent/slowrewardnoskp_200000_1_7_22_12.zip')
+
+
+agent_=PPO.load('trained_agent/ppo_60000_9_8_1_21.zip')
+agent = lambda x : agent_.predict(x)
+
+agent_=TD3_torch.TD3.load('trained_agent/final_200000_0_6_15_44.zip')
+agent=agent_.actor.mu.cpu()
+
+agent_ =SAC.load('trained_agent/re_iticosttimes_100000_3_17_0_40_11.zip')
 agent_=agent_.actor.cpu()
 agent = lambda x : agent_.forward(x, deterministic=True)
 
@@ -67,6 +73,14 @@ df=df[df.isFullOn==False]
 # df=df[110:130]
 df=df[:-100]
 states, actions, tasks=monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.002)
+
+with open("C:/Users/24455/Desktop/viktor_normal_trajectory.pkl",'rb') as f:
+    df = pickle.load(f)
+# df=df[df.fullon==False]
+# df=df[110:130]
+df=df[:-100]
+states, actions, tasks=monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.002)
+
 
 theta=env.reset_task_param()
 

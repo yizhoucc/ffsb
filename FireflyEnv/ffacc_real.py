@@ -1,8 +1,348 @@
 import gym
 from gym import spaces
+from gym.core import ObservationWrapper, RewardWrapper
+from matplotlib.colors import rgb2hex
 from numpy import pi
 import numpy as np
 from FireflyEnv.env_utils import *
+
+
+
+class SmoothAction1d(gym.Env):
+    # only the dev action cost, testing training for smooth actions
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.max_distance=0.9 
+        self.min_distance=0.7
+        # self.max_ctrl=1. 
+        self.dt = 0.1
+        low=-np.inf
+        high=np.inf
+        self.action_space = spaces.Box(low=-1., high=1.,shape=(1,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high,shape=(5,),dtype=np.float32)
+        self.gains_range=[1.,1.001]
+        self.goal_radius_range=[0.1,0.1001]
+        self.dev_action_cost_range=[0.,1.]
+        self.reward_amout=100.
+        self.trial_len=70
+        self.trial_timer=0
+        self.cost_scale=1.
+        
+
+    def step(self,action,debug={}):
+        action=torch.tensor(action)
+        self.trial_timer+=1
+        self.s[0]-=self.s[1]*self.dt*self.phi[0]
+        reward,stop=self.calculate_reward(action)
+        self.trial_reward+=reward
+        self.s[1]=action
+        done=False
+        if stop or self.trial_timer>self.trial_len:
+            done=True
+            print(self.trial_reward,bool((self.distance()-self.phi[1])<=0),self.is_skip())
+        return self.wrap_decision_info(),reward,done,debug
+    
+    def if_stop(self,):
+        stop=False
+        self.if_start()
+        if self.start and (abs(self.s[1])<0.05):
+            stop=True
+        return stop
+
+    def if_start(self,):
+        if not self.start:
+            if self.s[1]>0.05:
+                self.start=True
+    
+    def is_skip(self,):
+        skip=False
+        if self.trial_timer<4:
+            skip=True
+        return skip
+    
+    def calculate_reward(self,action):
+        stop=self.if_stop()
+        cost=self.calculate_cost(action)*self.cost_scale
+        reward=0.
+        if stop and self.distance()<self.phi[1]:
+            reward=self.reward_amout
+        return reward-cost,stop
+    
+    def calculate_cost(self,action):
+        return (action-self.s[1])**2*self.phi[2]*200
+
+    def reset(self,                
+                pro_gains = None, 
+                goal_radius=None,
+                dev_action_cost_factor=None,
+                d=None):
+        d = torch.zeros(1).uniform_(self.min_distance, self.max_distance) if not d else d
+        # self.previous_vctrl=torch.zeros(1).uniform_(0., self.max_ctrl)
+        self.s=torch.tensor([d,0.])
+        self.phi=self.reset_task_param(pro_gains=pro_gains, 
+                            goal_radius=goal_radius,
+                            dev_action_cost_factor=dev_action_cost_factor,
+                            )
+        self.trial_timer=0
+        self.trial_reward=0.
+        self.start=False
+        return self.wrap_decision_info()
+    
+    def reset_task_param(self,                
+                pro_gains = None, 
+                goal_radius=None,
+                dev_action_cost_factor=None,
+                ):
+        _pro_gains = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  
+        _goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.goal_radius_range[1])
+        _dev_action_cost_factor = torch.zeros(1).uniform_(self.dev_action_cost_range[0], self.dev_action_cost_range[1])
+        phi=torch.cat([_pro_gains,
+            _goal_radius,
+            _dev_action_cost_factor,
+        ])
+        phi[0]=pro_gains if pro_gains is not None else phi[0]
+        phi[1]=goal_radius if goal_radius is not None else phi[1]
+        phi[2]=dev_action_cost_factor if dev_action_cost_factor is not None else phi[2]
+        return phi
+
+    def wrap_decision_info(self,):
+        return torch.cat([self.s,self.phi,torch.ones(1)*self.trial_timer])
+
+    def distance(self,):
+        return abs(self.s[0])
+
+class SmoothAction1dgamma(SmoothAction1d):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.gamma_range=[0,1]
+        low=-np.inf
+        high=np.inf
+        self.observation_space = spaces.Box(low=low, high=high,shape=(7,),dtype=np.float32)
+
+    def calculate_reward(self,action):
+        stop=self.if_stop()
+        cost=self.calculate_cost(action)*self.cost_scale
+        reward=0.
+        if stop and self.s[0]<self.phi[1]:
+            reward=self.reward_amout*self.phi[3]**self.trial_timer
+        return reward-cost,stop
+        
+    def reset_task_param(self,                
+                pro_gains = None, 
+                goal_radius=None,
+                dev_action_cost_factor=None,
+                gamma=None,
+                ):
+        _pro_gains = torch.zeros(1).uniform_(self.gains_range[0], self.gains_range[1])  
+        _goal_radius = torch.zeros(1).uniform_(self.goal_radius_range[0], self.goal_radius_range[1])
+        _dev_action_cost_factor = torch.zeros(1).uniform_(self.dev_action_cost_range[0], self.dev_action_cost_range[1])
+        _gamma = 1-0.07*torch.zeros(1).uniform_(self.gamma_range[0], self.gamma_range[1])
+        phi=torch.cat([_pro_gains,
+            _goal_radius,
+            _dev_action_cost_factor,
+            _gamma,
+        ])
+        phi[0]=pro_gains if pro_gains is not None else phi[0]
+        phi[1]=goal_radius if goal_radius is not None else phi[1]
+        phi[2]=dev_action_cost_factor if dev_action_cost_factor is not None else phi[2]
+        phi[3]=gamma if gamma is not None else phi[3]
+        return phi
+
+    def reset(self,                
+                pro_gains = None, 
+                goal_radius=None,
+                dev_action_cost_factor=None,
+                gamma=None,
+                ):
+        self.distance = torch.zeros(1).uniform_(self.min_distance, self.max_distance)
+        # self.previous_vctrl=torch.zeros(1).uniform_(0., self.max_ctrl)
+        self.s=torch.tensor([self.distance,0.])
+        self.phi=self.reset_task_param(pro_gains=pro_gains, 
+                            goal_radius=goal_radius,
+                            dev_action_cost_factor=dev_action_cost_factor,
+                            gamma=gamma,
+                            )
+        self.trial_timer=0
+        self.trial_reward=0.
+        self.start=False
+        return self.wrap_decision_info()
+
+class SmoothAction1dRewardRate(SmoothAction1d):
+
+    def __init__(self) -> None:
+        super().__init__()
+        low=-np.inf
+        high=np.inf
+        self.observation_space = spaces.Box(low=low, high=high,shape=(6,),dtype=np.float32)
+        self.stop_punish=0.1
+
+    def step(self,action,debug={}):
+        self.prev_d=self.distance().item()
+        action=torch.tensor(action)
+        self.trial_timer+=1
+        self.s[0]-=self.s[1]*self.dt*self.phi[0]
+        reward,cost,stop=self.calculate_reward(action)
+        self.trial_reward+=reward
+        self.trial_cost+=cost
+        self.s[1]=action
+        done=False
+        if (stop and self.distance()<=self.phi[1]) or self.trial_timer>self.trial_len:
+            done=True 
+            print((self.trial_reward-self.trial_cost)/self.trial_timer,
+            bool((self.distance()-self.phi[1])<=0),self.is_skip())
+        return  self.wrap_decision_info(),\
+                (self.trial_reward-self.trial_cost)/self.trial_timer,\
+                done,debug
+
+    def reset(self,                
+                pro_gains = None, 
+                goal_radius=None,
+                dev_action_cost_factor=None,
+                d=None):
+        d = torch.zeros(1).uniform_(self.min_distance, self.max_distance) if not d else d
+        self.s=torch.tensor([d,0.])
+        self.phi=self.reset_task_param(pro_gains=pro_gains, 
+                            goal_radius=goal_radius,
+                            dev_action_cost_factor=dev_action_cost_factor,
+                            )
+        self.trial_timer=0
+        self.trial_reward=0.
+        self.trial_cost=0.
+        self.start=False
+        return self.wrap_decision_info()
+
+    def calculate_reward(self,action):
+        stop=self.if_stop()
+        cost=self.calculate_cost(action)*self.cost_scale
+        reward=0.
+        if stop and self.s[0]<self.phi[1]:
+            reward=self.reward_amout
+        else:
+            reward=self.aux1()+self.aux2()
+        return reward,cost,stop
+
+    def aux1(self,): # reward when reducing distance
+        return self.prev_d-self.distance()
+
+    def aux2(self,): # punish when not doing anything
+        scalar=0
+        if self.if_stop(): # start then stop
+            scalar=-1
+        return scalar*self.stop_punish
+
+class Smooth1dCrossFade(SmoothAction1dRewardRate):
+
+    def __init__(self) -> None:
+        super().__init__()
+        low=-np.inf
+        high=np.inf
+        self.observation_space = spaces.Box(low=low, high=high,shape=(6,),dtype=np.float32)
+        self.stop_punish=0.1
+        self.rewardfun_ratio=1
+    
+    def rewardfun(self, action):
+        reward,cost,stop=self.calculate_reward(action)
+        self.trial_reward+=reward
+        self.trial_cost+=cost
+        reward_rate=(self.trial_reward-self.trial_cost)/(self.trial_timer+5)
+        if stop or self.trial_timer>self.trial_len: # end of ep
+            signal=self.rewardfun_ratio*(reward-cost)+(1-self.rewardfun_ratio)*reward_rate 
+            done=True
+            print(
+            self.rewardfun_ratio,
+            self.s[0],
+            (self.trial_reward-self.trial_cost)/self.trial_timer,
+            self.trial_reward,
+            self.trial_cost,
+            self.trial_timer,
+            bool((self.distance()-self.phi[1])<0),self.is_skip())
+        else:
+            r=self.rewardfun_ratio*reward
+            c=self.rewardfun_ratio*cost
+            signal=r-c
+            done=False
+
+        return signal,done
+
+    def step(self,action,debug={}):
+        self.prev_d=abs(self.s[0].item())
+        self.prev_a=self.s[1].item()
+        action=torch.tensor(action)
+        self.trial_timer+=1
+        self.s[0]-=self.s[1]*self.dt*self.phi[0]
+        self.s[1]=action
+
+        signal,done=self.rewardfun(action)
+        return self.wrap_decision_info(),signal,done,debug
+
+
+        # if stop or self.trial_timer>self.trial_len:
+        #     r=(self.trial_reward-self.trial_cost)/self.trial_timer*15
+        #     print((
+        #     self.s[0],
+        #     self.trial_reward,
+        #     self.trial_cost,
+        #     r),
+        #     self.trial_timer,
+        #     bool((self.distance()-self.phi[1])<0),self.is_skip())
+        #     return self.wrap_decision_info(),r,True,debug
+        # else:
+        #     return self.wrap_decision_info(),0.,False,debug
+        # if stop or self.trial_timer>self.trial_len:
+        #     r=(self.trial_reward-self.trial_cost)/self.trial_timer
+        #     print((self.s[0],self.trial_reward,self.trial_cost),r,self.trial_timer,
+        #     bool((self.distance()-self.phi[1])<0),self.is_skip())
+        #     return self.wrap_decision_info(),\
+        #         self.trial_reward-self.trial_cost,(stop or self.trial_timer>self.trial_len),debug
+        # else:
+        #     return self.wrap_decision_info(),0.,False,debug
+
+
+    def calculate_reward(self,action):
+        stop=self.if_stop()
+        cost=self.calculate_cost(action)*self.cost_scale
+        reward=0.
+        if stop and self.distance()<=self.phi[1]:
+            reward=self.reward_amout
+        elif stop and self.distance()>self.phi[1]:
+            reward=self.aux3()
+        else:
+            reward=self.aux1()+self.aux2()
+        return reward,cost,stop
+
+    def realtime_reward(self,action):
+        return self.calculate_reward(action)
+        
+    def reward_rate(self,action):
+        reward,cost,stop=self.calculate_reward(action)
+        if stop or self.trial_timer>self.trial_len:
+            r=(self.trial_reward-self.trial_cost)/self.trial_timer*15
+            print((
+            self.s[0],
+            self.trial_reward,
+            self.trial_cost,
+            r),
+            self.trial_timer,
+            bool((self.distance()-self.phi[1])<0),self.is_skip())
+            return self.wrap_decision_info(),r,True,debug
+        else:
+            return self.wrap_decision_info(),0.,False,debug
+    
+    def calculate_cost(self,action):
+        return (action-self.prev_a)**2*self.phi[2]*200
+        
+    def aux1(self,): # reward when reducing distance
+        return self.prev_d-abs(self.s[0])
+    def aux2(self,): # punish when not doing anything
+        scalar=0
+        if self.if_stop(): # start then stop
+            scalar=-1
+        return scalar*self.stop_punish
+    def aux3(self,):
+        return self.phi[1]/(self.distance()+self.phi[1])
+
 
 
 class Simple1d(gym.Env, torch.nn.Module): 
@@ -2370,7 +2710,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         phi[9]=dev_w_cost_factor if dev_w_cost_factor is not None else phi[9]
         phi[10]=inital_x_std if inital_x_std is not None else phi[10]
         phi[11]=inital_y_std if inital_y_std is not None else phi[11]
-        return col_vector(phi)
+        return phi
 
     def step(self, action):
         action=torch.tensor(action).reshape(1,-1)
@@ -2402,7 +2742,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             self.recent_trials+=1
             self.trial_counter+=1
             # print(self.trial_counter)
-            if self.trial_counter!=0 and self.trial_counter%100==0:
+            if self.trial_counter!=0 and self.trial_counter%10==0:
                 print('rewarded: ',self.recent_rewarded_trials, 'skipped: ', self.recent_skipped_trials, ' out of total: ', self.recent_trials)
                 self.recent_rewarded_trials=0
                 self.recent_skipped_trials=0
@@ -2459,7 +2799,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
 
     def caculate_reward(self):
         if self.stop:
-            _,d= self.get_distance()
+            _,d= self.get_distance(state=self.b)
             if d<=self.goal_r:
                 reward=torch.tensor([1.])*self.reward
             else:
@@ -2593,8 +2933,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
 
     def apply_action(self,state,action):
         px, py, angle, v, w = torch.split(state.view(-1), 1)
-        v=action[0,0]*self.pro_gainv_hat
-        w=action[0,1]*self.pro_gainw_hat
+        v=action[0,0]*self.pro_gainv_hat*torch.ones(1)
+        w=action[0,1]*self.pro_gainw_hat*torch.ones(1)
         next_s = torch.stack((px, py, angle, v, w))
         return next_s.view(-1,1)
 
@@ -2714,4 +3054,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         # mincost=2
         scalar=self.reward/mincost
         cost=cost*scalar
+        if abs(action[0,0]-previous_action[0,0])<0.1 and abs(action[0,1]-previous_action[0,1])<0.1:
+            cost=cost*0
         return cost

@@ -28,21 +28,20 @@ def monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.005):
     orignal_dt=get_frame_rate(df, default_rate=0.0012)
 
     index=0
-    while index<=df.ep.iloc[-1]:
+    while index<df.shape[0]:
         try:
             # state=[
             #     [convert_unit(y,factor=factor),convert_unit(x,factor=factor)] for x, y in zip(down_sampling(df.px[index], orignal_dt, new_dt),down_sampling(df.py[index], orignal_dt, new_dt))
             #     ]
-            xs=convert_unit(torch.tensor(down_sampling(df.py[index], orignal_dt, new_dt)), factor=factor)
-
-            ys=-convert_unit(torch.tensor(down_sampling(df.px[index], orignal_dt, new_dt)), factor=factor)
+            xs=convert_unit(torch.tensor(down_sampling(df.pos_y[index], orignal_dt, new_dt), dtype=torch.float), factor=factor)
+            ys=-convert_unit(torch.tensor(down_sampling(df.pos_x[index], orignal_dt, new_dt), dtype=torch.float), factor=factor)
             initx=xs[0]
             inity=ys[0]
             xs=xs-initx
             ys=ys-inity
-            hs=torch.stack(down_sampling((pi/180*torch.tensor(df.p_heading[index])), orignal_dt, new_dt)).float()-pi/2
-            vs=convert_unit(torch.stack(down_sampling((torch.tensor(df.real_v[index])), orignal_dt, new_dt)),factor=factor).float()
-            ws=-pi/180*torch.stack(down_sampling((torch.tensor(df.real_w[index])), orignal_dt, new_dt)).float()
+            hs=torch.stack(down_sampling((pi/180*torch.tensor(df.head_dir[index], dtype=torch.float)), orignal_dt, new_dt)).float()-pi/2
+            vs=convert_unit(torch.stack(down_sampling((torch.tensor(df.pos_v[index], dtype=torch.float)), orignal_dt, new_dt)),factor=factor).float()
+            ws=-pi/180*torch.stack(down_sampling((torch.tensor(df.pos_w[index], dtype=torch.float)), orignal_dt, new_dt)).float()
             state=torch.stack([xs,ys,hs,vs,ws])
             # df.action_v[index]
             # df.real_v[index]
@@ -55,13 +54,13 @@ def monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.005):
             # plt.plot(180/pi*torch.atan2(df.FFY[index]-torch.tensor((df.py[index])),df.FFX[index]-torch.tensor((df.px[index]))))
             # plt.plot(torch.atan2(torch.tensor((df.px[index])-df.FFX[index]),torch.tensor((df.py[index])-df.FFY[index]))-torch.tensor(df.real_relative_angle[index]*pi/180))
             # np.arctan((down_sampling(df.px[index], orignal_dt, 0.2)-df.FFX[index])/(down_sampling(df.py[index], orignal_dt, 0.2)-df.FFY[index]))-down_sampling(df.real_relative_angle[index]*pi/180, orignal_dt, 0.2)            
-            task=[[ convert_unit(df.FFY[index],factor=factor)-initx,-convert_unit(df.FFX[index],factor=factor)-inity],convert_unit(goal_radius,factor=factor)]
-            action=[[v,-w] for v, w in zip(down_sampling(df.action_v[index], orignal_dt, new_dt),down_sampling(df.action_w[index], orignal_dt, new_dt))]
+            task=[[ convert_unit(df.target_y[index],factor=factor)-initx,-convert_unit(df.target_x[index],factor=factor)-inity],convert_unit(goal_radius,factor=factor)]
+            action=[[v.astype('float32'),-w.astype('float32')] for v, w in zip(down_sampling(df.action_v[index], orignal_dt, new_dt),down_sampling(df.action_w[index], orignal_dt, new_dt))]
             states.append(state)
             actions.append(action)
             tasks.append(task)
             index+=1
-        except KeyError:
+        except:
             index+=1
             continue
     return states, actions, tasks

@@ -35,36 +35,50 @@ env.no_skip=True
 modelname=None
 # modelname='iticosttimes_100000_2_2_21_23'
 note='re' 
-from stable_baselines3 import SAC
+from stable_baselines3 import SAC,PPO
 
-# 2d td3
+
 if modelname is None:
-    model = TD3(MlpPolicy,
+    
+#    td3
+    # model = TD3(MlpPolicy,
+    #     env,
+    #     buffer_size=int(1e6),
+    #     batch_size=512,
+    #     learning_rate=3e-4,
+    #     learning_starts= 5000,
+    #     tau= 0.005,
+    #     gamma= 0.99,
+    #     train_freq = 10,
+    #     gradient_steps = -1,
+    #     n_episodes_rollout = 1,
+    #     action_noise= action_noise,
+    #     optimize_memory_usage = False,
+    #     policy_delay = 2,
+    #     target_policy_noise = 0.2,
+    #     target_noise_clip = 0.5,
+    #     tensorboard_log = None,
+    #     create_eval_env = False,
+    #     policy_kwargs = {'net_arch':[128,256,256]},
+    #     verbose = 0,
+    #     seed = None,
+    #     device = "cpu",
+    #     )
+
+# ppo
+    model = PPO('MlpPolicy',
         env,
-        buffer_size=int(1e6),
-        batch_size=512,
         learning_rate=3e-4,
-        learning_starts= 5000,
-        tau= 0.005,
-        gamma= 0.99,
-        train_freq = 6,
-        gradient_steps = -1,
-        n_episodes_rollout = 1,
-        action_noise= action_noise,
-        optimize_memory_usage = False,
-        policy_delay = 2,
-        target_policy_noise = 0.2,
-        target_noise_clip = 0.5,
-        tensorboard_log = None,
-        create_eval_env = False,
+        n_steps=4,
+        batch_size=512,
+        gamma=0.99,
         policy_kwargs = {'net_arch':[128,256,256]},
-        verbose = 0,
-        seed = None,
-        device = "cpu",
-        )
-    train_time=200000
+    )
+
+    train_time=60000
     for i in range(10):  
-        namestr= ("trained_agent/td3_{}_{}_{}_{}_{}".format(train_time,i,
+        env.cost_scale=1/20*i
+        namestr= ("trained_agent/ppo_{}_{}_{}_{}_{}".format(train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
         model.learn(train_time)
@@ -86,6 +100,9 @@ if modelname is None:
         # env=ffacc_real.FireflyFinal(arg)
         # arg.init_action_noise=arg.init_action_noise/2+0.05
         # action_noise=NormalActionNoise(mean=0., sigma=float(arg.init_action_noise))
+
+
+
 else:
     # arg.goal_distance_range=[0.2,1]
     # arg.mag_action_cost_range= [0.0001,0.1]

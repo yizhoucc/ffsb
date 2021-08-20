@@ -130,7 +130,7 @@ class TD3(OffPolicyAlgorithm):
         self.critic = self.policy.critic
         self.critic_target = self.policy.critic_target
 
-    def train(self, gradient_steps: int, batch_size: int = 100) -> None:
+    def train(self, gradient_steps: int, batch_size: int = 100,verbose=False) -> None:
 
         # Update learning rate according to lr schedule
         self._update_learning_rate([self.actor.optimizer, self.critic.optimizer])
@@ -178,12 +178,14 @@ class TD3(OffPolicyAlgorithm):
 
                 polyak_update(self.critic.parameters(), self.critic_target.parameters(), self.tau)
                 polyak_update(self.actor.parameters(), self.actor_target.parameters(), self.tau)
-
+                if verbose:
+                    print(gradient_step,'losses: ',np.mean(actor_losses[:-1]),np.mean(critic_losses[:-1]) )
         self._n_updates += gradient_steps
         logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         logger.record("train/actor_loss", np.mean(actor_losses))
         logger.record("train/critic_loss", np.mean(critic_losses))
         # logger.record("reward/batch_mean_reward", np.mean(replay_data.rewards.tolist()))
+
 
     def learn(
         self,

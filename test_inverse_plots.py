@@ -1,3 +1,4 @@
+from collections import namedtuple
 import torch
 import os
 os.chdir('C:\\Users\\24455\\iCloudDrive\\misc\\ffsb')
@@ -404,7 +405,8 @@ def _hessian(y, x):
     return jacobian(jacobian(y, x, create_graph=True), x)                                             
 
 
-def compute_H(env, agent, theta_estimation, true_theta, phi, trajectory_data=None,H_dim=7, num_episodes=100,is1d=False):
+def compute_H(env, agent, theta_estimation, true_theta, phi, trajectory_data=None,H_dim=7, 
+            num_episodes=100,is1d=False):
   states, actions, tasks=trajectory(agent, torch.Tensor(phi), torch.Tensor(true_theta), env, num_episodes,is1d=is1d)
   theta_estimation=torch.nn.Parameter(torch.Tensor(theta_estimation))
   phi=torch.nn.Parameter(torch.Tensor(phi))
@@ -418,7 +420,8 @@ def compute_H(env, agent, theta_estimation, true_theta, phi, trajectory_data=Non
   return H
 
 
-def compute_loss(env, agent, theta_estimation, true_theta, phi, trajectory_data=None, num_episodes=100,is1d=False):
+def compute_loss(env, agent, theta_estimation, true_theta, phi, 
+  trajectory_data=None, num_episodes=100,is1d=False):
   if trajectory_data is None:
     states, actions, tasks=trajectory(agent, torch.Tensor(phi), torch.Tensor(true_theta), env, num_episodes, is1d=is1d)
   else:
@@ -429,7 +432,8 @@ def compute_loss(env, agent, theta_estimation, true_theta, phi, trajectory_data=
   return loss
 
 
-def compute_loss_wrapped(env, agent, true_theta, phi, trajectory_data=None, num_episodes=100,is1d=False):
+def compute_loss_wrapped(env, agent, true_theta, phi, trajectory_data=None, 
+  num_episodes=100,is1d=False):
   new_function= lambda theta_estimation: compute_loss(env, agent, theta_estimation, true_theta, phi, num_episodes=100,is1d=is1d)
   return new_function
 
@@ -587,7 +591,9 @@ def diagnose_dict(index,inverse_data, monkeystate=True,num_trials=10):
   packed['initw']=actions[index][0][1]
   return packed
 
-def diagnose_trial(index, phi, eaction, etask, theta, agent, env, num_trials=10,monkeystate=None,estate=None, guided=True, initv=0, initw=0):
+
+def diagnose_trial(index, phi, eaction, etask, theta, agent, env, num_trials=10,
+    monkeystate=None,estate=None, guided=True, initv=0, initw=0):
   agent_actions=[]
   agent_beliefs=[]
   agent_covs=[]
@@ -639,7 +645,9 @@ def diagnose_trial(index, phi, eaction, etask, theta, agent, env, num_trials=10,
     }
   return return_dict
 
-def diagnose_plot(estate, theta,eaction, etask, agent_actions, agent_beliefs, agent_covs,astate=None,index=None):
+
+def diagnose_plot(estate, theta,eaction, etask, agent_actions, agent_beliefs, a
+    gent_covs,astate=None,index=None):
   fig = plt.figure(figsize=[16, 16])
 
   ax1 = fig.add_subplot(221)
@@ -692,6 +700,7 @@ def diagnose_plot(estate, theta,eaction, etask, agent_actions, agent_beliefs, ag
     pos=  [agent_beliefs[0][:,:,0][t,0],
             agent_beliefs[0][:,:,0][t,1]]
     plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax4,alpha=0.2)
+
 
 def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
   def sample_trials(agent, env, theta, phi, etask, num_trials=5, initv=0.,initw=0.):
@@ -822,6 +831,7 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
       ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
       ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
 
+
 def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,initv=0.):
   def sample_trials(agent, env, theta, phi, etask, num_trials=5, initv=0.):
     agent_actions=[]
@@ -912,7 +922,9 @@ def diagnose_plot_theta1d(agent, env, phi, theta_init, theta_final,nplots,initv=
       ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
       ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
 
-def diagnose_plot_xaqgrant(estate, theta,eaction, etask, agent_actions, agent_beliefs, agent_covs,astate=None,index=None, tasks=None, actions=None):
+
+def diagnose_plot_xaqgrant(estate, theta,eaction, etask, agent_actions, agent_beliefs, 
+    agent_covs,astate=None,index=None, tasks=None, actions=None):
   fig = plt.figure(figsize=[12, 8])
   ax1 = fig.add_subplot(221)
   ax1.set_xlabel('time, s')
@@ -938,7 +950,9 @@ def diagnose_plot_xaqgrant(estate, theta,eaction, etask, agent_actions, agent_be
     ax2.plot(torch.tensor(actions[i])[:,1],color='steelblue', alpha=0.4)
   ax2.legend()
 
-def diagnose_stopcompare(estate, theta,eaction, etask, agent_actions, agent_beliefs, agent_covs,astate=None,index=None, tasks=None, actions=None):
+
+def diagnose_stopcompare(estate, theta,eaction, etask, agent_actions, agent_beliefs, agent_covs,
+    astate=None,index=None, tasks=None, actions=None):
   fig = plt.figure(figsize=[8, 8])
   ax1 = fig.add_subplot(111)
   ax1.set_xlim([-0.1,1.1])
@@ -956,7 +970,9 @@ def diagnose_stopcompare(estate, theta,eaction, etask, agent_actions, agent_beli
     ax1.plot(a[:,0],a[:,1],'orange', alpha=0.2)
     ax1.scatter(a[-1,0],a[-1,1], color='orange', alpha=0.5)
 
-def diagnose_plot_xaqgrantoverhead(estate, theta,eaction, etask, agent_actions, agent_beliefs, agent_covs,astate=None):
+
+def diagnose_plot_xaqgrantoverhead(estate, theta,eaction, etask, agent_actions, agent_beliefs, 
+    agent_covs,astate=None):
   fig = plt.figure(figsize=[10, 8])
   ax3 = fig.add_subplot(223)
   ax3.set_xlabel('world x, cm')
@@ -976,7 +992,9 @@ def diagnose_plot_xaqgrantoverhead(estate, theta,eaction, etask, agent_actions, 
   ax3.plot(0,0, color='orange', linewidth=2, label='estimated belief')
   ax3.legend()
 
-def diagnose_plot_stop(estate, theta,eaction, etask, agent_actions, agent_beliefs, agent_covs,astate=None, index=None):
+
+def diagnose_plot_stop(estate, theta,eaction, etask, agent_actions, agent_beliefs, 
+    agent_covs,astate=None, index=None):
   fig = plt.figure(figsize=[16, 16])
 
   ax1 = fig.add_subplot(221)
@@ -1024,6 +1042,7 @@ def diagnose_plot_stop(estate, theta,eaction, etask, agent_actions, agent_belief
       pos=  [agent_beliefs[i][:,:,0][-1,0],
               agent_beliefs[i][:,:,0][-1,1]]
       plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax4,alpha=0.1)
+
 
 def similar_trials(ind, tasks, actions):
   indls=[]
@@ -1119,6 +1138,7 @@ add_colorbar(img)
 plt.imshow(torch.sign(H[-1]))
 
 # plot monkey similar trials, path and controls
+ind=torch.randint(low=100,high=5000,size=(1,))
 indls=similar_trials(ind,tasks,actions)
 fig = plt.figure(figsize=[16, 8])
 ax1 = fig.add_subplot(121)
@@ -1148,7 +1168,10 @@ for ind in indls:
         [0.1592],
         [0.0547],
         [0.6404],
-        [0.7203]])
+        [0.7203],
+        [0.01],
+        [0.01],]
+        ).view(-1)
   pac['initv']=actions[ind][0][0]
   pac['guided']=monkeyobs
   pac['num_trials']=1
@@ -1164,7 +1187,7 @@ for ind in indls:
 
 
 # diagnoise inverse results
-ind=torch.randint(low=100,high=7000,size=(1,))
+ind=torch.randint(low=100,high=5000,size=(1,))
 monkeyobs=False
 pac=diagnose_dict(ind,'30_8_38', monkeystate=monkeyobs)
 pac['guided']=monkeyobs
@@ -1410,9 +1433,6 @@ ax1.set_xlim([-1.1,1.1])
 
 
 
-
-
-
 for atheta in theta_trajectory:
     plt.plot(true_theta)
     plt.plot(atheta)
@@ -1490,116 +1510,11 @@ hessian(loss, theta_estimation)
 # H=compute_H(env, agent, theta_estimation, true_theta, phi, trajectory_data=None, num_episodes=100)
 # cov=theta_cov(H)
 # stderr(cov)
-
-
-
-# # action cost-----------------------------------------------
-# baselines_mlp_model = TD3.load('trained_agent//TD_action_cost_700000_8_19_21_56.zip')
-# agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[128,128],n_inputs=31)
-# # loading enviorment, same as training
-# env=firefly_action_cost.FireflyActionCost(arg)
-# # ---seting the env for inverse----
-# # TODO, move it to a function of env
-# env.agent_knows_phi=False
-
-# a=load_inverse_data('EP200updates200lr0.1step23_7_29EP200updates200sample2IT2')
-# theta_trajectory=a['theta_estimations']
-# true_theta=a['true_theta']
-# theta_estimation=theta_trajectory[-1]
-# phi=np.array(a['phi'])
-# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)
-
-# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi,background_contour=True)
-
-
-
-
-
-# # acc-----------------------------------------------
-# baselines_mlp_model = TD3.load('trained_agent//acc_retrain_1000000_2_18_21_4.zip')
-# agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[128,128],n_inputs=30)
-# env=firefly_action_cost.FireflyActionCost(arg)
-# env.agent_knows_phi=False
-
-# a=load_inverse_data('test_acc_EP200updates100lr0.1step219_23_4EP200updates100sample2IT2')
-# theta_trajectory=a['theta_estimations']
-# true_theta=a['true_theta']
-# theta_estimation=theta_trajectory[-1]
-# phi=np.array(a['phi'])
-
-# # no bg, faster
-# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)
-# # with bg as contour
-# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi,background_contour=True)
-# # with bg as img
-# background_data=plot_inverse_trajectory(theta_trajectory,
-# true_theta,env,agent, phi=phi,background_data=None,
-# background_contour=True,
-# background_look='pixel')
-# # with bg as img, with bg data already in hand
-# background_data=plot_inverse_trajectory(theta_trajectory,
-# true_theta,env,agent, phi=phi,background_data=background_data,
-# background_contour=True,
-# background_look='pixel')
-
-# accac-----------------------------------------------------
-# baselines_mlp_model = TD3.load('trained_agent//accac_final_1000000_9_11_20_25.zip')
-# agent = policy_torch.copy_mlp_weights(baselines_mlp_model,layers=[512,512],n_inputs=32)
-# arg.goal_radius_range=[0.1,0.3]
-# arg.TERMINAL_VEL = 0.025
-# arg.goal_radius_range=[0.15,0.3]
-# arg.std_range = [0.02,0.3,0.02,0.3]
-# arg.TERMINAL_VEL = 0.025  # terminal velocity? # norm(action) that you believe as a signal to stop 0.1.
-# arg.DELTA_T=0.2
-# arg.EPISODE_LEN=35
-# env=firefly_accac.FireflyAccAc(arg)
-# env.agent_knows_phi=False
-
-# a=load_inverse_data('18_22_23')
-# theta_trajectory=a['theta_estimations']
-# true_theta=a['true_theta']
-# theta_estimation=theta_trajectory[-1]
-# phi=np.array(a['phi'])
-# # no bg, faster
-# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)
-
-
-
-
-# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, 
-# phi=phi,background_contour=True,H=False,number_pixels=15)
-
-
-# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, 
-# phi=phi,background_contour=True,H=False,number_pixels=5,background_look='pixel',background_data=background_data)
-
-# plt.imshow(background_data)
-
-# H=compute_H(env, agent, theta_estimation, np.array(true_theta).reshape(-1,1), phi, trajectory_data=None,H_dim=len(true_theta), num_episodes=100)
-# H_trace=np.trace(H)
-# cov=theta_cov(H)
 # torch.eig(torch.Tensor(cov))
 
 
 
 # plot trajectories-------------------------------------------
-# action costs
-theta_trajectorys=[]
-a=load_inverse_data('EP100updates500lr0.1step226_6_13EP100updates500sample2IT2')
-theta_trajectorys.append(a['theta_estimations'])
-a=load_inverse_data('EP100updates500lr0.1step226_7_55EP100updates500sample2IT2')
-theta_trajectorys.append(a['theta_estimations'])
-a=load_inverse_data('EP100updates500lr0.1step225_21_18EP100updates500sample2IT2')
-theta_trajectorys.append(a['theta_estimations'])
-a=load_inverse_data('EP100updates500lr0.1step225_23_4EP100updates500sample2IT2')
-theta_trajectorys.append(a['theta_estimations'])
-a=load_inverse_data('EP100updates500lr0.1step226_0_53EP100updates500sample2IT2')
-theta_trajectorys.append(a['theta_estimations'])
-a=load_inverse_data('EP100updates500lr0.1step226_2_32EP100updates500sample2IT2')
-theta_trajectorys.append(a['theta_estimations'])
-a=load_inverse_data('EP100updates500lr0.1step226_4_16EP100updates500sample2IT2')
-theta_trajectorys.append(a['theta_estimations'])
-
 
 def true_vs_estimation(theta_trajectorys,true_theta,index):
   end_list=[]
@@ -1744,3 +1659,67 @@ def plottrial1d():
   plt.plot(actionls[:],color='orange')
   # plt.plot(vls[previ:i],color='blue')
   plt.plot(dls[:],color='green')
+
+n=5
+fig = plt.figure(figsize=[3*n,3])
+for cost_factor in np.arange(0,1,1/n):
+  with torch.no_grad():
+      actionls=[]
+      positionls=[]
+      vls=[]
+      bls=[]
+      rls=[]
+      mcls=[]
+      dcls=[]
+      dls=[]
+      thetals=[]
+      goalls=[]
+      env.reset(dev_action_cost_factor=cost_factor,d=0.8)
+      print(env.s[0])
+      done=False
+      while not done:
+        action=agent(env.wrap_decision_info())
+        _,_,done,_=env.step(action)
+        actionls.append(action)
+        positionls.append(env.s[0].item())
+        vls.append(env.s[1].item())
+  ax = fig.add_subplot(1,n,int(cost_factor*n)+1)
+  ax.plot(vls[:],color='blue')
+  ax.plot(positionls[:],color='green')
+  ax.set_ylim([0.,1.])
+fig.tight_layout(pad=2.0)
+
+
+
+def diag_1d_theta(n=10):
+  def sample_trials(cost,gamma):
+    with torch.no_grad():
+      actionls=[]
+      positionls=[]
+      vls=[]
+      env.reset(dev_action_cost_factor=cost,gamma=gamma)
+      print(env.s[0])
+      done=False
+      while not done:
+        action=agent(env.wrap_decision_info())
+        _,_,done,_=env.step(action)
+        actionls.append(action)
+        positionls.append(env.s[0].item())
+        vls.append(env.s[1].item())
+    return vls,positionls
+  fig = plt.figure(figsize=[n*5, n*3])
+  for i in range(n):
+    for j in range(n):
+      ax1 = fig.add_subplot(n,n,n*i+j+1)
+      cost=0.1*i
+      gamma=0.1*j
+      vls, positionls=  sample_trials(cost,gamma)
+      ax1.set_xlabel('dt')
+      ax1.set_ylabel('control and distance')
+      ax1.set_title('cost: {}, gamma: {}'.format(str(cost),str(1-0.07*gamma)))
+      ax1.plot(vls,color='blue')
+      ax1.plot(positionls,color='green')
+  fig.tight_layout(pad=3.0)
+      # ax1.set_xlim([-0.1,1.1])
+      # ax1.set_ylim([-0.6,0.6])
+  

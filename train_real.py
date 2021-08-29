@@ -16,12 +16,9 @@ arg.mag_action_cost_range= [0.1,1.]
 arg.dev_action_cost_range= [0.1,1.]
 arg.dev_v_cost_range= [0.1,1.]
 arg.dev_w_cost_range= [0.1,1.]
-# arg.goal_distance_range=[0.01,0.99]
 arg.gains_range =[0.35,0.45,pi/2-0.1,pi/2+0.1]
-# arg.goal_radius_range=[0.07,0.2]
-arg.std_range = [0.01,0.07,0.01,0.07]
-# arg.mag_action_cost_range= [0.0001,0.0005]
-# arg.dev_action_cost_range= [0.0001,0.0005]
+arg.goal_radius_range=[0.07,0.2]
+arg.std_range = [0.01,1,0.01,1]
 arg.reward_amount=100
 arg.terminal_vel = 0.05
 arg.dt=0.1
@@ -33,112 +30,84 @@ arg.cost_scale=1
 env=ffacc_real.FireFlyReady(arg)
 env.no_skip=True
 modelname=None
-# modelname='iticosttimes_100000_2_2_21_23'
+# modelname='initcost'
 note='re' 
 from stable_baselines3 import SAC,PPO
 
 
 if modelname is None:
-    
-#    td3
-    # model = TD3(MlpPolicy,
-    #     env,
-    #     buffer_size=int(1e6),
-    #     batch_size=512,
-    #     learning_rate=3e-4,
-    #     learning_starts= 5000,
-    #     tau= 0.005,
-    #     gamma= 0.99,
-    #     train_freq = 10,
-    #     gradient_steps = -1,
-    #     n_episodes_rollout = 1,
-    #     action_noise= action_noise,
-    #     optimize_memory_usage = False,
-    #     policy_delay = 2,
-    #     target_policy_noise = 0.2,
-    #     target_noise_clip = 0.5,
-    #     tensorboard_log = None,
-    #     create_eval_env = False,
-    #     policy_kwargs = {'net_arch':[128,256,256]},
-    #     verbose = 0,
-    #     seed = None,
-    #     device = "cpu",
-    #     )
-
-# ppo
-    model = PPO('MlpPolicy',
+   #td3
+    model = TD3(MlpPolicy,
         env,
-        learning_rate=3e-4,
-        n_steps=4,
+        buffer_size=int(1e6),
         batch_size=512,
-        gamma=0.99,
-        policy_kwargs = {'net_arch':[128,256,256]},
-    )
-
-    train_time=60000
-    for i in range(10):  
-        env.cost_scale=1/20*i
-        namestr= ("trained_agent/ppo_{}_{}_{}_{}_{}".format(train_time,i,
+        learning_rate=1e-3,
+        learning_starts= 2000,
+        tau= 0.005,
+        gamma= 0.99,
+        # train_freq = 10,
+        gradient_steps = -1,
+        n_episodes_rollout = 1,
+        action_noise= action_noise,
+        optimize_memory_usage = False,
+        policy_delay = 2,
+        target_policy_noise = 0.2,
+        target_noise_clip = 0.5,
+        tensorboard_log = None,
+        create_eval_env = False,
+        policy_kwargs = {'net_arch':[256,256]},
+        verbose = 0,
+        seed = None,
+        device = "cpu",
+        )
+    train_time=150000
+    for i in range(1,11):  
+        env.cost_scale=(1/20)**3
+        if i==1:
+            for j in range(1,5): 
+                env.noise_scale=0.1*j
+                namestr= ("trained_agent/td3_{}_{}_{}_{}_{}".format(train_time,i,
+                str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
+                ))
+                model.learn(train_time)
+                model.save(namestr)
+        namestr= ("trained_agent/td3_{}_{}_{}_{}_{}".format(train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
         model.learn(train_time)
         model.save(namestr)
-        
-        # model = TD3.load('./trained_agent/manual',
-        # env,
-        # tensorboard_log="./Tensorboard/",
-        # buffer_size=int(1e6),
-        # batch_size=512,
-        # device='cpu',
-        # verbose=True,
-        # action_noise=action_noise,
-        # learning_rate=1e-4*5
-        # )
-
-        # arg.dev_v_cost_range[1]+=0.1
-        # arg.dev_w_cost_range[1]+=0.1
-        # env=ffacc_real.FireflyFinal(arg)
-        # arg.init_action_noise=arg.init_action_noise/2+0.05
-        # action_noise=NormalActionNoise(mean=0., sigma=float(arg.init_action_noise))
-
-
-
 else:
-    # arg.goal_distance_range=[0.2,1]
-    # arg.mag_action_cost_range= [0.0001,0.1]
-    # arg.dev_v_cost_range= [0.1,2]
-    # arg.dev_w_cost_range= [0.1,2]
-    # arg.std_range = [0.01,0.5,0.01,0.5]  
-
-    # # arg.goal_distance_range=[0.1,1]
-    # # arg.gains_range =[0.05,1,pi/4,pi]
-    # # arg.goal_radius_range=[0.07,0.2]
-    # # arg.std_range = [0.001,0.6,pi/800,0.6]
-    # # arg.mag_action_cost_range= [0.0001,0.1]
-    # # arg.dev_action_cost_range= [0.0001,0.2]
-    # arg.goal_distance_range=[0.01,0.99]
-    # arg.gains_range =[0.3,0.5,pi/2-0.2,pi/2+0.2]
-    # # arg.gains_range =[0.39,0.41,pi/2-0.1,pi/2+0.1]
-    # arg.goal_radius_range=[0.1,0.15]
-    # arg.mag_action_cost_range= [0.00001,0.05]
-    # arg.dev_action_cost_range= [0.0001,0.1]
-    model = TD3.load('./trained_agent/'+modelname,
-        env,
-        tensorboard_log="./Tensorboard/",
-        buffer_size=int(1e6),
-        batch_size=512,
-        device='cpu',
-        verbose=True,
-        action_noise=action_noise,
-        learning_rate=1e-4*5
-        )
-    train_time=2000000 
-    for i in range(100):  
+    for i in range(1,11): 
+        env.noise_scale=0.5
+        action_noise = NormalActionNoise(mean=0., sigma=float(0.3-0.02*i))
+        model = TD3.load('./trained_agent/'+modelname,
+            env,
+            action_noise=action_noise,
+            learning_rate=5e-4
+            )
+        train_time=50000
+        env.cost_scale=(1/20*i)**2
         namestr= ("trained_agent/{}_{}_{}".format(note,modelname,i))
-        model.learn(total_timesteps=int(train_time/100),tb_log_name=namestr)
+        model.learn(train_time)
         model.save(namestr)
 
-
+# # ppo
+#     model = PPO('MlpPolicy',
+#         env,
+#         learning_rate=3e-4,
+#         n_steps=4,
+#         batch_size=512,
+#         gamma=0.99,
+#         policy_kwargs = {'net_arch':[128,256,256]},
+#     )
+#     train_time=60000
+#     for i in range(10):  
+#         env.cost_scale=1/20*i
+#         namestr= ("trained_agent/ppo_{}_{}_{}_{}_{}".format(train_time,i,
+#         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
+#         ))
+#         model.learn(train_time)
+#         model.save(namestr)
 
 # # 1d test
 # arg.initial_uncertainty_range=[0,1]
@@ -277,7 +246,4 @@ else:
 #             model.save(namestr)
 # raise RuntimeError
 
-
-agent=SAC.load('trained_agent/re_sacappbelief_500000_4_20_5_38_2.zip')
-agent=agent.actor.cpu()
 

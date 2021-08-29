@@ -56,7 +56,7 @@ import TD3_torch
 agent_=PPO.load('trained_agent/ppo_60000_9_8_1_21.zip')
 agent = lambda x : agent_.predict(x)
 
-agent_=TD3_torch.TD3.load('trained_agent/final_200000_0_6_15_44.zip')
+agent_=TD3_torch.TD3.load('trained_agent/re_initcost_1.zip')
 agent=agent_.actor.mu.cpu()
 
 agent_ =SAC.load('trained_agent/re_iticosttimes_100000_3_17_0_40_11.zip')

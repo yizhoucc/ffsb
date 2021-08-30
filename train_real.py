@@ -1,5 +1,5 @@
 from stable_baselines3.td3.policies import MlpPolicy
-from TD3_torch import TD3
+# from TD3_torch import TD3
 from Config import Config
 arg=Config()
 import numpy as np
@@ -8,8 +8,9 @@ import time
 from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 from reward_functions import reward_singleff
 from FireflyEnv import ffacc_real
+import torch
 
-action_noise = NormalActionNoise(mean=0., sigma=float(0.3))
+action_noise = NormalActionNoise(mean=0., sigma=float(0.5))
 arg.init_action_noise=0.5
 arg.goal_distance_range=[0.3,1] 
 arg.mag_action_cost_range= [0.1,1.]
@@ -32,41 +33,41 @@ env.no_skip=True
 modelname=None
 # modelname='initcost'
 note='re' 
-from stable_baselines3 import SAC,PPO
+from stable_baselines3 import SAC,PPO,TD3
 
 
 if modelname is None:
-   #td3
     model = TD3(MlpPolicy,
         env,
         buffer_size=int(1e6),
         batch_size=512,
-        learning_rate=1e-3,
-        learning_starts= 2000,
+        learning_rate=7e-4,
+        learning_starts= 1000,
         tau= 0.005,
-        gamma= 0.99,
-        # train_freq = 10,
-        gradient_steps = -1,
-        n_episodes_rollout = 1,
+        gamma= 0.96,
+        train_freq = 4,
+        # gradient_steps = -1,
+        # n_episodes_rollout = 1,
         action_noise= action_noise,
-        optimize_memory_usage = False,
+        # optimize_memory_usage = False,
         policy_delay = 2,
-        target_policy_noise = 0.2,
-        target_noise_clip = 0.5,
+        # target_policy_noise = 0.2,
+        # target_noise_clip = 0.5,
         tensorboard_log = None,
-        create_eval_env = False,
-        policy_kwargs = {'net_arch':[256,256]},
+        # create_eval_env = False,
+        policy_kwargs = {'net_arch':[64,64],'activation_fn':torch.nn.LeakyReLU},
         verbose = 0,
         seed = None,
         device = "cpu",
         )
     train_time=150000
     for i in range(1,11):  
-        env.cost_scale=(1/20)**3
+        env.cost_scale=1e-5
         if i==1:
-            for j in range(1,5): 
+            for j in range(1,11): 
+                # arg.std_range = [0.01,0.1*j,0.01,0.1*j]
                 env.noise_scale=0.1*j
-                namestr= ("trained_agent/td3_{}_{}_{}_{}_{}".format(train_time,i,
+                namestr= ("trained_agent/td3_{}_{}_{}_{}_{}".format(train_time,j,
                 str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
                 ))
                 model.learn(train_time)

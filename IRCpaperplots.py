@@ -442,7 +442,7 @@ theta=torch.tensor([[0.4000],
         [0.1],
 ])
 
-agent_=TD3_torch.TD3.load('trained_agent/td3_150000_1_29_11_12.zip')
+agent_=TD3_torch.TD3.load('trained_agent/td3_150000_9_30_5_33.zip')
 agent=agent_.actor.mu.cpu()
 input={
     'agent':agent,
@@ -450,7 +450,7 @@ input={
     'phi':phi,
     'env': env,
     'num_trials':10,
-    'task':[0.7,-0.2],
+    # 'task':[0.5,-0.2],
     'mkdata':{},
     'use_mk_data':False,
 }

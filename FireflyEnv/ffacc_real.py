@@ -2673,7 +2673,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.stop=False 
         self.agent_start=False 
         self.trial_timer = torch.zeros(1)
-        self.trial_sum_cost=0
+        self.trial_sum_cost=0.
+        self.trial_sum_reward=0.
         if self.debug:
             self.obs_traj=obs_traj
             self.pro_traj=pro_traj
@@ -2787,6 +2788,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
     def step(self, action,next_state=None):
         action=torch.tensor(action).reshape(1,-1)
         self.a=action
+        _, self.prev_d=self.get_distance(state=self.b)
         self.trial_timer+=1
         self.sys_vel=torch.norm(action)
         if not self.if_agent_stop(sys_vel=self.sys_vel) and not self.agent_start:
@@ -2803,8 +2805,9 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.b, self.P=self.belief_step(self.b,self.P,self.o,action)
         self.decision_info=self.wrap_decision_info(previous_action=action,task_param=self.theta)
         # eval
-        self.episode_reward, cost = self.caculate_reward()
+        reward, cost = self.caculate_reward()
         self.trial_sum_cost += cost
+        self.trial_sum_reward += reward
         if self.debug:
             self.trial_actions.append(action)
             self.trial_costs.append(cost)
@@ -2824,10 +2827,10 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             print(
             'distance, ', "{:.1f}".format((self.get_distance()[1]-self.goal_r).item()),
             'stop',self.stop,
-            'reward: {:.1f}, cost: {:.1f}'.format((self.episode_reward-self.trial_sum_cost).item(), self.trial_sum_cost.item()))
+            'reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost))
             # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}
         self.previous_action=action
-        return self.decision_info, self.episode_reward-cost, end_current_ep, {}
+        return self.decision_info, reward-cost, end_current_ep, {}
 
     def state_step(self,a, s): # update xy, then apply new action as new v and w
         next_s = self.update_state(s)
@@ -2881,8 +2884,9 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         #     # reward=(self.goal_r/d)**2
         #     reward=torch.tensor([0.])
         # reward+= (1-self.cost_scale)*self.reward*min(self.goal_r/d,1)*0.01
-
+        reward=torch.tensor([0.])
         cost=self.action_cost(self.a, self.previous_action)
+        _,d= self.get_distance(state=self.b)
         if self.stop: # only evaluate reward when stop.
             rew_std = self.goal_r/2 
             mu = torch.Tensor([self.goalx,self.goaly])-self.b[:2,0]
@@ -2904,10 +2908,9 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 print('P', P)
                 print('R', R)
             reward = self.reward * reward  
-        else: # not stop, zero reward.
-            reward=torch.tensor([0.])
-
-        return reward, cost
+            reward+=(1-self.cost_scale) # stop reward, no matter what
+        reward-=(d-self.prev_d)*(1-self.cost_scale) # approaching reward
+        return reward.item(), cost.item()
     
     def action_cost(self, action, previous_action):
         # action is row vector
@@ -2917,8 +2920,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         vcost=(action[0,0]-previous_action[0,0])**2*self.theta[7]
         wcost=(action[0,1]-previous_action[0,1])**2*self.theta[8]
         cost=vcost+wcost
-        mincost=1/10/10*20 #1/20^2 min cost per dt, for 20 dts.
-        # mincost=2
+        # mincost=1/10/10*20 #1/20^2 min cost per dt, for 20 dts.
+        mincost=2
         scalar=self.reward/mincost
         cost=cost*scalar
         if abs(action[0,0]-previous_action[0,0])<0.1 and abs(action[0,1]-previous_action[0,1])<0.1:

@@ -30,7 +30,7 @@ arg.cost_scale=1
 env=ffacc_real.FireFlyReady(arg)
 env.no_skip=True
 modelname=None
-# modelname='initcost'
+# modelname='re_re_re_re_nocost_0_1_1_1'
 note='re' 
 from stable_baselines3 import SAC,PPO
 
@@ -41,13 +41,13 @@ if modelname is None:
         env,
         buffer_size=int(1e6),
         batch_size=512,
-        learning_rate=1e-3,
-        learning_starts= 2000,
+        learning_rate=5e-4,
+        learning_starts= 1000,
         tau= 0.005,
         gamma= 0.99,
-        # train_freq = 10,
+        train_freq = 4,
         gradient_steps = -1,
-        n_episodes_rollout = 1,
+        # n_episodes_rollout = 1,
         action_noise= action_noise,
         optimize_memory_usage = False,
         policy_delay = 2,
@@ -60,12 +60,12 @@ if modelname is None:
         seed = None,
         device = "cpu",
         )
-    train_time=150000
+    train_time=50000
     for i in range(1,11):  
-        env.cost_scale=(1/20)**3
+        env.cost_scale=1e-5
         if i==1:
             for j in range(1,5): 
-                env.noise_scale=0.1*j
+                env.noise_scale=0.2*j
                 namestr= ("trained_agent/td3_{}_{}_{}_{}_{}".format(train_time,i,
                 str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
                 ))
@@ -78,7 +78,7 @@ if modelname is None:
         model.save(namestr)
 else:
     for i in range(1,11): 
-        env.noise_scale=0.5
+        env.noise_scale=1
         action_noise = NormalActionNoise(mean=0., sigma=float(0.3-0.02*i))
         model = TD3.load('./trained_agent/'+modelname,
             env,

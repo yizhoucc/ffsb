@@ -57,7 +57,7 @@ if modelname is None:
         # create_eval_env = False,
         policy_kwargs = {'net_arch':[64,64],'activation_fn':torch.nn.LeakyReLU},
         verbose = 0,
-        seed = None,
+        seed = 0,
         device = "cpu",
         )
     train_time=150000

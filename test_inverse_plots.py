@@ -571,7 +571,7 @@ def plot_inverse_trajectorys(theta_trajectorys,true_theta,
     return background_data
 
 
-def diagnose_dict(index,inverse_data, monkeystate=True,num_trials=10):
+def diagnose_dict(index,inverse_data, monkeystate=True,num_trials=10,**kwargs):
   inverse_data=load_inverse_data(inverse_data)
   packed={}
   packed['index']=index
@@ -600,7 +600,7 @@ def diagnose_trial(index, phi, eaction, etask, theta, agent, env, num_trials=10,
   agent_states=[]
   with torch.no_grad():
     for trial_i in range(num_trials):
-      env.reset(phi=phi,theta=theta,goal_position=etask[0],initv=initv, initw=initw)
+      env.reset(phi=phi,theta=theta,goal_position=etask[0],vctrl=initv, wctrl=initw)
       epbliefs=[]
       epbcov=[]
       epactions=[]
@@ -769,7 +769,7 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
       cov=data['agent_covs'][0][t][:2,:2]
       pos=  [agent_beliefs[0][:,:,0][t,0],
               agent_beliefs[0][:,:,0][t,1]]
-      plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
+      plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha_factor=0.2)
 
   # v and w
     ax2 = fig.add_subplot(6,nplots,n+nplots+1)
@@ -1047,12 +1047,12 @@ def diagnose_plot_stop(estate, theta,eaction, etask, agent_actions, agent_belief
 def similar_trials(ind, tasks, actions):
   indls=[]
   for i in range(len(tasks)):
-      if tasks[i][0][0]>tasks[ind][0][0]-0.05 \
-      and tasks[i][0][0]<tasks[ind][0][0]+0.05 \
+      if tasks[i][0][0]>tasks[ind][0][0]-0.03 \
+      and tasks[i][0][0]<tasks[ind][0][0]+0.03 \
       and tasks[i][0][1]>tasks[ind][0][1]-0.03 \
       and tasks[i][0][1]<tasks[ind][0][1]+0.03 \
-      and actions[i][0][0]>actions[ind][0][0]-0.1 \
-      and actions[i][0][0]<actions[ind][0][0]+0.1:
+      and actions[i][0][0]>actions[ind][0][0]-0.05 \
+      and actions[i][0][0]<actions[ind][0][0]+0.05:
           indls.append(i)
   return indls
 
@@ -1121,7 +1121,7 @@ def diagnose_dynamic_wrapped():
 
 
 # plot losses
-a=load_inverse_data('30_8_38')
+a=load_inverse_data('brune12_17_11')
 theta_trajectory=a['theta_estimations']
 true_theta=a['true_theta']
 theta_estimation=theta_trajectory[-1]
@@ -1129,13 +1129,9 @@ phi=np.array(a['phi'])
 H=a['Hessian'] 
 stds=a['theta_std']
 losses=np.array(a['loss'])
-# background_data=plot_inverse_trajectory(theta_trajectory,true_theta,env,agent, phi=phi)
 plt.plot(losses)
 
 
-img=plt.imshow(H[-1])
-add_colorbar(img)
-plt.imshow(torch.sign(H[-1]))
 
 # plot monkey similar trials, path and controls
 ind=torch.randint(low=100,high=5000,size=(1,))
@@ -1158,20 +1154,8 @@ for ind in indls:
   ax1.add_patch(goalcircle)
 
   monkeyobs=False
-  pac=diagnose_dict(ind,'3_21_42', monkeystate=monkeyobs)
-  pac['theta']=torch.tensor([[0.2245],
-        [1.0581],
-        [0.3250],
-        [0.1881],
-        [0.1867],
-        [0.1844],
-        [0.1592],
-        [0.0547],
-        [0.6404],
-        [0.7203],
-        [0.01],
-        [0.01],]
-        ).view(-1)
+  pac=diagnose_dict(ind,'brune12_17_11', monkeystate=monkeyobs)
+  pac['theta']=torch.tensor(theta_estimation)
   pac['initv']=actions[ind][0][0]
   pac['guided']=monkeyobs
   pac['num_trials']=1
@@ -1188,8 +1172,8 @@ for ind in indls:
 
 # diagnoise inverse results
 ind=torch.randint(low=100,high=5000,size=(1,))
-monkeyobs=False
-pac=diagnose_dict(ind,'30_8_38', monkeystate=monkeyobs)
+monkeyobs=True
+pac=diagnose_dict(ind,'brune12_17_11', monkeystate=monkeyobs)
 pac['guided']=monkeyobs
 pac['num_trials']=15
 pac['theta']=torch.tensor(
@@ -1202,7 +1186,6 @@ pac['theta']=torch.tensor(
         [0.13],
         [0.2],
         [0.2],
-        [0.3],
         [0.3],
         [0.3],
 ])
@@ -1458,8 +1441,10 @@ phi=phi,background_contour=True,H=True,number_pixels=9,loss_function=loss_functi
 env=ffac_1d.FireflyTrue1d_cpu(arg)
 agent=agent.mu.cpu()
 
+# hessians
 H=compute_H(env, agent, theta_estimation, true_theta, phi, H_dim=10, trajectory_data=None, num_episodes=2,is1d=False)
 H=compute_H(env, agent, theta_estimation, true_theta, phi, H_dim=7, trajectory_data=None, num_episodes=20,is1d=True)
+H=compute_H(env, agent, theta_estimation, true_theta, phi, H_dim=11, trajectory_data=None, num_episodes=20,is1d=True)
 cov=theta_cov(H)
 stderr(cov)
 ev, evector=torch.eig(H,eigenvectors=True)

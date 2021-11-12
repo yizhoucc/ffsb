@@ -112,6 +112,7 @@ class SmoothAction1d(gym.Env):
     def distance(self,):
         return abs(self.s[0])
 
+
 class SmoothAction1dgamma(SmoothAction1d):
 
     def __init__(self) -> None:
@@ -168,6 +169,7 @@ class SmoothAction1dgamma(SmoothAction1d):
         self.trial_reward=0.
         self.start=False
         return self.wrap_decision_info()
+
 
 class SmoothAction1dRewardRate(SmoothAction1d):
 
@@ -231,6 +233,7 @@ class SmoothAction1dRewardRate(SmoothAction1d):
         if self.if_stop(): # start then stop
             scalar=-1
         return scalar*self.stop_punish
+
 
 class Smooth1dCrossFade(SmoothAction1dRewardRate):
 
@@ -343,6 +346,20 @@ class Smooth1dCrossFade(SmoothAction1dRewardRate):
     def aux3(self,):
         return self.phi[1]/(self.distance()+self.phi[1])
 
+
+class Neural1d(SmoothAction1d):
+
+    def __init__(self) -> None:
+        super().__init__()
+        low=-np.inf
+        high=np.inf
+        self.observation_space = spaces.Box(low=low, high=high,shape=(5,),dtype=np.float32)
+
+    def wrap_decision_info(self,):
+        s=self.s.clone().detach()
+        if self.trial_timer>1: # obs does not have the locatoin
+            s[0]=0.
+        return torch.cat([s,self.phi])
 
 
 class Simple1d(gym.Env, torch.nn.Module): 
@@ -2611,9 +2628,10 @@ class Firefly1dsession(FireflyTrue1d):
 
 
 class FireFlyReady(gym.Env, torch.nn.Module): 
-# for paper, so it should have own functions
+    # for paper, so it should have own functions
 
     def __init__(self,arg=None,kwargs=None):
+        super(FireFlyReady, self).__init__()
         self.arg=arg
         self.min_distance = arg.goal_distance_range[0]
         self.max_distance = arg.goal_distance_range[1] 
@@ -2625,8 +2643,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.reward=arg.reward_amount
         low=-np.inf
         high=np.inf
-        self.action_space = spaces.Box(low=-1., high=1.,shape=(2,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=low, high=high,shape=(1,26),dtype=np.float32)
         self.cost_scale = arg.cost_scale
         self.presist_phi=                   arg.presist_phi
         self.agent_knows_phi=               arg.agent_knows_phi
@@ -2646,7 +2662,11 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.recent_trials=                 0
         self.debug=                         0
         self.noise_scale =                  1
-    
+        self.reward_ratio =                 1
+        obsdim=self.reset().shape[-1]
+        self.action_space = spaces.Box(low=-1., high=1.,shape=(2,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high,shape=(1,obsdim),dtype=np.float32)
+
     def reset(self,
                 pro_gains = None, 
                 pro_noise_stds = None,
@@ -2654,8 +2674,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 phi=None,
                 theta=None,
                 goal_position=None,
-                vctrl=0.,
-                wctrl=0.,
+                vctrl=torch.zeros(1).uniform_(0., 1.),
+                wctrl=torch.zeros(1).uniform_(-1., 1.),
                 obs_traj=None,
                 pro_traj=None,
                 ): 
@@ -2663,7 +2683,9 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             self.phi=phi
         elif not self.presist_phi and phi is None: # normal training, random a new phi for each trial
             self.phi=self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_noise_stds=obs_noise_stds)
-        
+        elif self.presist_phi and phi is not None:
+            self.phi=phi
+
         if theta is not None:
             self.theta=theta
         else:
@@ -2675,15 +2697,19 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.trial_timer = torch.zeros(1)
         self.trial_sum_cost=0.
         self.trial_sum_reward=0.
+        self.reset_state(goal_position=goal_position,vctrl=vctrl,wctrl=wctrl)
+        self.reset_belief()
+        self.o=torch.tensor([[0],[0]])
+        self.decision_info=self.wrap_decision_info(b=self.b, previous_action=self.previous_action, time=self.trial_timer, task_param=self.theta)
         if self.debug:
             self.obs_traj=obs_traj
             self.pro_traj=pro_traj
             self.trial_costs=[]
             self.trial_actions=[]
-        self.reset_state(goal_position=goal_position,vctrl=vctrl,wctrl=wctrl)
-        self.reset_belief()
-        self.o=torch.tensor([[0],[0]])
-        self.decision_info=self.wrap_decision_info(b=self.b, previous_action=self.previous_action, time=self.trial_timer, task_param=self.theta)
+            self.ss=[self.s.clone()]
+            self.bs=[self.b.clone()]
+            self.covs=[self.P.clone()]
+            self.actions=[]
         return self.decision_info.view(1,-1)
 
     def reset_state(self,goal_position=None,vctrl=0.,wctrl=0.):
@@ -2715,12 +2741,17 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         [vctrl*self.theta[0]],
         [wctrl*self.theta[1]]])
 
-    def wrap_decision_info(self,b=None,P=None, previous_action=None, time=None, task_param=None):
+    def wrap_decision_info(self,
+            b=None,
+            P=None, 
+            previous_action=None, 
+            time=None, 
+            task_param=None):
         task_param=task_param if task_param is not None else self.theta
         b=b if b is not None else self.b
         P=P if P is not None else self.P
         time=time if time is not None else self.trial_timer
-        previous_action=previous_action if previous_action is not None else self.a
+        previous_action=previous_action if previous_action is not None else self.previous_action
         prevv, prevw = torch.split(previous_action.view(-1), 1)
         px, py, angle, v, w = torch.split(b.view(-1), 1)
         relative_distance = torch.sqrt((self.goalx-px)**2+(self.goaly-py)**2).view(-1)
@@ -2808,9 +2839,19 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         reward, cost = self.caculate_reward()
         self.trial_sum_cost += cost
         self.trial_sum_reward += reward
+        if end_current_ep:
+            signal=(
+                (1-self.reward_ratio)*(self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5) 
+                + self.reward_ratio*(reward-cost))
+        else:
+            signal=self.reward_ratio*(reward-cost)
         if self.debug:
             self.trial_actions.append(action)
             self.trial_costs.append(cost)
+            self.ss.append(self.s.clone())
+            self.bs.append(self.b.clone())
+            self.covs.append(self.P.clone())
+            self.actions.append(action)
         if end_current_ep:
             if self.rewarded(): # eval based on belief.
                 self.recent_rewarded_trials+=1
@@ -2825,12 +2866,14 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 self.recent_skipped_trials=0
                 self.recent_trials=0
             print(
-            'distance, ', "{:.1f}".format((self.get_distance()[1]-self.goal_r).item()),
-            'stop',self.stop,
-            'reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost))
+            # 'distance, ', "{:.1f}".format((self.get_distance()[1]-self.goal_r).item()),
+            # 'stop',self.stop,
+            # 'reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost),
+            'rate {:.1f}'.format((self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5).item()) 
+            )
             # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}
         self.previous_action=action
-        return self.decision_info, reward-cost, end_current_ep, {}
+        return self.decision_info, signal, end_current_ep, {}
 
     def state_step(self,a, s): # update xy, then apply new action as new v and w
         next_s = self.update_state(s)
@@ -2850,7 +2893,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
 
     def update_state(self, state): # use v and w to update x y and heading
         px, py, angle, v, w = torch.split(state.view(-1), 1)
-        if v==0:
+        if v<=0:
             pass
         elif w==0:
             px = px + v*self.dt * torch.cos(angle)
@@ -2860,12 +2903,13 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             py = py+torch.cos(angle)*(v/w-(v*torch.cos(w*self.dt)/w))+torch.sin(angle)*((v*torch.sin(w*self.dt)/w))
         angle = angle + w* self.dt
         angle = torch.clamp(angle,-pi,pi)
-        px = torch.clamp(px, -self.max_distance, self.max_distance) 
-        py = torch.clamp(py, -self.max_distance, self.max_distance) 
+        # px = torch.clamp(px, -self.max_distance, self.max_distance) 
+        # py = torch.clamp(py, -self.max_distance, self.max_distance) 
         next_s = torch.stack((px, py, angle, v, w ))
         return next_s.view(-1,1)
 
-    def caculate_reward(self):
+    #  v2  
+    # def caculate_reward(self):
         # cost=self.action_cost(self.a, self.previous_action)
         # _,d= self.get_distance(state=self.b)
         # if self.stop:
@@ -2884,10 +2928,13 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         #     # reward=(self.goal_r/d)**2
         #     reward=torch.tensor([0.])
         # reward+= (1-self.cost_scale)*self.reward*min(self.goal_r/d,1)*0.01
+
+        # v2
+    def caculate_reward(self):
         reward=torch.tensor([0.])
         cost=self.action_cost(self.a, self.previous_action)
         _,d= self.get_distance(state=self.b)
-        if self.stop: # only evaluate reward when stop.
+        if self.rewarded(): # only evaluate reward when stop near enough.
             rew_std = self.goal_r/2 
             mu = torch.Tensor([self.goalx,self.goaly])-self.b[:2,0]
             R = torch.eye(2)*rew_std**2 
@@ -2908,8 +2955,21 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 print('P', P)
                 print('R', R)
             reward = self.reward * reward  
-            reward+=(1-self.cost_scale) # stop reward, no matter what
-        reward-=(d-self.prev_d)*(1-self.cost_scale) # approaching reward
+            # reward+=(1-self.cost_scale)*self.dt # stop reward, no matter what
+        # reward+(self.prev_d-d)*(1-self.cost_scale)*self.dt # approaching reward
+        # reward-=torch.norm(self.a)*self.dt
+        return reward.item(), cost.item()
+
+    #v3
+    def caculate_reward(self):
+        reward=torch.tensor([0.])
+        cost=self.action_cost(self.a, self.previous_action)
+        if self.rewarded(): # only evaluate reward when stop near enough.
+            mu = self.b[:2,0]-torch.Tensor([self.goalx,self.goaly])
+            P = self.P[:2,:2]
+            alpha = -0.5 * mu @ P.inverse() @ mu.t()
+            reward_prob = torch.exp(alpha)
+            reward = self.reward * reward_prob 
         return reward.item(), cost.item()
     
     def action_cost(self, action, previous_action):
@@ -2919,13 +2979,15 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         action[0,1]=-1.0 if action[0,1]<-1.0 else action[0,1]
         vcost=(action[0,0]-previous_action[0,0])**2*self.theta[7]
         wcost=(action[0,1]-previous_action[0,1])**2*self.theta[8]
+        # if abs(action[0,0]-previous_action[0,0])<0.15:
+        #     vcost=vcost*0
+        # if abs(action[0,1]-previous_action[0,1])<0.15:
+        #     wcost=wcost*0
         cost=vcost+wcost
         # mincost=1/10/10*20 #1/20^2 min cost per dt, for 20 dts.
         mincost=2
         scalar=self.reward/mincost
         cost=cost*scalar
-        if abs(action[0,0]-previous_action[0,0])<0.1 and abs(action[0,1]-previous_action[0,1])<0.1:
-            cost=cost*0
         return cost*self.cost_scale
 
     def unpack_theta(self):
@@ -3037,6 +3099,9 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         vw[0] =  vw[0] + noisev
         vw[1] =  vw[1] + noisew
         return vw.view(-1,1)
+    
+    def obs_err(self,):
+        return torch.distributions.Normal(0,torch.ones(2)).sample()*(self.theta[4:6].view(-1))
 
     def observations_mean(self, s):
         vw = s.view(-1)[-2:]
@@ -3061,21 +3126,252 @@ class FireFlyReady(gym.Env, torch.nn.Module):
     def forward(self, action,task_param,state=None, giving_reward=None):
         action=torch.tensor(action).reshape(1,-1)
         self.a=action
-        self.episode_time=self.episode_time+1
+        _, self.prev_d=self.get_distance(state=self.b)
+        self.trial_timer+=1
         self.sys_vel=torch.norm(action)
         if not self.if_agent_stop(sys_vel=self.sys_vel) and not self.agent_start:
             self.agent_start=True
         if self.agent_start:
             self.stop=True if self.if_agent_stop(sys_vel=self.sys_vel) else False 
-        end_current_ep=(self.stop or self.episode_time>=self.episode_len)
+        end_current_ep= self.rewarded() or self.trial_timer>=self.episode_len
         # dynamic
         if state is None:
             self.s=self.state_step(action,self.s)
         else:
             self.s=state
-            self.previous_action=action
         self.o=self.observations(self.s)
-        self.o_mu=self.observations_mean(self.s)
         self.b, self.P=self.belief_step(self.b,self.P,self.o,action)
-        self.decision_info=self.wrap_decision_info(b=self.b,P=self.P, time=self.episode_time,task_param=self.theta)
+        self.decision_info=self.wrap_decision_info(previous_action=action,task_param=self.theta)
+        # eval
+        # reward, cost = self.caculate_reward()
+        # self.trial_sum_cost += cost
+        # self.trial_sum_reward += reward
+        # if end_current_ep:
+        #     signal=(
+        #         (1-self.reward_ratio)*(self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5) 
+        #         + self.reward_ratio*(reward-cost))
+        # else:
+        #     signal=self.reward_ratio*(reward-cost)
+        # if self.debug:
+        #     self.trial_actions.append(action)
+        #     self.trial_costs.append(cost)
+        #     self.ss.append(self.s.clone())
+        #     self.bs.append(self.b.clone())
+        #     self.covs.append(self.P.clone())
+        #     self.actions.append(action)
+        # if end_current_ep:
+        #     if self.rewarded(): # eval based on belief.
+        #         self.recent_rewarded_trials+=1
+        #     if self.skipped():
+        #         self.recent_skipped_trials+=1
+        #     self.recent_trials+=1
+        #     self.trial_counter+=1
+        #     # print(self.trial_counter)
+        #     if self.trial_counter!=0 and self.trial_counter%10==0:
+        #         print('rewarded: ',self.recent_rewarded_trials, 'skipped: ', self.recent_skipped_trials, ' out of total: ', self.recent_trials)
+        #         self.recent_rewarded_trials=0
+        #         self.recent_skipped_trials=0
+        #         self.recent_trials=0
+        #     print(
+        #     # 'distance, ', "{:.1f}".format((self.get_distance()[1]-self.goal_r).item()),
+        #     # 'stop',self.stop,
+        #     # 'reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost),
+        #     'rate {:.1f}'.format((self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5).item()) 
+        #     )
+        #     # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}
+        self.previous_action=action
         return self.decision_info, end_current_ep
+
+
+class FireFlyReadySession(FireFlyReady): 
+    '''
+        final training, with session structure
+        narrow theta range.
+        
+    '''
+
+    def __init__(self,arg=None,**kwargs):
+        super(FireFlyReadySession, self).__init__(arg)
+        if 'session_len' in kwargs:
+            self.session_len=kwargs['session_len']
+        else:
+            self.session_len=800
+
+    def reset(self,
+                pro_gains = None, 
+                pro_noise_stds = None,
+                obs_noise_stds = None,
+                phi=None,
+                theta=None,
+                goal_position=None,
+                vctrl=0.,
+                wctrl=0.,
+                obs_traj=None,
+                pro_traj=None,
+                newsession=True
+                   ): 
+        if newsession:
+            print('new sess------------------------------')
+            self.session_timer=torch.zeros(1)
+            if not self.presist_phi and phi is not None: # when given phi upon reset, use this
+                self.phi=phi
+            elif not self.presist_phi and phi is None: # normal training, random a new phi for each trial
+                self.phi=self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_noise_stds=obs_noise_stds)
+            elif self.presist_phi and phi is not None:
+                self.phi=phi
+
+            if theta is not None:
+                self.theta=theta
+            else:
+                self.theta=self.phi if self.agent_knows_phi else self.reset_task_param(pro_gains=pro_gains,pro_noise_stds=pro_noise_stds,obs_noise_stds=obs_noise_stds)
+            self.unpack_theta()
+        self.sys_vel=torch.zeros(1)
+        self.stop=False 
+        self.agent_start=False 
+        self.trial_timer = torch.zeros(1)
+        self.trial_sum_cost=0.
+        self.trial_sum_reward=0.
+        self.reset_state(goal_position=goal_position,vctrl=vctrl,wctrl=wctrl)
+        self.reset_belief()
+        self.o=torch.tensor([[0],[0]])
+        self.decision_info=self.wrap_decision_info(b=self.b, previous_action=self.previous_action, time=self.trial_timer, task_param=self.theta)
+        if self.debug:
+            self.obs_traj=obs_traj
+            self.pro_traj=pro_traj
+            self.trial_costs=[]
+            self.trial_actions=[]
+            self.ss=[self.s.clone()]
+            self.bs=[self.b.clone()]
+            self.covs=[self.P.clone()]
+            self.actions=[]
+        return self.decision_info.view(1,-1)
+
+    
+    def step(self, action,next_state=None):
+        '''
+            session timer ++
+            done = session ends
+        '''
+
+        action=torch.tensor(action).reshape(1,-1)
+        self.a=action
+        _, self.prev_d=self.get_distance(state=self.b)
+        self.trial_timer+=1
+        self.session_timer+=1
+        self.sys_vel=torch.norm(action)
+        if not self.if_agent_stop(sys_vel=self.sys_vel) and not self.agent_start:
+            self.agent_start=True
+        if self.agent_start:
+            self.stop=True if self.if_agent_stop(sys_vel=self.sys_vel) else False 
+        # dynamic
+        if next_state is None:
+            self.s=self.state_step(action,self.s)
+        else:
+            self.s=next_state
+        self.o=self.observations(self.s)
+        self.b, self.P=self.belief_step(self.b,self.P,self.o,action)
+        self.decision_info=self.wrap_decision_info(previous_action=action,task_param=self.theta)
+        # eval
+        reward, cost = self.caculate_reward()
+        self.trial_sum_cost += cost
+        self.trial_sum_reward += reward
+        end_current_ep= self.rewarded() or self.trial_timer>=self.episode_len
+        if end_current_ep:
+            signal=(
+                (1-self.reward_ratio)*(self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5) 
+                + self.reward_ratio*(reward-cost))
+        else:
+            signal=self.reward_ratio*(reward-cost)
+        self.previous_action=action
+
+        if self.debug:
+            self.trial_actions.append(action)
+            self.trial_costs.append(cost)
+            self.ss.append(self.s.clone())
+            self.bs.append(self.b.clone())
+            self.covs.append(self.P.clone())
+            self.actions.append(action)
+        if end_current_ep and self.session_timer<self.session_len:
+            if self.rewarded(): # eval based on belief.
+                self.recent_rewarded_trials+=1
+            if self.skipped():
+                self.recent_skipped_trials+=1
+            self.recent_trials+=1
+            self.trial_counter+=1
+            # print(self.trial_counter)
+            if self.trial_counter!=0 and self.trial_counter%10==0:
+                print('rewarded: ',self.recent_rewarded_trials, 'skipped: ', self.recent_skipped_trials, ' out of total: ', self.recent_trials)
+                self.recent_rewarded_trials=0
+                self.recent_skipped_trials=0
+                self.recent_trials=0
+            print(
+                # 'distance, ', "{:.1f}".format((self.get_distance()[1]-self.goal_r).item()),
+                # 'stop',self.stop,
+                'reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost),
+                # 'rate {:.1f}'.format((self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5).item()) 
+                )
+            # print('sess time', self.session_timer)
+            self.reset(newsession=False)
+            return self.decision_info, signal, False, {}
+            # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}
+        elif self.session_timer>=self.session_len:
+            return self.decision_info, signal, True, {}
+        else: 
+            return self.decision_info, signal, False, {}
+
+    def caculate_reward(self):
+        reward=torch.tensor([0.])
+        cost=self.action_cost(self.a, self.previous_action)
+        if self.rewarded(): # only evaluate reward when stop near enough.
+            mu = self.b[:2,0]-torch.Tensor([self.goalx,self.goaly])
+            P = self.P[:2,:2]
+            alpha = -0.5 * mu @ P.inverse() @ mu.t()
+            reward_prob = torch.exp(alpha) /2 / pi /torch.sqrt(P.det())
+            reward_prob=torch.min(torch.ones(1),reward_prob)
+            reward = self.reward * reward_prob 
+        return reward.item(), cost.item()
+
+
+class FireFlyPaper(FireFlyReady): 
+    # return no time, 
+
+    def wrap_decision_info(self,
+            b=None,
+            P=None, 
+            previous_action=None, 
+            time=None, 
+            task_param=None):
+        task_param=task_param if task_param is not None else self.theta
+        b=b if b is not None else self.b
+        P=P if P is not None else self.P
+        time=time if time is not None else self.trial_timer
+        previous_action=previous_action if previous_action is not None else self.previous_action
+        prevv, prevw = torch.split(previous_action.view(-1), 1)
+        px, py, angle, v, w = torch.split(b.view(-1), 1)
+        # relative_distance = torch.sqrt((self.goalx-px)**2+(self.goaly-py)**2).view(-1)
+        relative_angle = torch.atan((self.goaly-py)/(self.goalx-px)).view(-1)-angle
+        relative_angle = torch.clamp(relative_angle,-pi,pi)
+        # vecL = bcov2vec(P)
+        rotationmatrix=lambda x : torch.tensor([[torch.cos(x),-torch.sin(x)],[torch.sin(x),torch.cos(x)]])
+        r=rotationmatrix(angle)
+        P = P[:2,:2]
+        rotatedP=r.t()@P@r
+        rotatedP=rotatedP.view(-1)[[0,1,3]] #discrod the yx entry.
+        mu = b[:2,0]-torch.Tensor([self.goalx,self.goaly])
+        alpha = -0.5 * mu @ P.inverse() @ mu.t()
+        reward_prob = torch.exp(alpha).view(-1)
+
+        relative_distance=torch.norm(mu).view(-1)
+        decision_info = torch.cat([
+            relative_distance, 
+            relative_angle, 
+            rotatedP, 
+            reward_prob,
+            v, 
+            w, 
+            prevv,
+            prevw,
+            task_param.view(-1)])
+            
+        return decision_info.view(1, -1)
+

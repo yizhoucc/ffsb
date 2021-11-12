@@ -1,6 +1,8 @@
 
 # collections of functions for inverse control
 
+import pickle
+import warnings
 import torch
 from torch import nn
 import numpy as np
@@ -22,8 +24,8 @@ import tqdm
 import torch 
 import numpy as np
 import itertools
-
-
+from concurrent import futures
+from monkey_functions import data_iter
 
 def reset_theta_log(gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
     '''
@@ -249,8 +251,7 @@ def single_theta_inverse(arg, env, agent, filename,
                 for i in range(len(theta)):
                     if i in fixed_param_ind:
                         theta.grad[i]=0.
-            optT.step() # performing single optimize step: this changes theta
-            # theta.data[:6,0]=theta.data[:6,0].clamp(1e-3,999)
+            optT.step() 
             theta.data[:,0]=theta.data[:,0].clamp(1e-3,999)
             theta_log.append(theta.clone().detach())
 
@@ -284,7 +285,181 @@ def single_theta_inverse(arg, env, agent, filename,
         savename=('inverse_data/' + filename + '.pkl')
         torch.save(save_dict, savename)
 
+
+def monkey_inverse(arg, env, agent, filename, 
+                number_updates=10,
+                phi=None,init_theta=None,
+                trajectory_data=None, 
+                batchsize=50,
+                use_H=False, 
+                is1d=False, 
+                fixed_param_ind=None, 
+                assign_true_param=None,
+                task=None, 
+                gpu=True,
+                action_var=0.1,
+                **kwargs):
+    env.agent_knows_phi=False
+    env.presist_phi=True
+    if phi is None:
+        raise ValueError('need to provide phi!')   
+    if trajectory_data is None:
+        raise ValueError('need to provide monkey trajectory!')   
+    phi=phi.clone().detach()
+    # phi=torch.nn.Parameter(phi)
+    if init_theta is not None:
+            init_theta = init_theta 
+    else:
+        init_theta=env.reset_task_param().view(-1,1)
+    theta=torch.nn.Parameter(init_theta.clone().detach())
+
+    if gpu:
+        theta.cuda()
+        phi.cuda()
+
+    print('initial theta: \n',theta)
+    save_dict={'theta_estimations':[theta.data.clone().tolist()]}
+    save_dict['true_theta']=theta.data.clone().tolist()
+    save_dict['phi']=phi.data.clone().tolist()
+    save_dict['inital_theta']=theta.data.clone().tolist()
+    save_dict['Hessian']=[]
+    save_dict['theta_cov']=[]
+    save_dict['H_trace']=[]
+    save_dict['theta_std']=[]
+    save_dict['initial_lr']=arg.ADAM_LR
+    save_dict['lr_stepsize']=arg.LR_STEP
+    save_dict['sample_size']=arg.sample
+    save_dict['batch_size']=arg.batch
+    save_dict['updates_persample']=arg.NUM_IT
+    save_dict['loss']=[]
+    save_dict['grad']=[]
+    # prepare the logs
+    loss_log = []
+    theta_log = []
+    gradient=[]
+    env.reset(phi=phi)
+    optT = torch.optim.Adam([theta], lr=arg.ADAM_LR)
+    scheduler = torch.optim.lr_scheduler.StepLR(optT, step_size=arg.LR_STEP, gamma=arg.lr_gamma) 
+    mkstates, mkactions, mktasks=trajectory_data
+    for epoch in range(arg.NUM_IT):
+        batchsize=int((epoch//arg.NUM_IT)*len(mktasks))+arg.batch
+        for states, actions, tasks in data_iter(batchsize,mkstates,mkactions,mktasks):
+            if arg.LR_STOP < scheduler.get_lr()[0]:
+                scheduler.step()
+            for it in range(number_updates):
+                loss = monkeyloss(agent, actions, tasks, phi, theta, env, action_var=action_var,
+                        num_iteration=1, states=states, samples=arg.sample,gpu=gpu)
+                loss_log.append(loss.clone().detach().cpu().item())
+                optT.zero_grad() 
+                tik=time.time()
+                loss.backward(retain_graph=True) 
+                print('backward time {:.0f}'.format(time.time()-tik))
+                gradient.append(theta.grad.clone().detach())
+                print('loss :', loss.clone().detach().cpu().item())
+                save_dict['loss'].append(loss.clone().detach().cpu().item())
+                print('gradient :', theta.grad.clone().detach())
+                save_dict['grad'].append(theta.grad.clone().detach().cpu().item())
+                if fixed_param_ind is not None:
+                    for i in range(len(theta)):
+                        if i in fixed_param_ind:
+                            theta.grad[i]=0.
+                optT.step()         
+                theta.data[:,0]=theta.data[:,0].clamp(1e-3,999)
+                theta_log.append(theta.clone().detach())
+
+                # compute H
+                if use_H:
+                    grads = torch.autograd.grad(loss, theta, create_graph=True)[0]
+                    H = torch.zeros(len(theta),len(theta))
+                    for i in range(len(theta)):
+                        print('param', i)
+                        H[i] = torch.autograd.grad(grads[i], theta, retain_graph=True)[0].view(-1)
+                    save_dict['Hessian'].append(H)
+                    save_dict['H_trace'].append(np.trace(H))
+                    cov=np.linalg.inv(H)
+                    save_dict['theta_cov'].append(cov)
+                    theta_std=np.sqrt(np.diag(cov)).tolist()
+                    save_dict['theta_std'].append(theta_std)
+                    print('H_trace: \n',np.trace(H))
+                    print('std err: \n',theta_std)
+                # loss_diff.append(torch.abs(prev_loss - loss))
+                # prev_loss = loss.data
+                #     #print("num_theta:{}, num:{}, loss:{}".format(n, it, np.round(loss.data.item(), 6)))
+                #     #print("num:{},theta diff sum:{}".format(it, 1e6 * (true_theta - theta.data.clone()).sum().data))
+                print('epoch: ', epoch, 'batchsize',batchsize,'\n')
+                print('converged_theta:\n{}'.format( theta.data.clone() ) )
+                # print('true theta:     \n{}'.format(true_theta.data.clone()))
+                # print('loss: \n',loss)
+                print('learning rate: \n', scheduler.get_lr()[0])
+                    # print('\ngrad     ', theta.grad.data.clone())
+                print('\n')
+            save_dict['theta_estimations'].append(theta.data.clone().tolist())
+            savename=('inverse_data/' + filename + '.pkl')
+            torch.save(save_dict, savename)
+
+
+def monkeyloss(agent=None, 
+            actions=None, 
+            tasks=None, 
+            phi=None, 
+            theta=None, 
+            env=None,
+            num_iteration=1, 
+            states=None, 
+            samples=1, 
+            gpu=False,
+            action_var=0.1):
+    if gpu:
+        logPr = torch.zeros(1).cuda()[0] #torch.FloatTensor([])
+    else:
+        logPr = torch.zeros(1)[0] #torch.FloatTensor([])
     
+    def _wrapped_call(ep, task):     
+        logPr_ep = torch.zeros(1).cuda()[0] if gpu else torch.zeros(1)[0]   
+        for sample_index in range(samples): 
+            mkactionep = actions[ep][1:] # a0 is inital condition
+            if mkactionep==[] or mkactionep.shape[0]==0:
+                continue
+            env.reset(theta=theta, phi=phi, goal_position=task, vctrl=mkactionep[0][0],wctrl=mkactionep[0][1])
+            for t,mk_action in enumerate(mkactionep[1:]): # use a t and s t (treat st as st+1)
+                # agent's action
+                action = agent(env.decision_info)
+                # agent's obs, last step obs doesnt matter.
+                if type(states[ep])==list:
+                    nextstate=states[ep][1:][t]
+                elif type(states[ep])==torch.Tensor:
+                    nextstate=states[ep][1:][t].view(-1,1)
+                obs=env.observations(nextstate)
+                # agent's belief
+                env.b, env.P=env.belief_step(env.b,env.P, obs, torch.tensor(mk_action).view(1,-1))
+                previous_action=mk_action # current action is prev action for next time
+                env.trial_timer+=1
+                env.decision_info=env.wrap_decision_info(
+                                            previous_action=torch.tensor(previous_action), 
+                                            time=env.trial_timer)
+                # loss
+                action_loss = logll(torch.tensor(mk_action),action,std=np.sqrt(action_var))
+                obs_loss = logll(error=env.obs_err(), std=theta[4:6])
+                logPr_ep = logPr_ep + action_loss.sum() + obs_loss.sum()
+                action_loss.detach_()
+                obs_loss.detach_()
+        return logPr_ep/samples
+
+
+    # trial_ind=list(range(len(tasks)))
+    # with futures.ProcessPoolExecutor() as pool:
+    #     for logPr_ep in pool.map(_wrapped_call,trial_ind, tasks):
+    #             logPr = logPr + logPr_ep
+    tik=time.time()
+    for ep, task in enumerate(tasks):
+        logPr_ep=_wrapped_call(ep, task)
+        logPr += logPr_ep
+    regularization=torch.sum(1/(theta+1e-4))
+    print('calculate loss time {:.0f}'.format(time.time()-tik))
+
+    return logPr/len(tasks)+0.01*regularization
+
+
 def trajectory(agent, phi, theta, env, NUM_EP=100, 
             is1d=False, if_obs=False,etask=None, estate=None, 
             eaction=None,test_theta=None, return_belief=False):
@@ -377,6 +552,53 @@ def trajectory(agent, phi, theta, env, NUM_EP=100,
         return states, actions, tasks,belief
     else:
         return states, actions, tasks
+
+
+def trajectory_inverse(agent, phi, theta, env, NUM_EP=100, 
+            etask=None, estate=None, 
+            eaction=None,**kwargs):
+    # new version, optimzed for inverse
+    # change, only calculate belief (not running whole dynamic)
+    if etask is not None:
+        warnings.warn('need to provide inital condition!')
+        #------prepare saving vars-----
+    actions = [] # action
+    obs=[]
+    phi=torch.nn.Parameter(phi)
+    theta=torch.nn.Parameter(theta)
+    episode = 0
+    if eaction is None: 
+        warnings.warn('need to provide monkey actions!')
+    else: 
+        while episode < NUM_EP:
+            # get initial condition
+            env.reset(phi=phi,theta=theta,goal_position=etask[episode][0])
+            actions_ep = []
+            t=0
+            while t<len(eaction[episode]):
+                # choose action
+                if hasattr(agent,'actor'):
+                    action = agent.actor(env.decision_info)[0]
+                else:
+                    action = agent(env.decision_info)[0]
+                if type(estate[episode])==list:
+                    nextstate=estate[episode][t+1]
+                    # if  t+1<len(estate[episode]):
+                    #         _,done=env(eaction[episode][t],task_param=theta,state=estate[episode][t+1])                 
+                elif type(estate[episode])==torch.tensor:
+                    nextstate=estate[episode][:,t+1].view(-1,1)
+
+                    # if  t+1<(estate[episode].shape[1]):
+                    #     _,done=env(eaction[episode][t],task_param=theta,state=estate[episode][:,t+1].view(-1,1)) 
+                else:
+                    warnings.warn('need to provide monkey states!')
+                obs=env.observations(nextstate)
+                env.b=env.belief_step(env.b,env.P, obs, eaction[episode][t])
+                actions_ep.append(action)
+                t=t+1
+            actions.append(actions_ep)
+            episode +=1 
+    return None, actions, None
 
 
 def trajectory_(agent, theta, env, arg, gains_range, std_range, goal_radius_range, NUM_EP):
@@ -556,7 +778,7 @@ def getLoss(agent, actions, tasks, phi, theta, env, num_iteration=1, states=None
             # take out the teacher trajectories for one episode
             a_traj_ep = actions[ep]  
             # reset monkey's internal model, using the task parameters, estimation of theta
-            env.reset(theta=theta, phi=phi, goal_position=pos, initv=a_traj_ep[0][0])  
+            env.reset(theta=theta, phi=phi, goal_position=pos)#, initv=a_traj_ep[0][0])  
             # repeat for steps in episode
             for t,teacher_action in enumerate(a_traj_ep): 
                 if hasattr(agent,'actor'):
@@ -574,28 +796,23 @@ def getLoss(agent, actions, tasks, phi, theta, env, num_iteration=1, states=None
                             decision_info,_=env(teacher_action,task_param=theta, state=states[ep][:,t+1].view(-1,1))            
 
                 action_loss = logll(torch.tensor(teacher_action),action,std=np.sqrt(action_var))
-                obs_loss = logll(env.o, env.o_mu, std=theta.clone().detach()[4:6])
+                obs_loss = logll(env.o, env.observations_mean(env.s), std=theta.clone().detach()[4:6])
                 logPr_ep = logPr_ep + action_loss.sum() + obs_loss.sum()
                 action_loss.detach()
                 obs_loss.detach()
-
-            # # the first sample
-            # if sample_index==0:
-            #     max_logpr=logPr_ep
-            # else:
-            #     if max_logpr>logPr_ep:
-            #         # replace the neg logll with the new sampled logll
-            #         max_logpr=logPr_ep   
 
             logPr = logPr + logPr_ep
             logPr_ep.detach()
     return logPr
 
 
-def logll(true, estimate, std=0.3):
+def logll(true=None, estimate=None, std=0.3, error=None):
     # loss=1/std/torch.sqrt(torch.tensor([6.28]))*(torch.exp(-0.5*((estimate-true)/std)**2))
     # -torch.log(loss+0.001)
-    loss=torch.log(torch.sqrt(torch.tensor([6.28]))*std)+1/2*((estimate-true)/std)**2
+    if error is not None:
+        loss=torch.log(torch.sqrt(torch.tensor([2*pi]))*std)+1/2*(error/std)**2
+    else:
+        loss=torch.log(torch.sqrt(torch.tensor([6.28]))*std)+1/2*((estimate-true)/std)**2
     return loss
 
 
@@ -708,8 +925,13 @@ def load_inverse_data(filename):
       data=torch.load('inverse_data/{}'.format(filename))
   else:
       data=torch.load('inverse_data/{}.pkl'.format(filename))
+  data['filename']='inverse_data/{}.pkl'.format(filename)
   return data
 
+def save_inverse_data(inverse_data):
+    'save the loaded data dict as pkl'
+    filename=inverse_data['filename']
+    torch.save(inverse_data, filename)
 
 
 

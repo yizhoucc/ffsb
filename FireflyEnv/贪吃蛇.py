@@ -12,41 +12,60 @@ class MultiFF(Env):
             'vgain':1.,
             'wgain':0.7,
             'dt':0.1,
-            'reward_amount':100,
+            'reward_amount':1,
 
         }
-        self.world_size=1.
+        self.world_size=1
         self.n_firefly=10
         self.reso=10
-        self.vgain=arg['vgain']
-        self.wgain=arg['wgain']
-        self.dt=arg['dt']
         self.reward_amount=arg['reward_amount']
         low=-np.inf
         high=np.inf
-        self.action_space = spaces.Box(low=0., high=1.,shape=(2,), dtype=np.float32)
+        self.action_space = spaces.Discrete(5)
         self.observation_space = spaces.Box(low=low, high=high,shape=(self.reso,self.reso),dtype=np.int)
 
     def step(self,action=None,debug_info={},done=False):
+        self.trial_timer+=1
         action=torch.tensor(action)
         self.state_step(action)
         reward=self.calculate_reward()
         self.wrap_decision_info()
+        if self.countff()==0:
+            done=True
+            print(self.trial_timer)
         return self.decision_info, reward, done, debug_info
 
     def state_step(self,action):
-        dx=torch.cos(self.agentheading)*action[0]*self.vgain*self.dt
-        dy=torch.sin(self.agentheading)*action[0]*self.vgain*self.dt
-        self.agentx+=dx.item()
-        self.agenty+=dy.item()
-        self.agentheading+=action[1]*self.wgain*self.dt
+        '''
+        0 stay
+        1 up
+        2 down
+        3 left
+        4 right
+        '''
+
+        if action==3:
+            dx=-1
+        elif action==4:
+            dx=1
+        else:
+            dx=0
+
+        if action==1:
+            dy=1
+        elif action==2:
+            dy=-1
+        else:
+            dy=0        
+
+        self.agentx+=dx
+        self.agenty+=dy
         self.clamp2edge()
         self.state2image()
 
     def clamp2edge(self,):
-        self.agentx=torch.clamp(self.agentx,1e-6,1-1e-6)
-        self.agenty=torch.clamp(self.agenty,1e-6,1-1e-6)
-        self.agentheading=torch.clamp(self.agentheading,1e-6,2*pi-1e-6)
+        self.agentx=torch.clamp(self.agentx,0, self.reso-1)
+        self.agenty=torch.clamp(self.agenty,0, self.reso-1)
         
 
     def state2image(self,):
@@ -54,10 +73,11 @@ class MultiFF(Env):
             for j in range(self.s.shape[1]):
                 if self.s[i,j]==2:
                     self.s[1,j]-=2.
-        x,y=int(self.agentx//0.1),int(self.agenty//0.1)
+        x,y=int(self.agentx),int(self.agenty)
         self.s[x,y]+=2.
 
     def reset(self):
+        self.trial_timer=0
         self.s=torch.zeros(self.reso,self.reso)
         for i in range(self.n_firefly):
             self.add_ff()
@@ -71,7 +91,6 @@ class MultiFF(Env):
             else:
                 self.s[agentx,agenty]=2.
                 i+=1 
-        self.agentheading=torch.zeros(1).uniform_(0,2*pi)
         self.wrap_decision_info()
         return self.decision_info
     
@@ -79,7 +98,7 @@ class MultiFF(Env):
         reward=0.
         if self.reached_target():
             reward=self.reward_amount
-            print('reward', reward, 'nff', self.countff())
+            # print('reward', reward, 'nff', self.countff())
         return reward
 
     def wrap_decision_info(self,):
@@ -91,7 +110,7 @@ class MultiFF(Env):
             for j in range(self.s.shape[1]):
                 if self.s[i,j]==3:
                     self.s[i,j]-=1
-                    self.add_ff()
+                    # self.add_ff()
                     reached=True
         return reached
 
@@ -112,3 +131,8 @@ class MultiFF(Env):
                 if self.s[i,j]==1:
                     count+=1
         return count
+
+from stable_baselines3 import DQN
+env=MultiFF()
+model = DQN("MlpPolicy", env, verbose=1)
+model.learn(total_timesteps=1000000, log_interval=50)

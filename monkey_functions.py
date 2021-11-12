@@ -1,4 +1,5 @@
 import pickle
+from PIL.Image import ROTATE_90
 import torch
 import pandas
 import numpy as np
@@ -8,6 +9,80 @@ from matplotlib import pyplot as plt
 # testing imports
 
 
+# from __future__ import division
+# import numpy as np
+# import matplotlib.pyplot as plt
+
+# forwarddf=df[df.target_x<50][df.target_x>-50]
+# dataf=[]
+# for d in forwarddf.action_w:
+#     dataf.append(d)
+
+# ldf=df[df.target_x>90]
+# rdf=df[df.target_x<-90]
+# datas=[]
+# for d in ldf.action_w:
+#     datas.append(d)
+# for d in rdf.action_w:
+#     datas.append(d)
+
+
+# maxlen=0
+# for d in dataf:
+#     maxlen=max(maxlen,len(d))
+
+
+# p=[]
+# for d in datas:
+#     if len(d)<maxlen:
+#         d+=[0.]*(maxlen-len(d))
+#     ps = np.abs(np.fft.fft(d))**2
+#     time_step = 1 / 10
+#     freqs = np.fft.fftfreq(len(d), time_step)
+#     p.append(ps.tolist())
+
+# p=np.array(p)
+# meanp=np.mean(p,0)
+# idx = np.argsort(freqs)
+# plt.plot(freqs[idx], meanp[idx])
+# plt.xticks(rotation = 45)
+# plt.xlabel('Hz')
+# plt.ylabel('power specturm')
+
+# from scipy import signal
+# ys=[]
+# for d in dataf:
+#     if len(d)<maxlen:
+#         d+=[0.]*(maxlen-len(d))
+#     d=np.array(d)
+#     f, Pxx_den = signal.welch(d, 10)
+#     ys.append(Pxx_den.tolist())
+# ys=np.array(ys)
+# meanp=np.mean(ys,0)
+# plt.plot(f, meanp)
+# # plt.ylim([0.5e-3, 1])
+# plt.xlabel('frequency [Hz]')
+# plt.ylabel('PSD [V**2/Hz]')
+# plt.show()
+from operator import itemgetter 
+
+def dfdownsample(df,filename):
+    index=0
+    while index<df.shape[0]:
+        df.pos_x[index]=down_sampling(df.pos_x[index], 0.0012,0.1)
+        df.pos_y[index]=down_sampling(df.pos_y[index], 0.0012,0.1)
+        df.head_dir[index]=down_sampling(df.head_dir[index], 0.0012,0.1)
+        df.pos_r[index]=down_sampling(df.pos_r[index], 0.0012,0.1)
+        df.pos_v[index]=down_sampling(df.pos_v[index], 0.0012,0.1)
+        df.pos_w[index]=down_sampling(df.pos_w[index], 0.0012,0.1)
+        df.relative_radius[index]=down_sampling(df.relative_radius[index], 0.0012,0.1)
+        df.relative_angle[index]=down_sampling(df.relative_angle[index], 0.0012,0.1)
+        df.time[index]=down_sampling(df.time[index], 0.0012,0.1)
+        df.action_v[index]=down_sampling(df.action_v[index], 0.0012,0.1)
+        df.action_w[index]=down_sampling(df.action_w[index], 0.0012,0.1)
+        index+=1
+    df.to_pickle(filename)
+
 
 def load_monkey_data(filename, partial_obs=True):
 
@@ -15,8 +90,52 @@ def load_monkey_data(filename, partial_obs=True):
     df = pickle.load(infile)
     # throw out full obs trials
     if partial_obs:
-        df=df[df.isFullOn==False]
+        df=df[df.full_on==False]
     return df
+
+
+def data_iter(batch_size,states,actions,tasks):
+    num_samples=len(tasks)
+    allinds=list(range(num_samples))
+    np.random.shuffle(allinds)
+    for i in range(0, num_samples, batch_size):
+        batchinds=torch.tensor(allinds[i:min(i+batch_size, num_samples)])
+        yield itemgetter(*batchinds)(states),itemgetter(*batchinds)(actions),itemgetter(*batchinds)(tasks)
+
+
+def monkey_data_downsampled(df,factor=0.0025):
+    states = []
+    actions = []
+    tasks=[]
+    index=0
+    while index<df.shape[0]:
+        try:
+            if len(df.action_v[index])>2:
+                # process data.
+                # all angles into radius scale -pi/2
+                # x=y, y=-x (rotation)
+                xs=convert_unit(torch.tensor(df.pos_y[index], dtype=torch.float), factor=factor)
+                ys=-convert_unit(torch.tensor(df.pos_x[index], dtype=torch.float), factor=factor)
+                hs=pi/180*torch.tensor(df.head_dir[index], dtype=torch.float)-pi/2
+                vs=convert_unit(torch.tensor(df.pos_v[index], dtype=torch.float),factor=factor)
+                ws=pi/180*torch.tensor(df.pos_w[index], dtype=torch.float)
+                state=torch.stack([xs,ys,hs,vs,ws]).t()
+                
+                wctrls=torch.tensor(df.action_w[index]).float()
+                vctrls=torch.tensor(df.action_v[index]).float()
+                action=[vctrls,wctrls]
+                action=torch.stack(action).t()
+
+                task=[convert_unit(df.target_y[index],factor=factor),-convert_unit(df.target_x[index],factor=factor)]
+
+                states.append(state)
+                actions.append(action)
+                tasks.append(task)
+        except:
+            index+=1
+            continue
+        index+=1
+    return states, actions, tasks
 
 
 def monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.005):
@@ -24,9 +143,7 @@ def monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.005):
     states = [] # true location
     actions = [] # action
     tasks=[] # vars that define an episode
-
     orignal_dt=get_frame_rate(df, default_rate=0.0012)
-
     index=0
     while index<df.shape[0]:
         try:
@@ -55,7 +172,7 @@ def monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.005):
             # plt.plot(torch.atan2(torch.tensor((df.px[index])-df.FFX[index]),torch.tensor((df.py[index])-df.FFY[index]))-torch.tensor(df.real_relative_angle[index]*pi/180))
             # np.arctan((down_sampling(df.px[index], orignal_dt, 0.2)-df.FFX[index])/(down_sampling(df.py[index], orignal_dt, 0.2)-df.FFY[index]))-down_sampling(df.real_relative_angle[index]*pi/180, orignal_dt, 0.2)            
             task=[[ convert_unit(df.target_y[index],factor=factor)-initx,-convert_unit(df.target_x[index],factor=factor)-inity],convert_unit(goal_radius,factor=factor)]
-            action=[[v.astype('float32'),-w.astype('float32')] for v, w in zip(down_sampling(df.action_v[index], orignal_dt, new_dt),down_sampling(df.action_w[index], orignal_dt, new_dt))]
+            action=[[v.astype('float32'),w.astype('float32')] for v, w in zip(down_sampling(df.action_v[index], orignal_dt, new_dt),down_sampling(df.action_w[index], orignal_dt, new_dt))]
             states.append(state)
             actions.append(action)
             tasks.append(task)

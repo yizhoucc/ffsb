@@ -5,7 +5,7 @@ warnings.filterwarnings('ignore')
 from copy import copy
 import time
 import random
-from stable_baselines3 import SAC,PPO
+from stable_baselines3 import SAC,PPO,TD3
 seed=0
 random.seed(seed)
 import torch
@@ -46,8 +46,8 @@ arg.cost_scale=1
 
 arg.ADAM_LR = 0.007
 arg.LR_STOP=0.001
-arg.sample = 50 # samples for 1 mk trial
-arg.batch = 50
+arg.sample = 40 # samples for 1 mk trial
+arg.batch = 200
 arg.NUM_IT = 30 # iteration of all data
 number_updates=1 # update per batch
 # load torch model
@@ -65,7 +65,7 @@ number_updates=1 # update per batch
 # agent_=PPO.load('trained_agent/ppo_60000_9_8_1_21.zip')
 # agent = lambda x : agent_.predict(x)
 
-agent_=TD3_torch.TD3.load('trained_agent/paper.zip')
+agent_=TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
 
 # agent_ =SAC.load('trained_agent/re_iticosttimes_100000_3_17_0_40_11.zip')
@@ -107,17 +107,17 @@ phi=torch.tensor([[0.5],
         [0.001],
 ])
 
-theta=torch.tensor([[0.4584],
-        [1.4814],
-        [0.5913],
-        [0.5037],
-        [0.5060],
-        [0.5034],
-        [0.0451],
-        [0.5890],
-        [0.5880],
-        [0.0381],
-        [0.0231]])
+theta=torch.tensor([[0.3419],
+        [1.1250],
+        [0.2165],
+        [0.2362],
+        [0.3720],
+        [0.1858],
+        [0.0021],
+        [0.4856],
+        [1.0716],
+        [0.0183],
+        [0.2193]])
 
 # theta_estimation=torch.tensor(
 # [[0.2207319438457489],

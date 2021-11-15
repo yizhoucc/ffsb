@@ -358,7 +358,7 @@ def monkey_inverse(arg, env, agent, filename,
                 print('loss :', loss.clone().detach().cpu().item())
                 save_dict['loss'].append(loss.clone().detach().cpu().item())
                 print('gradient :', theta.grad.clone().detach())
-                save_dict['grad'].append(theta.grad.clone().detach().cpu().item())
+                save_dict['grad'].append(theta.grad.clone().detach().cpu())
                 if fixed_param_ind is not None:
                     for i in range(len(theta)):
                         if i in fixed_param_ind:

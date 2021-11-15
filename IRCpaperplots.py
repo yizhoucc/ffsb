@@ -251,14 +251,14 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
     for i in range(len(agent_actions)):
       ax2.plot(agent_actions[i],alpha=0.7)
     ax2.set_ylim([-1.1,1.1])
-  # dev and mag costs
-    ax2 = fig.add_subplot(6,nplots,n+nplots*2+1)
-    ax2.set_xlabel('t')
-    ax2.set_ylabel('costs')
-    ax2.set_title('costs')
-    for i in range(len(data['devcosts'])):
-      ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
-      # ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
+#   # dev and mag costs
+#     ax2 = fig.add_subplot(6,nplots,n+nplots*2+1)
+#     ax2.set_xlabel('t')
+#     ax2.set_ylabel('costs')
+#     ax2.set_title('costs')
+#     for i in range(len(data['devcosts'])):
+#       ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
+#       # ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
 
   # straight trails
   etask=[[0.7,0.0]]
@@ -293,14 +293,14 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
       ax2.plot(agent_actions[i],alpha=0.7)
     ax2.set_ylim([-1.1,1.1])
 
-    # dev and mag costs
-    ax2 = fig.add_subplot(6,nplots,n+nplots*5+1)
-    ax2.set_xlabel('t')
-    ax2.set_ylabel('costs')
-    ax2.set_title('costs')
-    for i in range(len(data['devcosts'])):
-      ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
-      # ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
+    # # dev and mag costs
+    # ax2 = fig.add_subplot(6,nplots,n+nplots*5+1)
+    # ax2.set_xlabel('t')
+    # ax2.set_ylabel('costs')
+    # ax2.set_title('costs')
+    # for i in range(len(data['devcosts'])):
+    #   ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
+    #   # ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
 
 def policygiventheta():
 
@@ -1497,6 +1497,24 @@ def plotoverhead_skip(input):
         fig.tight_layout(pad=0)
 
 
+# change theta in direction of mattered most eigen vector 
+def matter_most_eigen_direction():
+    theta_mean=torch.tensor([[0.5],
+            [1.57],
+            [0.5],
+            [0.5],
+            [0.5],
+            [0.5],
+            [0.13],
+            [0.5],
+            [0.5],
+            [0.5],
+            [0.5],
+    ])
+    mattermost=evector[0]
+    # matterleast=evector[-1]
+    diagnose_plot_theta(agent, env, phi, theta_init, theta_mean+4*mattermost.view(-1,1),4)
+    # diagnose_plot_theta(agent, env, phi, theta_init, theta_mean+3*matterleast.view(-1,1),3)
 
 
 
@@ -1507,8 +1525,7 @@ def plotoverhead_skip(input):
 
 
 
-env=ffacc_real.FireFlyReady(arg)
-# env=FireFlyPaper(arg)
+env=ffacc_real.FireFlyPaper(arg)
 # load monkey data
 with open("C:/Users/24455/Desktop/bruno_pert_downsample",'rb') as f: 
     df = pickle.load(f)
@@ -1522,7 +1539,7 @@ states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
 
 # load inverse data
 from InverseFuncs import *
-inverse_data=load_inverse_data('brunompert10_16_54')
+inverse_data=load_inverse_data('brunompert13_20_20')
 theta_trajectory=inverse_data['theta_estimations']
 true_theta=inverse_data['true_theta']
 theta_estimation=theta_trajectory[-1]
@@ -1583,7 +1600,7 @@ plotctrl(res)
 
 
 
-env=FireFlyPaper(arg)
+env=ffacc_real.FireFlyPaper(arg)
 ind=torch.randint(low=100,high=5000,size=(1,))
 pac=diagnose_dict(ind,'victorm2_17_28',
     agent=agent,env=env, monkeystate=True,
@@ -1674,7 +1691,11 @@ theta_final=torch.tensor([[0.4000],
         [0.1],
         [0.1],
 ])
-# diagnose_plot_theta(agent, env, phi, theta_init, theta_final,5)
+env=ffacc_real.FireFlyPaper(arg)
+diagnose_plot_theta(agent, env, phi, theta_init, theta_init+theta_final.view(-1,1),5)
+
+
+
 
 
 # 1. action change with change in belief vars
@@ -1952,65 +1973,6 @@ with initiate_plot(2, 2, 300) as fig, warnings.catch_warnings():
 ################################
 ######### work flow ############
 ################################
-#---------------------------------------------------------------------
-# load and process monkey's data
-# with open("C:/Users/24455/Desktop/viktor_normal_trajectory.pkl",'rb') as f:
-#     df = pickle.load(f)
-# states, actions, tasks=monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.002)
-
-#---------------------------------------------------------------------
-# example data for testing:
-# monkeytask=[x[0] for x in tasks[:2]]
-# monkeystate=states[:2]
-# monkeyaction=actions[:2]
-# num_trials=5
-# phi=phi
-# theta=theta
-
-phi=torch.tensor([[0.4000],
-        [1.57],
-        [0.01],
-        [0.01],
-        [0.01],
-        [0.01],
-        [0.13],
-        [0.1],
-        [0.1],
-        [0.1],
-        [0.1],
-])
-theta=torch.tensor([[0.4000],
-        [1.57],
-        [0.5],
-        [0.5],
-        [0.5],
-        [0.5],
-        [0.13],
-        [0.9],
-        [0.9],
-        [0.5],
-        [0.5],
-])
-theta=torch.tensor([[0.4000],
-        [1.57],
-        [0.7],
-        [0.7],
-        [0.2],
-        [0.2],
-        [0.13],
-        [0.9],
-        [0.9],
-        [0.5],
-        [0.5],
-])
-
-
-# with suppress():
-#     res=trial_data(input)
-# plotoverhead(res)
-# plotctrl(res)
-# # plotoverheadcolor(res)
-# testplot()
 
 
 
@@ -2019,7 +1981,6 @@ theta=torch.tensor([[0.4000],
 
 
 # assume the wrong gain and agent makes sense 
-
 def agent_double_gain():
     phi=torch.tensor([[0.4000],
             [1.57],
@@ -2187,6 +2148,16 @@ def agent_double_goalr():
     plotoverheadcolor(res2,linewidth=1,alpha=0.3,ax=ax)
     ax.get_figure()
 
+
+
+
+
+
+
+
+
+
+
 # Heissian polots
 def sample_batch(states=None, actions=None, tasks=None, batch_size=20,**kwargs):
     totalsamples=len(tasks)
@@ -2233,14 +2204,16 @@ def compute_H_monkey(env,
 
 H=compute_H_monkey(env, 
                     agent, 
-                    theta_estimation, 
+                    theta, 
                     phi, 
                     H_dim=11, 
-                    num_episodes=20,
-                    num_samples=2,
+                    num_episodes=9,
+                    num_samples=9,
                     monkeydata=(states, actions, tasks))           
 inverse_data['Hessian']=H
 save_inverse_data(inverse_data)
+
+matter_most_eigen_direction()
 
 stderr(torch.inverse(H))
 
@@ -2259,6 +2232,7 @@ with initiate_plot(5,5,300) as fig:
     plt.yticks(x_pos, [theta_names[i] for i in inds],ha='right')
     plt.xticks(x_pos, [theta_names[i] for i in inds],rotation=45,ha='right')
     add_colorbar(im)
+
 
 # correlation matrix
 b=torch.diag(torch.tensor(cov),0)
@@ -2459,16 +2433,6 @@ def monkey_loss_wrapped(
     
   return new_function
 
-
-H=compute_H_monkey(env, 
-                    agent, 
-                    theta_estimation, 
-                    phi, 
-                    H_dim=11, 
-                    num_episodes=50,
-                    monkeydata=(states, actions, tasks))
-inverse_data['Hessian']=H
-save_inverse_data(inverse_data)
 
 
 number_pixels=3

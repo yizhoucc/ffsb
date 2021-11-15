@@ -3375,3 +3375,48 @@ class FireFlyPaper(FireFlyReady):
             
         return decision_info.view(1, -1)
 
+class FireFlyPaperv2(FireFlyReady): 
+    # return only few things:
+    # distance, angle, uncertainty xy, to decide if to stop
+    # reward prob, a combined feature from distance and uncertainty 
+    # prev control, to decide the range of new actions
+    # goal r, action cost params
+
+    def wrap_decision_info(self,
+            b=None,
+            P=None, 
+            previous_action=None, 
+            time=None, 
+            task_param=None):
+        task_param=task_param if task_param is not None else self.theta
+        b=b if b is not None else self.b
+        P=P if P is not None else self.P
+        time=time if time is not None else self.trial_timer
+        previous_action=previous_action if previous_action is not None else self.previous_action
+        prevv, prevw = torch.split(previous_action.view(-1), 1)
+        px, py, angle, v, w = torch.split(b.view(-1), 1)
+        # relative_distance = torch.sqrt((self.goalx-px)**2+(self.goaly-py)**2).view(-1)
+        relative_angle = torch.atan((self.goaly-py)/(self.goalx-px)).view(-1)-angle
+        relative_angle = torch.clamp(relative_angle,-pi,pi)
+        # vecL = bcov2vec(P)
+        rotationmatrix=lambda x : torch.tensor([[torch.cos(x),-torch.sin(x)],[torch.sin(x),torch.cos(x)]])
+        r=rotationmatrix(angle)
+        P = P[:2,:2]
+        rotatedP=r.t()@P@r
+        rotatedP=rotatedP.view(-1)[[0,1,3]] #discrod the yx entry.
+        mu = b[:2,0]-torch.Tensor([self.goalx,self.goaly])
+        alpha = -0.5 * mu @ P.inverse() @ mu.t()
+        reward_prob = torch.exp(alpha).view(-1)
+
+        relative_distance=torch.norm(mu).view(-1)
+        decision_info = torch.cat([
+            relative_distance, 
+            relative_angle, 
+            rotatedP, 
+            reward_prob,
+            prevv,
+            prevw,
+            task_param[4:7].view(-1)])
+            
+        return decision_info.view(1, -1)
+

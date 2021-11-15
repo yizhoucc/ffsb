@@ -27,12 +27,12 @@ arg.training=True
 arg.presist_phi=False
 arg.agent_knows_phi=True
 arg.cost_scale=1
-env=ffacc_real.FireFlyPaper(arg)
+env=ffacc_real.FireFlyPaperv2(arg)
 env.no_skip=True
 n_actions = env.action_space.shape[-1]
 action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.2 * np.ones(n_actions))        
 modelname=None
-modelname='halfv2'
+# modelname='halfv2'
 note='re' 
 from stable_baselines3 import TD3
 

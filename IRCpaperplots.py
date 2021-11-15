@@ -1655,7 +1655,7 @@ trained agents can do the test, and theta alters the behavior.
 
 # 1. warpped up of agents with diff theta in a row
 
-phi=torch.tensor([[0.4000],
+phi=torch.tensor([[0.5000],
         [1.57],
         [0.01],
         [0.01],
@@ -1667,31 +1667,31 @@ phi=torch.tensor([[0.4000],
         [0.1],
         [0.1],
 ])
-theta_init=torch.tensor([[0.4000],
+theta_init=torch.tensor([[0.5000],
         [1.57],
         [0.1],
         [0.1],
         [0.1],
         [0.1],
-        [0.13],
+        [0.01],
         [0.1],
         [0.1],
         [0.1],
         [0.1],
 ])
-theta_final=torch.tensor([[0.4000],
+theta_final=torch.tensor([[0.5000],
         [1.57],
         [0.1],
         [0.1],
         [0.1],
+        [0.6],
+        [0.2],
         [0.1],
-        [0.13],
-        [0.9],
-        [0.9],
+        [0.1],
         [0.1],
         [0.1],
 ])
-env=ffacc_real.FireFlyPaper(arg)
+env.debug=True
 diagnose_plot_theta(agent, env, phi, theta_init, theta_init+theta_final.view(-1,1),5)
 
 

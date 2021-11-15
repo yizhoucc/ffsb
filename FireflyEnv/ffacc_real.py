@@ -2909,7 +2909,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         return next_s.view(-1,1)
 
     #  v2  
-    # def caculate_reward(self):
+    # def caculate_rewardv2(self):
         # cost=self.action_cost(self.a, self.previous_action)
         # _,d= self.get_distance(state=self.b)
         # if self.stop:
@@ -2933,7 +2933,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
     def caculate_reward(self):
         reward=torch.tensor([0.])
         cost=self.action_cost(self.a, self.previous_action)
-        _,d= self.get_distance(state=self.b)
+        # _,d= self.get_distance(state=self.b)
         if self.rewarded(): # only evaluate reward when stop near enough.
             rew_std = self.goal_r/2 
             mu = torch.Tensor([self.goalx,self.goaly])-self.b[:2,0]
@@ -2961,7 +2961,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         return reward.item(), cost.item()
 
     #v3
-    def caculate_reward(self):
+    def caculate_rewardv3(self):
         reward=torch.tensor([0.])
         cost=self.action_cost(self.a, self.previous_action)
         if self.rewarded(): # only evaluate reward when stop near enough.

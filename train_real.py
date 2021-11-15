@@ -11,13 +11,13 @@ from FireflyEnv import ffacc_real
 import torch
 
 arg.init_action_noise=0.5
-arg.goal_distance_range=[0.2,1] 
+arg.goal_distance_range=[0.1,1] 
 arg.mag_action_cost_range= [0.1,1.]
 arg.dev_action_cost_range= [0.1,1.]
 arg.dev_v_cost_range= [0.1,1.]
 arg.dev_w_cost_range= [0.1,1.]
-arg.gains_range =[0.2,1.,pi/2-0.6,pi/2+0.6]
-arg.goal_radius_range=[0.07,0.2]
+arg.gains_range =[0.1,1.,pi/2-0.6,pi/2+0.6]
+arg.goal_radius_range=[0.01,0.2]
 arg.std_range = [0.1,1,0.1,1]
 arg.reward_amount=100
 arg.terminal_vel = 0.1
@@ -62,17 +62,18 @@ if modelname is None:
         )
     train_time=100000
     for i in range(1,11):  
-        env.cost_scale=0
+        env.cost_scale=0.5
+        env.noise_scale=1
         if i==1:
             for j in range(1,11): 
                 # arg.std_range = [0.01,0.1*j,0.01,0.1*j]
-                # env.noise_scale=0.02*j
-                namestr= ("trained_agent/td3_{}_{}_{}_{}_{}".format(train_time,j,
+                env.cost_scale=0.02*j
+                namestr= ("trained_agent/paperv2_{}_{}_{}_{}_{}".format(train_time,j,
                 str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
                 ))
                 model.learn(train_time)
                 model.save(namestr)
-        namestr= ("trained_agent/td3_{}_{}_{}_{}_{}".format(train_time,i,
+        namestr= ("trained_agent/paperv2_{}_{}_{}_{}_{}".format(train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
         model.learn(train_time)

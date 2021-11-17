@@ -66,6 +66,15 @@ from matplotlib import pyplot as plt
 # plt.show()
 from operator import itemgetter 
 
+def datawash(df):
+    from pandas import concat
+    trialtypes={}
+    df=df[df.trial_dur<4]
+    df=concat([df[df.category=='skip'], df[df.category=='normal']])
+    trialtypes[1]=df[df.full_on == False]
+    
+    return df
+
 def dfdownsample(df,filename):
     index=0
     while index<df.shape[0]:

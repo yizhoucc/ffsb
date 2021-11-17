@@ -32,7 +32,7 @@ env.no_skip=True
 n_actions = env.action_space.shape[-1]
 action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.2 * np.ones(n_actions))        
 modelname=None
-# modelname='halfv2'
+modelname='paperv2'
 note='re' 
 from stable_baselines3 import TD3
 
@@ -55,7 +55,7 @@ if modelname is None:
         # target_noise_clip = 0.5,
         tensorboard_log = None,
         # create_eval_env = False,
-        policy_kwargs = {'net_arch':[64,64,64,32],'activation_fn':torch.nn.ReLU},
+        policy_kwargs = {'net_arch':[64,64],'activation_fn':torch.nn.ReLU},
         verbose = 0,
         seed = 42,
         device = "cpu",
@@ -64,16 +64,18 @@ if modelname is None:
     for i in range(1,11):  
         env.cost_scale=0.5
         env.noise_scale=1
+        env.cost_scale=0.02*i
         if i==1:
             for j in range(1,11): 
                 # arg.std_range = [0.01,0.1*j,0.01,0.1*j]
-                env.cost_scale=0.02*j
-                namestr= ("trained_agent/paperv2_{}_{}_{}_{}_{}".format(train_time,j,
+                env.noise_scale=0.1*j
+                env.cost_scale=0.
+                namestr= ("trained_agent/{}_{}_{}_{}_{}_{}".format(note,train_time,j,
                 str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
                 ))
                 model.learn(train_time)
                 model.save(namestr)
-        namestr= ("trained_agent/paperv2_{}_{}_{}_{}_{}".format(train_time,i,
+        namestr= ("trained_agent/{}_{}_{}_{}_{}_{}".format(note,train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
         model.learn(train_time)
@@ -93,8 +95,8 @@ else:
             )
         env.noise_scale=1
         train_time=50000
-        # env.cost_scale=min(0.1+0.05*i,1)
-        env.cost_scale=0.5
+        env.cost_scale=min(0.05*i,0.1)
+        # env.cost_scale=0.5
         # env.cost_scale=0.1
         env.reward_ratio=1
         namestr= ("trained_agent/{}{}_{}".format(note,modelname,i))

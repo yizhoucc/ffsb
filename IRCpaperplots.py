@@ -95,10 +95,10 @@ arg = Config()
 
 arg.presist_phi=True
 arg.agent_knows_phi=False
-arg.goal_distance_range=[0.4,1]
+arg.goal_distance_range=[0.1,1]
 arg.gains_range =[0.05,1.5,pi/4,pi/1]
-arg.goal_radius_range=[0.05,0.3]
-arg.std_range = [0.08,0.3,pi/80,pi/80*5]
+arg.goal_radius_range=[0.001,0.3]
+arg.std_range = [0.08,1,0.08,1]
 arg.mag_action_cost_range= [0.0001,0.001]
 arg.dev_action_cost_range= [0.0001,0.005]
 arg.dev_v_cost_range= [0.1,0.5]
@@ -231,7 +231,7 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
     data=sample_trials(agent, env, theta, phi, etask, num_trials=1)
     estate=data['estate']
     ax1.plot(estate[0,:],estate[1,:], color='r',alpha=0.5)
-    goalcircle = plt.Circle((etask[0][0],etask[0][1]), 0.13, color='y', alpha=0.5)
+    goalcircle = plt.Circle((etask[0][0],etask[0][1]), theta[6], color='y', alpha=0.5)
     ax1.add_patch(goalcircle)
     ax1.set_xlim([-0.1,1.1])
     ax1.set_ylim([-0.6,0.6])
@@ -271,7 +271,7 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
     data=sample_trials(agent, env, theta, phi, etask, num_trials=1)
     estate=data['estate']
     ax1.plot(estate[0,:],estate[1,:], color='r',alpha=0.5)
-    goalcircle = plt.Circle((etask[0][0],etask[0][1]), 0.13, color='y', alpha=0.5)
+    goalcircle = plt.Circle((etask[0][0],etask[0][1]), theta[6], color='y', alpha=0.5)
     ax1.add_patch(goalcircle)
     ax1.set_xlim([-0.1,1.1])
     ax1.set_ylim([-0.6,0.6])
@@ -682,6 +682,41 @@ def policygiventheta():
         orange_patch = mpatches.Patch(color=color_settings['w'], label='angular')
         ax.legend(handles=[teal_patch,orange_patch],loc='upper right',fontsize=6)
 
+def policygiventhetav2(n):
+    env.reset(phi=phi,theta=theta)
+    bl=torch.zeros(5)
+    # br=torch.tensor([0.0,0.0,0.0,0,0])
+    P=torch.eye(5) * 1e-8 
+    P[0,0]=(env.theta[9]*0.05)**2 # sigma xx
+    P[1,1]=(env.theta[10]*0.05)**2 # sigma yy
+    reso=30
+
+    with initiate_plot(10, 20, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        # vary ith
+        for i in range(n):
+            beliefl=env.wrap_decision_info().clone().detach()
+            beliefl[0,i]=0.
+            beliefr=beliefl.clone().detach()
+            beliefr[0,i]=1. 
+            delta=(beliefr-beliefl)/(reso-1)
+            actions=[]
+            with torch.no_grad():
+                for n in range(reso):
+                    b=beliefl+delta*n
+                    action=agent(b)[0]
+                    actions.append(action)
+            actions=torch.stack(actions)
+            ax = fig.add_subplot(10,5,i+1)
+            ax.set_xlim([0, 1]); ax.set_ylim([-1, 1])
+            ax.plot(np.linspace(0,1,reso), actions[:,0],color=color_settings['v'])
+            ax.plot(np.linspace(0,1,reso),actions[:,1],color=color_settings['w'])
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.axes.xaxis.set_ticks([0,0.5,1])
+            ax.set_title('{}th'.format(i))
+
+
 #---------------------------------------------------------------------
 # inversed theta with error bar
 def inversed_theta_bar(inverse_data):
@@ -816,8 +851,7 @@ def agentvsmk_skip(num_trials=10):
         'env': env,
         'num_trials':num_trials,
         'task':[tasks[i] for i in ind],
-        'mkdata':{
-                        },                      
+        'mkdata':{},                      
         'use_mk_data':False
     }
 
@@ -896,10 +930,7 @@ def plot_inverse_trend(theta_trajectory):
       ax=fig.add_subplot(1,numparams,n+1,)
       ax.plot([t[n] for t in theta_trajectory])
 
-################################
-######### ultils ###############
-################################
-#---------------------------------------------------------------------
+
 # make the input hashmap
 def input_formatter(**kwargs):
     result={}
@@ -948,8 +979,8 @@ def similar_trials(ind, tasks, actions):
       and tasks[i][0]<tasks[ind][0]+0.05 \
       and tasks[i][1]>tasks[ind][1]-0.03 \
       and tasks[i][1]<tasks[ind][1]+0.03 \
-      and actions[i][0]>actions[ind][0]-0.1 \
-      and actions[i][0]<actions[ind][0]+0.1:
+      and actions[i][0][0]>actions[ind][0][0]-0.1 \
+      and actions[i][0][1]<actions[ind][0][1]+0.1:
           indls.append(i)
   return indls
 
@@ -957,8 +988,6 @@ def similar_trials(ind, tasks, actions):
 def normalizematrix(data):
     return (data - np.min(data)) / (np.max(data) - np.min(data))
 
-#---------------------------------------------------------------------
-# ruiyi ultils
 
 def get_relative_r_ang(px, py, heading_angle, target_x, target_y):
     heading_angle = np.deg2rad(heading_angle)
@@ -1066,6 +1095,51 @@ def config_colors():
     return colors
 
 
+# Heissian polots
+def sample_batch(states=None, actions=None, tasks=None, batch_size=20,**kwargs):
+    totalsamples=len(tasks)
+    sampleind=torch.randint(0,totalsamples,(batch_size,)) # trial inds
+    sample_states=[states[i] for i in sampleind]
+    sample_actions=[actions[i] for i in sampleind]
+    sample_tasks=[tasks[i] for i in sampleind]
+    return sample_states, sample_actions, sample_tasks
+
+
+def compute_H_monkey(env, 
+                    agent, 
+                    theta_estimation, 
+                    phi, 
+                    H_dim=11, 
+                    num_episodes=1,
+                    num_samples=1,
+                    action_var=0.1,
+                    **kwargs):
+    # TODO integrate sample batch
+    states, actions, tasks=kwargs['monkeydata']
+    totalsamples=len(tasks)
+    sampleind=torch.randint(0,totalsamples,(num_episodes,)) # trial inds
+    sample_states=[states[i] for i in sampleind]
+    sample_actions=[actions[i] for i in sampleind]
+    sample_tasks=[tasks[i] for i in sampleind]
+    thistheta=torch.nn.Parameter(torch.Tensor(theta_estimation))
+    phi=torch.Tensor(phi)
+    phi.requires_grad=False
+    loss = monkeyloss(agent, sample_actions, sample_tasks, phi, 
+                        thistheta, env, 
+                        action_var=action_var,
+                        num_iteration=1, 
+                        states=sample_states, 
+                        samples=num_samples,
+                        gpu=False)
+    print('bp for grad')                    
+    grads = torch.autograd.grad(loss, thistheta, create_graph=True,allow_unused=True)[0]
+    H = torch.zeros(H_dim,H_dim)
+    for i in range(H_dim):
+        print('calculate {}th row of H'.format(i))
+        H[i] = torch.autograd.grad(grads[i], thistheta, retain_graph=True,allow_unused=True)[0].view(-1)
+    return H
+
+
 def convert_2d_response(x, y, z, xmin, xmax, ymin, ymax, num_bins=20, kernel_size=3, isconvolve=True):
     @njit
     def compute(*args):
@@ -1094,35 +1168,6 @@ def convert_2d_response(x, y, z, xmin, xmax, ymin, ymax, num_bins=20, kernel_siz
             data = convolve(data, kernel, boundary='extend')
     return xx, yy, data
 
-#---------------------------------------------------------------------
-# collect the agent trial data, give task (optional, mk data)
-    '''
-        trial data.
-        based on input, get agent data (w/wo mk data)
-
-        input:(
-                agent,                              nn 
-                env, gym                            obj
-                number of sampled trials,           int
-                use_mk_data,                        bool
-                task                                list
-                mkdata:{
-                    trial index                  int
-                    task,                        list
-                    actions,                     array/list of lists/none
-                    states}                      array/list of lists/none
-                    
-        log (
-                monkey trial index,                 int/none
-                monkey control,                     
-                monkey position (s),
-                agent control,
-                agent position (s),
-                belief mu,
-                cov,
-                theta,
-                )
-    '''
 
 def trial_data(input):
     '''
@@ -1230,7 +1275,7 @@ def trial_data(input):
                 t=0
                 while not done:
                     action = agent(env.decision_info)[0]
-                    if input['mkdata']['states'] is not None:
+                    if 'states' in input['mkdata']:
                         _,_,done,_=env.step(torch.tensor(action).reshape(1,-1),
                         next_state=input['mkdata']['states'][trial_i][t]) 
                     else:
@@ -1248,30 +1293,182 @@ def trial_data(input):
     return result
 
 
-#----inverse plots-----------------------------------------------------------------
+def inverse_trajectory_monkey(theta_trajectory,
+                    env=None,
+                    agent=None,
+                    phi=None, 
+                    background_data=None, 
+                    background_contour=False,
+                    number_pixels=10,
+                    background_look='contour',
+                    ax=None, 
+                    loss_sample_size=100, 
+                    H=None,
+                    action_var=0.1,
+                    **kwargs):
+    '''    
+        plot the inverse trajectory in 2d pc space
+        -----------------------------
+        input:
+        theta trajectory: list of list(theta)
+        method: PCA or other projections
+        -----------------------------
+        output:
+        background contour array and figure
+    '''
+    with torch.no_grad():
 
-'''
-    inverse converge data
-    2.  inputL(
-            theta trajectory(s),
-            phi,
+        # plot trajectory
+        fig = plt.figure(figsize=[8, 8])
+        ax = fig.add_subplot()
+        data_matrix=column_feature_data(theta_trajectory)
+        mu=np.mean(data_matrix,0)
+        try:
+            score, evectors, evals = pca(data_matrix)
+        except np.linalg.LinAlgError:
+            score, evectors, evals = pca(data_matrix)
+        # plot theta inverse trajectory
+        row_cursor=0
+        while row_cursor<score.shape[0]-1:
+            row_cursor+=1
+            ax.plot(score[row_cursor-1:row_cursor+1,0],
+                    score[row_cursor-1:row_cursor+1,1],
+                    '-',
+                    linewidth=0.1,
+                    color='g')
+            if row_cursor%20==0 or row_cursor==1:
+                ax.quiver(score[row_cursor-1, 0], score[row_cursor-1, 1],
+                        score[row_cursor, 0]-score[row_cursor-1, 0], score[row_cursor, 1]-score[row_cursor-1, 1],
+                        angles='xy',color='g',scale=0.2,width=1e-2, scale_units='xy')
+        ax.scatter(score[row_cursor, 0], score[row_cursor, 1], marker=(5, 1), s=200, color=[1, .5, .5])
+        ax.set_xlabel('projected parameters')
+        ax.set_ylabel('projected parameters')
 
-            param;{
-                background, bool,
-                uncertainty ellipse std,
-                }   
-                )
-        
-        log:(
-            heissian,
-            parameter uncertainties,
-            background pixel array,
-            uncertainty ellipse object(s),
-            pca convert function,
-            theta trajectory(s) in pc space,
-            phi in pc space,
-            )
-'''
+        # plot hessian
+        if H is not None:
+            cov=theta_cov(H)
+            cov_pc=evectors[:,:2].transpose()@np.array(cov)@evectors[:,:2]
+            plot_cov_ellipse(cov_pc,pos=score[-1,:2],alpha_factor=0.5,ax=ax)
+
+        # plot log likelihood contour
+        sample_states, sample_actions, sample_tasks=sample_batch(states=states,actions=actions,tasks=tasks,batch_size=loss_sample_size)
+        loss_function=monkey_loss_wrapped(env=env, 
+        agent=agent, 
+        phi=phi, 
+        states=sample_states,
+        actions=sample_actions,
+        action_var=action_var,
+        tasks=sample_tasks,)
+        current_xrange=list(ax.get_xlim())
+        current_xrange[0]-=0.1
+        current_xrange[1]+=0.1
+        current_yrange=list(ax.get_ylim())
+        current_yrange[0]-=0.1
+        current_yrange[1]+=0.1
+        xyrange=[current_xrange,current_yrange]
+        print('start background')
+        if background_contour:
+            background_data=plot_background(
+                ax, 
+                xyrange,
+                mu, 
+                evectors, 
+                loss_function, 
+                number_pixels=number_pixels,
+                look=background_look,
+                background_data=background_data)
+
+        return background_data
+
+
+def plot_background(
+    ax, 
+    xyrange,
+    mu, 
+    evectors, 
+    loss_function, 
+    number_pixels=10, 
+    look='contour', 
+    alpha=0.5,
+    background_data=None,
+    **kwargs):
+    with torch.no_grad():
+        X,Y=np.meshgrid(np.linspace(xyrange[0][0],xyrange[0][1],number_pixels),np.linspace(xyrange[1][0],xyrange[1][1],number_pixels))
+        if background_data is None:
+            background_data=np.zeros((number_pixels,number_pixels))
+            for i,u in enumerate(np.linspace(xyrange[1][0],xyrange[1][1],number_pixels)):
+                for j,v in enumerate(np.linspace(xyrange[0][0],xyrange[0][1],number_pixels)):
+                    score=np.array([u,v])
+                    reconstructed_theta=score@evectors.transpose()[:2,:]+mu
+                    reconstructed_theta=torch.tensor(reconstructed_theta).float()
+                    # if not np.array_equal(reconstructed_theta,reconstructed_theta.clip(1e-8,999)):
+                    #     background_data[i,j]=np.nan
+                    #     print(reconstructed_theta)
+                    # else:
+                    #     # reconstructed_theta=nn.Parameter(torch.Tensor(reconstructed_theta))
+                    background_data[i,j]=loss_function(reconstructed_theta)
+        if look=='contour':
+            ax.contourf(X,Y,background_data.transpose(),alpha=alpha,zorder=1)
+        # elif look=='pixel':
+        #     im=ax.imshow(X,Y,background_data,alpha=alpha,zorder=1)
+        #     add_colorbar(im)
+        return background_data
+
+
+def monkey_loss_wrapped(
+                env=None, 
+                agent=None, 
+                phi=None, 
+                actions=None,
+                tasks=None,
+                states=None,
+                num_episodes=10,
+                gpu=False,
+                action_var=0.001,
+                **kwargs):
+  new_function= lambda theta_estimation: monkeyloss(
+            agent=agent, 
+            actions=actions, 
+            tasks=tasks, 
+            phi=phi, 
+            theta=theta_estimation, 
+            env=env,
+            num_iteration=1, 
+            states=states, 
+            samples=num_episodes, 
+            action_var=action_var,
+            gpu=gpu)
+    
+  return new_function
+
+def plot_background_ev(
+    ax, 
+    evector,
+    loss_function, 
+    number_pixels=10, 
+    alpha=0.5,
+    scale=1.,
+    background_data=None,
+    **kwargs):
+    ev1=evector[:,0].view(-1,1)
+    ev2=evector[:,1].view(-1,1)
+    if background_data is None:
+        background_data=np.zeros((number_pixels,number_pixels))
+        with torch.no_grad():
+            X=np.linspace(theta-ev1*0.5*scale,theta+ev1*0.5*scale,number_pixels)
+            Y=np.linspace(theta-ev2*0.5*scale,theta+ev2*0.5*scale,number_pixels)
+            for i in range(number_pixels):
+                for j in range(number_pixels):
+                        reconstructed_theta=theta+X[i]+Y[j]
+                        if torch.all(reconstructed_theta>0):
+                            background_data[i,j]=loss_function(reconstructed_theta)
+                        else:
+                            background_data[i,j]=None
+            plt.contourf(background_data,alpha=alpha)
+        return background_data
+
+
+
 
 #-----inversed theta with error bar-------------------------------------
 
@@ -1279,15 +1476,7 @@ def trial_data(input):
 
 #-----forward plots----------------------------------------------------------------
 
-'''
-    ploting function
 
-    1. overhead view, a thin line connecting the end to target.
-    2. control curve
-    3. pc space theta trajectory approaching
-    4. 
-
-'''
 #-----control curve plots----------------------------------------------------------------
 
 def plotctrl(input,**kwargs):
@@ -1315,7 +1504,7 @@ def plotctrl(input,**kwargs):
         return  ax
 
 #----overhead----------------------------------------------------------------
-def plotoverhead(input):
+def plotoverhead(input,**kwargs):
     '''
         input:
         'theta':            input['theta'],
@@ -1329,9 +1518,11 @@ def plotoverhead(input):
         'mk_actions':       [],
         'mk_states':        [],
     '''
+    pathcolor='gray' if 'color' not in kwargs else kwargs['color'] 
     fontsize = 9
-    with initiate_plot(1.8, 1.8, 300) as fig:
-        ax = fig.add_subplot(111)
+    
+    if 'ax' in kwargs:
+        ax = kwargs['ax'] 
         ax.set_aspect('equal')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -1347,7 +1538,6 @@ def plotoverhead(input):
         ax.plot(np.linspace(-230, -230), np.linspace(0, 100), c='k')
         ax.text(-230, 100, s=r'$100cm$', fontsize=fontsize)
         ax.text(-130, 0, s=r'$100cm$', fontsize=fontsize)
-        fig.tight_layout(pad=0)
         ax.plot(np.linspace(0, 230 + 7),
                 np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
         
@@ -1355,7 +1545,7 @@ def plotoverhead(input):
             input['agent_states'][trial_i][:,0]=input['agent_states'][trial_i][:,0]-input['agent_states'][trial_i][0,0]
             input['agent_states'][trial_i][:,1]=input['agent_states'][trial_i][:,1]-input['agent_states'][trial_i][0,1]
             ax.plot(-input['agent_states'][trial_i][:,1]*400,input['agent_states'][trial_i][:,0]*400, 
-                c='gray', lw=0.1, ls='-')
+                c=pathcolor, lw=0.1, ls='-')
             # calculate if rewarded
             dy=input['agent_states'][trial_i][-1,0]*400-input['task'][trial_i][0]*400
             dx=input['agent_states'][trial_i][-1,1]*400-input['task'][trial_i][1]*400
@@ -1374,6 +1564,51 @@ def plotoverhead(input):
                 ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
                     c='r', marker='.', s=1, lw=1)
 
+    else:
+        with initiate_plot(1.8, 1.8, 300) as fig:
+            ax = fig.add_subplot(111)
+            ax.set_aspect('equal')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.axes.xaxis.set_ticks([]); ax.axes.yaxis.set_ticks([])
+            ax.set_xlim([-235, 235]); ax.set_ylim([-2, 430])
+            x_temp = np.linspace(-235, 235)
+            ax.plot(x_temp, np.sqrt(420**2 - x_temp**2), c='k', ls=':')
+            ax.text(-10, 425, s=r'$70\degree$', fontsize=fontsize)
+            ax.text(130, 150, s=r'$400cm$', fontsize=fontsize)
+            ax.plot(np.linspace(-230, -130), np.linspace(0, 0), c='k')
+            ax.plot(np.linspace(-230, -230), np.linspace(0, 100), c='k')
+            ax.text(-230, 100, s=r'$100cm$', fontsize=fontsize)
+            ax.text(-130, 0, s=r'$100cm$', fontsize=fontsize)
+            fig.tight_layout(pad=0)
+            ax.plot(np.linspace(0, 230 + 7),
+                    np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
+            
+            for trial_i in range(input['num_trials']):
+                input['agent_states'][trial_i][:,0]=input['agent_states'][trial_i][:,0]-input['agent_states'][trial_i][0,0]
+                input['agent_states'][trial_i][:,1]=input['agent_states'][trial_i][:,1]-input['agent_states'][trial_i][0,1]
+                ax.plot(-input['agent_states'][trial_i][:,1]*400,input['agent_states'][trial_i][:,0]*400, 
+                    c=pathcolor, lw=0.1, ls='-')
+                # calculate if rewarded
+                dy=input['agent_states'][trial_i][-1,0]*400-input['task'][trial_i][0]*400
+                dx=input['agent_states'][trial_i][-1,1]*400-input['task'][trial_i][1]*400
+                d2goal=(dx**2+dy**2)**0.5
+                if d2goal<=65: # reached goal
+                    ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
+                        c='g', marker='.', s=1, lw=1)
+                elif d2goal>65 and d2goal< 130:
+                    ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
+                        c='k', marker='.', s=1, lw=1)
+                    # yellow error line
+                    ax.plot([-input['agent_states'][trial_i][-1,1]*400,-input['task'][trial_i][1]*400],
+                                [input['agent_states'][trial_i][-1,0]*400,input['task'][trial_i][0]*400],color='yellow',alpha=0.3, linewidth=1)
+
+                else: # skipped
+                    ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
+                        c='r', marker='.', s=1, lw=1)
+    return ax
 
 def plotoverheadcolor(input,**kwargs):
     linewidth=kwargs['linewidth'] if 'linewidth' in kwargs else 0.1
@@ -1513,14 +1748,70 @@ def matter_most_eigen_direction():
     ])
     mattermost=evector[0]
     # matterleast=evector[-1]
-    diagnose_plot_theta(agent, env, phi, theta_init, theta_mean+4*mattermost.view(-1,1),4)
+    diagnose_plot_theta(agent, env, phi, theta_init, theta_mean+0.1*mattermost.view(-1,1),5)
     # diagnose_plot_theta(agent, env, phi, theta_init, theta_mean+3*matterleast.view(-1,1),3)
 
+# describes data df
+def histdfcol():
+    seen={}
+    for each in df.floor_density:
+        if each in seen:
+            seen[each]+=1
+        else:
+            seen[each]=1
+
+    def itkey(keys):
+        for key in keys:
+            yield key
+
+    keys=['gain_v',
+    'gain_w',
+    'perturb_vpeakmax',
+    'perturb_wpeakmax',
+    'perturb_sigma',
+    'perturb_dur',
+    'perturb_vpeak',
+    'perturb_wpeak',
+    'perturb_start_time',
+    'floor_density',
+    'pos_r_end',
+    'pos_theta_end',
+    'target_x',
+    'target_y',
+    'target_r',
+    'target_theta',
+    'full_on',
+    'rewarded',
+    'trial_dur',
+    'relative_radius_end',
+    'relative_angle_end',
+    'category',]
+
+    keygen=itkey(keys)
+
+    key=keygen.__next__()
+
+    plt.hist(df[key])
+    plt.title(key)
+    plt.show()
 
 
+# test color gradient line
 
+from matplotlib.collections import LineCollection
+x    = np.linspace(0,1, 100)
+y    = np.linspace(0,1, 100)
+cols = np.linspace(0,1,len(x))
 
+points = np.array([x, y]).T.reshape(-1, 1, 2)
+segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
+fig, ax = plt.subplots()
+lc = LineCollection(segments, cmap='viridis')
+lc.set_array(cols)
+lc.set_linewidth(2)
+line = ax.add_collection(lc)
+fig.colorbar(line,ax=ax)
 
 
 
@@ -1529,34 +1820,79 @@ env=ffacc_real.FireFlyPaper(arg)
 # load monkey data
 with open("C:/Users/24455/Desktop/bruno_pert_downsample",'rb') as f: 
     df = pickle.load(f)
-# with open("C:/Users/24455/Desktop/viktor_normal_trajectory.pkl",'rb') as f:
-#     df = pickle.load(f)
-    # df_pert=df[df.perturb_start_time>0]
-    # pstates, pactions, ptasks=monkey_trajectory(df_pert,new_dt=0.1, goal_radius=65,factor=0.002)
-
-    # # df=df[df.perturb_start_time.isnull()]
+df=datawash(df)
 states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
+# dfnormal=df[df.perturb_start_time.isna()]
+agent_=TD3_torch.TD3.load('trained_agent/paper.zip')
+agent=agent_.actor.mu.cpu()
 
 # load inverse data
 from InverseFuncs import *
-inverse_data=load_inverse_data('brunompert13_20_20')
+inverse_data=load_inverse_data("brunompert16_21_27")
 theta_trajectory=inverse_data['theta_estimations']
 true_theta=inverse_data['true_theta']
 theta_estimation=theta_trajectory[-1]
 theta=torch.tensor(theta_estimation)
-theta=torch.nn.Parameter(theta)
 phi=torch.tensor(inverse_data['phi'])
 H=inverse_data['Hessian'] 
+print(H)
 stds=inverse_data['theta_std']
 # grad=inverse_data['grad']
 losses=np.array(inverse_data['loss'])
-plt.plot(losses)
+with initiate_plot(1,1,300) as fig:
+    ax=fig.add_subplot(111)
+    ax.plot(losses)
 plot_inverse_trend(theta_trajectory)
+
+if H==[]:
+    H=compute_H_monkey(env, 
+                    agent, 
+                    theta, 
+                    phi, 
+                    H_dim=11, 
+                    num_episodes=22,
+                    num_samples=9,
+                    action_var=0.001,
+                    monkeydata=(states, actions, tasks))  
+stderr(torch.inverse(H))         
+inverse_data['Hessian']=H
+save_inverse_data(inverse_data)
+ev, evector=torch.eig(H,eigenvectors=True)
+env=ffacc_real.FireFlyPaper(arg)
+with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    ax = fig.add_subplot(111)
+    sample_states, sample_actions, sample_tasks=sample_batch(states=states,actions=actions,tasks=tasks,batch_size=20)
+    bk=plot_background_ev(
+    ax, 
+    evector,
+    loss_function=monkey_loss_wrapped(env=env, 
+        agent=agent, 
+        phi=phi, 
+        num_episodes=9,
+        action_var=0.1,
+        states=sample_states,
+        actions=sample_actions,
+        tasks=sample_tasks,), 
+    number_pixels=4, 
+    alpha=0.5,
+    scale=0.3,
+    background_data=None)
+    
+scale=0.3
+ev1=evector[0].view(-1,1)
+X=np.linspace(theta-ev1*0.5*scale,theta+ev1*0.5*scale,number_pixels)
+logll1d=[]
+for onetheta in X:
+    onetheta=torch.tensor(onetheta)
+    logll1d.append(loss_function(onetheta))
+plt.plot(logll1d)
 
 # load agent
 agent_=TD3_torch.TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
 policygiventheta()
+policygiventhetav2(env.decision_info.shape[-1])
 agentvsmk_skip(55)
 plot_critic_polar()
 ind=torch.randint(low=100,high=5000,size=(1,))
@@ -1692,7 +2028,7 @@ theta_final=torch.tensor([[0.5000],
         [0.1],
 ])
 env.debug=True
-diagnose_plot_theta(agent, env, phi, theta_init, theta_init+theta_final.view(-1,1),5)
+diagnose_plot_theta(agent, env, phi, theta_init, theta_final,5)
 
 
 
@@ -1778,7 +2114,7 @@ with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
 
 #---------------------------------------------------------------------
 # 3. monkey and inferred agent act similar on similar trials
-ind=torch.randint(low=100,high=9999,size=(1,))
+ind=torch.randint(low=100,high=1111,size=(1,))
 indls=similar_trials(ind, tasks, actions)
 indls=indls[:20]
 with torch.no_grad():
@@ -1795,8 +2131,6 @@ with torch.no_grad():
     }
     with suppress():
         resirc=trial_data(inputirc)
-    plotoverhead(resirc)
-    plotctrl(resirc)
 
     inputmk={
         'agent':agent,
@@ -1814,9 +2148,12 @@ with torch.no_grad():
     }
     with suppress():
         resmk=trial_data(inputmk)
-    plotoverhead(resmk)
-    plotctrl(resmk)
 
+ax=plotoverhead(resirc, color='orange')
+# plotctrl(resirc)
+plotoverhead(resmk,ax=ax, color='tab:blue')
+# plotctrl(resmk)
+ax.get_figure()
 
 
 #---------------------------------------------------------------------
@@ -1968,11 +2305,6 @@ with initiate_plot(2, 2, 300) as fig, warnings.catch_warnings():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
-
-
-################################
-######### work flow ############
-################################
 
 
 
@@ -2154,52 +2486,7 @@ def agent_double_goalr():
 
 
 
-
-
-
-
-# Heissian polots
-def sample_batch(states=None, actions=None, tasks=None, batch_size=20,**kwargs):
-    totalsamples=len(tasks)
-    sampleind=torch.randint(0,totalsamples,(batch_size,)) # trial inds
-    sample_states=[states[i] for i in sampleind]
-    sample_actions=[actions[i] for i in sampleind]
-    sample_tasks=[tasks[i] for i in sampleind]
-    return sample_states, sample_actions, sample_tasks
-
-
-def compute_H_monkey(env, 
-                    agent, 
-                    theta_estimation, 
-                    phi, 
-                    H_dim=11, 
-                    num_episodes=1,
-                    num_samples=1,
-                    **kwargs):
-    # TODO integrate sample batch
-    states, actions, tasks=kwargs['monkeydata']
-    totalsamples=len(tasks)
-    sampleind=torch.randint(0,totalsamples,(num_episodes,)) # trial inds
-    sample_states=[states[i] for i in sampleind]
-    sample_actions=[actions[i] for i in sampleind]
-    sample_tasks=[tasks[i] for i in sampleind]
-    thistheta=torch.nn.Parameter(torch.Tensor(theta_estimation))
-    phi=torch.Tensor(phi)
-    phi.requires_grad=False
-    loss = monkeyloss(agent, sample_actions, sample_tasks, phi, 
-                        thistheta, env, 
-                        action_var=0.1,
-                        num_iteration=1, 
-                        states=sample_states, 
-                        samples=num_samples,
-                        gpu=False)
-    print('bp for grad')                    
-    grads = torch.autograd.grad(loss, thistheta, create_graph=True,allow_unused=True)[0]
-    H = torch.zeros(H_dim,H_dim)
-    for i in range(H_dim):
-        print('calculate {}th row of H'.format(i))
-        H[i] = torch.autograd.grad(grads[i], thistheta, retain_graph=True,allow_unused=True)[0].view(-1)
-    return H
+# Heissian polots-----------------------------------------------------------
 
 
 H=compute_H_monkey(env, 
@@ -2213,7 +2500,7 @@ H=compute_H_monkey(env,
 inverse_data['Hessian']=H
 save_inverse_data(inverse_data)
 
-matter_most_eigen_direction()
+# matter_most_eigen_direction()
 
 stderr(torch.inverse(H))
 
@@ -2287,155 +2574,8 @@ with initiate_plot(5,1,300) as fig:
 
 # pca background
 
-def inverse_trajectory_monkey(theta_trajectory,
-                    env=None,
-                    agent=None,
-                    phi=None, 
-                    background_data=None, 
-                    background_contour=False,
-                    number_pixels=10,
-                    background_look='contour',
-                    ax=None, 
-                    loss_sample_size=100, 
-                    H=None,
-                    **kwargs):
-    '''    
-        plot the inverse trajectory in 2d pc space
-        -----------------------------
-        input:
-        theta trajectory: list of list(theta)
-        method: PCA or other projections
-        -----------------------------
-        output:
-        background contour array and figure
-    '''
-    with torch.no_grad():
-
-        # plot trajectory
-        fig = plt.figure(figsize=[8, 8])
-        ax = fig.add_subplot()
-        data_matrix=column_feature_data(theta_trajectory)
-        mu=np.mean(data_matrix,0)
-        try:
-            score, evectors, evals = pca(data_matrix)
-        except np.linalg.LinAlgError:
-            score, evectors, evals = pca(data_matrix)
-        # plot theta inverse trajectory
-        row_cursor=0
-        while row_cursor<score.shape[0]-1:
-            row_cursor+=1
-            ax.plot(score[row_cursor-1:row_cursor+1,0],
-                    score[row_cursor-1:row_cursor+1,1],
-                    '-',
-                    linewidth=0.1,
-                    color='g')
-            if row_cursor%20==0 or row_cursor==1:
-                ax.quiver(score[row_cursor-1, 0], score[row_cursor-1, 1],
-                        score[row_cursor, 0]-score[row_cursor-1, 0], score[row_cursor, 1]-score[row_cursor-1, 1],
-                        angles='xy',color='g',scale=0.2,width=1e-2, scale_units='xy')
-        ax.scatter(score[row_cursor, 0], score[row_cursor, 1], marker=(5, 1), s=200, color=[1, .5, .5])
-        ax.set_xlabel('projected parameters')
-        ax.set_ylabel('projected parameters')
-
-        # plot hessian
-        if H is not None:
-            cov=theta_cov(H)
-            cov_pc=evectors[:,:2].transpose()@np.array(cov)@evectors[:,:2]
-            plot_cov_ellipse(cov_pc,pos=score[-1,:2],alpha_factor=0.5,ax=ax)
-
-        # plot log likelihood contour
-        sample_states, sample_actions, sample_tasks=sample_batch(states=states,actions=actions,tasks=tasks,batch_size=loss_sample_size)
-        loss_function=monkey_loss_wrapped(env=env, 
-        agent=agent, 
-        phi=phi, 
-        states=sample_states,
-        actions=sample_actions,
-        tasks=sample_tasks,)
-        current_xrange=list(ax.get_xlim())
-        current_xrange[0]-=0.1
-        current_xrange[1]+=0.1
-        current_yrange=list(ax.get_ylim())
-        current_yrange[0]-=0.1
-        current_yrange[1]+=0.1
-        xyrange=[current_xrange,current_yrange]
-        print('start background')
-        if background_contour:
-            background_data=plot_background(
-                ax, 
-                xyrange,
-                mu, 
-                evectors, 
-                loss_function, 
-                number_pixels=number_pixels,
-                look=background_look,
-                background_data=background_data)
-
-        return background_data
-
-
-def plot_background(
-    ax, 
-    xyrange,
-    mu, 
-    evectors, 
-    loss_function, 
-    number_pixels=10, 
-    look='contour', 
-    alpha=0.5,
-    background_data=None,
-    **kwargs):
-    with torch.no_grad():
-        X,Y=np.meshgrid(np.linspace(xyrange[0][0],xyrange[0][1],number_pixels),np.linspace(xyrange[1][0],xyrange[1][1],number_pixels))
-        if background_data is None:
-            background_data=np.zeros((number_pixels,number_pixels))
-            for i,u in enumerate(np.linspace(xyrange[1][0],xyrange[1][1],number_pixels)):
-                for j,v in enumerate(np.linspace(xyrange[0][0],xyrange[0][1],number_pixels)):
-                    score=np.array([u,v])
-                    reconstructed_theta=score@evectors.transpose()[:2,:]+mu
-                    reconstructed_theta=torch.tensor(reconstructed_theta).float()
-                    if not np.array_equal(reconstructed_theta,reconstructed_theta.clip(1e-8,999)):
-                        background_data[i,j]=np.nan
-                        print(reconstructed_theta)
-                    else:
-                        # reconstructed_theta=nn.Parameter(torch.Tensor(reconstructed_theta))
-                        background_data[i,j]=loss_function(reconstructed_theta)
-        if look=='contour':
-            ax.contourf(X,Y,background_data.transpose(),alpha=alpha,zorder=1)
-        # elif look=='pixel':
-        #     im=ax.imshow(X,Y,background_data,alpha=alpha,zorder=1)
-        #     add_colorbar(im)
-        return background_data
-
-
-def monkey_loss_wrapped(
-                env=env, 
-                agent=agent, 
-                phi=phi, 
-                actions=actions,
-                tasks=tasks,
-                states=states,
-                num_episodes=10,
-                gpu=False,
-                action_var=0.1,
-                **kwargs):
-  new_function= lambda theta_estimation: monkeyloss(
-            agent=agent, 
-            actions=actions, 
-            tasks=tasks, 
-            phi=phi, 
-            theta=theta_estimation, 
-            env=env,
-            num_iteration=1, 
-            states=states, 
-            samples=num_episodes, 
-            action_var=action_var,
-            gpu=gpu)
-    
-  return new_function
-
-
-
-number_pixels=3
+env=ffacc_real.FireFlyPaper(arg)
+number_pixels=5
 background_data=inverse_trajectory_monkey(
                     theta_trajectory,
                     env=env,
@@ -2447,9 +2587,37 @@ background_data=inverse_trajectory_monkey(
                     number_pixels=number_pixels,
                     background_look='contour',
                     ax=None,
-                    loss_sample_size=50)
+                    action_var=0.001,
+                    loss_sample_size=20)
 inverse_data['background_data']={number_pixels:background_data}
 save_inverse_data(inverse_data)
+
+
+
+
+
+# background of eigen axis
+env=ffacc_real.FireFlyPaper(arg)
+with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    ax = fig.add_subplot(111)
+    sample_states, sample_actions, sample_tasks=sample_batch(states=states,actions=actions,tasks=tasks,batch_size=5)
+    bk=plot_background_ev(
+    ax, 
+    evector,
+    loss_function=monkey_loss_wrapped(env=env, 
+        agent=agent, 
+        phi=phi, 
+        num_episodes=5,
+        states=sample_states,
+        actions=sample_actions,
+        tasks=sample_tasks,), 
+    number_pixels=5, 
+    alpha=0.5,
+    scale=0.2,
+    background_data=None)
+plt.imshow(bk)
+
 
 #----------------------------------------------------------------
 # function to get value of a given belief
@@ -2509,13 +2677,14 @@ def getvalues(
 with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
     warnings.simplefilter('ignore')
     theta,rad = np.meshgrid(np.linspace(-0.75,0.75,nd), np.linspace(0.2,1,na)) 
-    fig = plt.figure()
     ax = fig.add_subplot(111,polar='True')
     ax.pcolormesh(theta, rad, values) #X,Y & data2D must all be same dimensions
     ax.set_theta_offset(pi/2)
     ax.grid(False)
     ax.set_thetamin(-43)
     ax.set_thetamax(43)
+
+
 
 
 norm = np.linalg.norm(values)

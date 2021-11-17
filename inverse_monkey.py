@@ -44,7 +44,7 @@ arg.PI_STD=1
 arg.presist_phi=False
 arg.cost_scale=1
 
-arg.ADAM_LR = 0.007
+arg.ADAM_LR = 0.01
 arg.LR_STOP=0.001
 arg.sample = 40 # samples for 1 mk trial
 arg.batch = 200
@@ -85,9 +85,9 @@ env=ffacc_real.FireFlyPaper(arg)
 print('loading data')
 with open("C:/Users/24455/Desktop/bruno_pert_downsample",'rb') as f:
         df = pickle.load(f)
-        df=df[df.full_on==False]
+df=datawash(df)
 # df=df[110:130]
-df=df[:-100]
+df=df[:-200]
 
 print('process data')
 states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
@@ -107,17 +107,17 @@ phi=torch.tensor([[0.5],
         [0.001],
 ])
 
-theta=torch.tensor([[0.3419],
-        [1.1250],
-        [0.2165],
-        [0.2362],
-        [0.3720],
-        [0.1858],
-        [0.0021],
-        [0.4856],
-        [1.0716],
-        [0.0183],
-        [0.2193]])
+theta=torch.tensor([[0.5],   
+        [1.6],   
+        [0.4],   
+        [0.4],   
+        [0.4405],   
+        [0.4],   
+        [0.13],   
+        [0.1],   
+        [0.1],   
+        [0.1],   
+        [0.1]])
 
 # theta_estimation=torch.tensor(
 # [[0.2207319438457489],
@@ -146,7 +146,7 @@ for i in range(1):
                     gpu=False,
                     # fixed_param_ind=[1,2,5,6],
                     # assign_true_param=[1,2,5,6],
-                    action_var=0.001, # how precise we want to predict the action
+                    action_var=0.01, # how precise we want to predict the action
                     batchsize=arg.batch,
                     )
 

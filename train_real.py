@@ -32,7 +32,7 @@ env.no_skip=True
 n_actions = env.action_space.shape[-1]
 action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.2 * np.ones(n_actions))        
 modelname=None
-modelname='paperv2'
+modelname='paper'
 note='re' 
 from stable_baselines3 import TD3
 

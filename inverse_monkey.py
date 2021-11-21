@@ -38,19 +38,19 @@ arg.agent_knows_phi=False
 DISCOUNT_FACTOR = 0.99
 arg.NUM_thetas = 1
 arg.LR_STEP = 20
-arg.LR_STOP = 0.5
-arg.lr_gamma = 0.5
+arg.lr_gamma = 1
 arg.PI_STD=1
 arg.presist_phi=False
 arg.cost_scale=1
 
+arg.action_var=0.0001
 arg.ADAM_LR = 0.01
 arg.LR_STOP=0.001
-arg.sample = 40 # samples for 1 mk trial
-arg.batch = 200
-arg.NUM_IT = 30 # iteration of all data
+arg.sample = 9 # samples for 1 mk trial
+arg.batch = 50
+arg.NUM_IT = 100 # iteration of all data
 number_updates=1 # update per batch
-# load torch model
+
 
 # continue from prev inverse
 # from InverseFuncs import *
@@ -61,31 +61,15 @@ number_updates=1 # update per batch
 # theta=torch.tensor(theta_estimation)
 # phi=torch.tensor(inverse_data['phi'])
 
-
-# agent_=PPO.load('trained_agent/ppo_60000_9_8_1_21.zip')
-# agent = lambda x : agent_.predict(x)
-
 agent_=TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
-
-# agent_ =SAC.load('trained_agent/re_iticosttimes_100000_3_17_0_40_11.zip')
-# agent_=agent_.actor.cpu()
-# agent = lambda x : agent_.forward(x, deterministic=True)
-
-
-# loading enviorment, same as training
 env=ffacc_real.FireFlyPaper(arg)
-
-# with open("C:/Users/24455/Desktop/DataFrame_normal",'rb') as f:
-#     df = pickle.load(f)
-# df=df[df.isFullOn==False]
-# # df=df[110:130]
-# df=df[:-100]
-# states, actions, tasks=monkey_trajectory(df,new_dt=0.1, goal_radius=65,factor=0.002)
 print('loading data')
-with open("C:/Users/24455/Desktop/bruno_pert_downsample",'rb') as f:
+note='brunonormal'
+with open("C:/Users/24455/Desktop/bruno_normal_downsample",'rb') as f:
         df = pickle.load(f)
 df=datawash(df)
+df=df[df.floor_density==0.005]
 # df=df[110:130]
 df=df[:-200]
 
@@ -119,19 +103,20 @@ theta=torch.tensor([[0.5],
         [0.1],   
         [0.1]])
 
-# theta_estimation=torch.tensor(
-# [[0.2207319438457489],
-#  [1.062300205230713],
-#  [0.32934996485710144],
-#  [0.1929050236940384],
-#  [0.19170257449150085],
-#  [0.1894093006849289],
-#  [0.16225792467594147],
-#  [0.05502069741487503],
-#  [0.6376186013221741],
-#  [0.7159334421157837]]
-#          )
-note='brunompert'
+theta_estimation=torch.tensor(
+[[0.5],
+        [1.4210],
+        [0.7],
+        [0.7],
+        [0.9],
+        [0.9],
+        [0.1606],
+        [0.0],
+        [0.0],
+        [0.001],
+        [0.001]]
+         )
+
 print('start inverse')
 for i in range(1):
     filename=(note+str(time.localtime().tm_mday)+'_'+str(time.localtime().tm_hour)+'_'+str(time.localtime().tm_min))
@@ -139,14 +124,14 @@ for i in range(1):
                     number_updates=number_updates,
                     true_theta=None, 
                     phi=phi,
-                    init_theta=theta,
+                    init_theta=theta_estimation,
                     trajectory_data=(states, actions, tasks),
                     use_H=False,
                     is1d=False,
                     gpu=False,
                     # fixed_param_ind=[1,2,5,6],
                     # assign_true_param=[1,2,5,6],
-                    action_var=0.01, # how precise we want to predict the action
+                    action_var=arg.action_var, # how precise we want to predict the action
                     batchsize=arg.batch,
                     )
 

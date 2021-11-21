@@ -344,7 +344,7 @@ def monkey_inverse(arg, env, agent, filename,
     for epoch in range(arg.NUM_IT):
         batchsize=int((epoch//arg.NUM_IT)*len(mktasks))+arg.batch
         for states, actions, tasks in data_iter(batchsize,mkstates,mkactions,mktasks):
-            if arg.LR_STOP < scheduler.get_lr()[0]:
+            if arg.LR_STOP < scheduler.get_lr()[0]*arg.LR_STEP:
                 scheduler.step()
             for it in range(number_updates):
                 loss = monkeyloss(agent, actions, tasks, phi, theta, env, action_var=action_var,
@@ -382,18 +382,13 @@ def monkey_inverse(arg, env, agent, filename,
                     save_dict['theta_std'].append(theta_std)
                     print('H_trace: \n',np.trace(H))
                     print('std err: \n',theta_std)
-                # loss_diff.append(torch.abs(prev_loss - loss))
-                # prev_loss = loss.data
-                #     #print("num_theta:{}, num:{}, loss:{}".format(n, it, np.round(loss.data.item(), 6)))
-                #     #print("num:{},theta diff sum:{}".format(it, 1e6 * (true_theta - theta.data.clone()).sum().data))
+
                 print('epoch: ', epoch, 'batchsize',batchsize,'\n')
-                print('converged_theta:\n{}'.format( theta.data.clone() ) )
-                # print('true theta:     \n{}'.format(true_theta.data.clone()))
-                # print('loss: \n',loss)
+                print('converged_theta:\n{}'.format( theta.clone().detach()) )
                 print('learning rate: \n', scheduler.get_lr()[0])
-                    # print('\ngrad     ', theta.grad.data.clone())
                 print('\n')
-            save_dict['theta_estimations'].append(theta.data.clone().tolist())
+                del loss
+            save_dict['theta_estimations'].append(theta.clone().detach().tolist())
             savename=('inverse_data/' + filename + '.pkl')
             torch.save(save_dict, savename)
 
@@ -438,23 +433,20 @@ def monkeyloss(agent=None,
                                             previous_action=torch.tensor(previous_action), 
                                             time=env.trial_timer)
                 # loss
-                action_loss = logll(torch.tensor(mk_action),action,std=np.sqrt(action_var))
-                obs_loss = logll(error=env.obs_err(), std=theta[4:6])
+                action_loss = -1*logll(torch.tensor(mk_action),action,std=np.sqrt(action_var))
+                obs_loss = -1*logll(error=env.obs_err(), std=theta[4:6].view(1,-1))
                 logPr_ep = logPr_ep + action_loss.sum() + obs_loss.sum()
-                action_loss.detach_()
-                obs_loss.detach_()
+                del action_loss
+                del obs_loss
         return logPr_ep/samples
 
-
-    # trial_ind=list(range(len(tasks)))
-    # with futures.ProcessPoolExecutor() as pool:
-    #     for logPr_ep in pool.map(_wrapped_call,trial_ind, tasks):
-    #             logPr = logPr + logPr_ep
     tik=time.time()
     for ep, task in enumerate(tasks):
         logPr_ep=_wrapped_call(ep, task)
         logPr += logPr_ep
+        del logPr_ep
     regularization=torch.sum(1/(theta+1e-4))
+
     print('calculate loss time {:.0f}'.format(time.time()-tik))
 
     return logPr/len(tasks)+0.01*regularization
@@ -806,13 +798,29 @@ def getLoss(agent, actions, tasks, phi, theta, env, num_iteration=1, states=None
     return logPr
 
 
-def logll(true=None, estimate=None, std=0.3, error=None):
+def logll(true=None, estimate=None, std=0.3, error=None, prob=False):
+    # print(error)
+    var=std**2
+    if error is not None: # use for point eval, obs
+        g=lambda x: 1/torch.sqrt(2*pi*torch.ones(1))*torch.exp(-0.5*x**2/var)
+        z=1/g(torch.zeros(1)+1e-8)
+        loss=torch.log(g(error)*z+1e-8)
+    else: # use for distribution eval, aciton
+        c=torch.abs(true-estimate)
+        var=std**2
+        gi=lambda x: -(torch.erf(x/torch.sqrt(torch.tensor([2]))/var)-1)/2
+        loss=torch.log(gi(c)*2+1e-8)
+    if prob:
+        return torch.exp(loss)
+    return loss
+
+def logllv1(true=None, estimate=None, std=0.3, error=None):
     # loss=1/std/torch.sqrt(torch.tensor([6.28]))*(torch.exp(-0.5*((estimate-true)/std)**2))
     # -torch.log(loss+0.001)
     if error is not None:
         loss=torch.log(torch.sqrt(torch.tensor([2*pi]))*std)+1/2*(error/std)**2
     else:
-        loss=torch.log(torch.sqrt(torch.tensor([6.28]))*std)+1/2*((estimate-true)/std)**2
+        loss=torch.log(torch.sqrt(torch.tensor([2*pi]))*std)+1/2*((estimate-true)/std)**2
     return loss
 
 

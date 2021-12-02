@@ -342,8 +342,10 @@ def monkey_inverse(arg, env, agent, filename,
     scheduler = torch.optim.lr_scheduler.StepLR(optT, step_size=arg.LR_STEP, gamma=arg.lr_gamma) 
     mkstates, mkactions, mktasks=trajectory_data
     for epoch in range(arg.NUM_IT):
-        batchsize=int((epoch//arg.NUM_IT)*len(mktasks))+arg.batch
+        batchsize=int(epoch/arg.NUM_IT*(len(mktasks)-arg.batch))+arg.batch
         for states, actions, tasks in data_iter(batchsize,mkstates,mkactions,mktasks):
+            if len(tasks)<=2:
+                break
             if arg.LR_STOP < scheduler.get_lr()[0]*arg.LR_STEP:
                 scheduler.step()
             for it in range(number_updates):
@@ -439,16 +441,13 @@ def monkeyloss(agent=None,
                 del action_loss
                 del obs_loss
         return logPr_ep/samples
-
     tik=time.time()
     for ep, task in enumerate(tasks):
         logPr_ep=_wrapped_call(ep, task)
         logPr += logPr_ep
         del logPr_ep
     regularization=torch.sum(1/(theta+1e-4))
-
     print('calculate loss time {:.0f}'.format(time.time()-tik))
-
     return logPr/len(tasks)+0.01*regularization
 
 

@@ -5,7 +5,7 @@ warnings.filterwarnings('ignore')
 from copy import copy
 import time
 import random
-from stable_baselines3 import SAC,PPO,TD3
+from stable_baselines3 import TD3
 seed=0
 random.seed(seed)
 import torch
@@ -43,11 +43,12 @@ arg.PI_STD=1
 arg.presist_phi=False
 arg.cost_scale=1
 
-arg.action_var=0.0001
-arg.ADAM_LR = 0.01
+arg.fixed_param_ind=[6]
+arg.action_var=0.001
+arg.ADAM_LR = 0.007
 arg.LR_STOP=0.001
-arg.sample = 9 # samples for 1 mk trial
-arg.batch = 50
+arg.sample = 5 # samples for 1 mk trial
+arg.batch = 22
 arg.NUM_IT = 100 # iteration of all data
 number_updates=1 # update per batch
 
@@ -60,18 +61,20 @@ number_updates=1 # update per batch
 # theta_estimation=theta_trajectory[-1]
 # theta=torch.tensor(theta_estimation)
 # phi=torch.tensor(inverse_data['phi'])
-
+env=ffacc_real.FireFlyPaper(arg)
 agent_=TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
-env=ffacc_real.FireFlyPaper(arg)
+
 print('loading data')
-note='brunonormal'
+note='bnorm4'
 with open("C:/Users/24455/Desktop/bruno_normal_downsample",'rb') as f:
         df = pickle.load(f)
 df=datawash(df)
+df=df[df.category=='normal']
+# df=df[df.target_r>250]
 df=df[df.floor_density==0.005]
-# df=df[110:130]
-df=df[:-200]
+# floor density are in [0.0001, 0.0005, 0.001, 0.005]
+df=df[:-100]
 
 print('process data')
 states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
@@ -110,7 +113,7 @@ theta_estimation=torch.tensor(
         [0.7],
         [0.9],
         [0.9],
-        [0.1606],
+        [0.13],
         [0.0],
         [0.0],
         [0.001],
@@ -133,6 +136,7 @@ for i in range(1):
                     # assign_true_param=[1,2,5,6],
                     action_var=arg.action_var, # how precise we want to predict the action
                     batchsize=arg.batch,
+                    fixed_param_ind=arg.fixed_param_ind,
                     )
 
 

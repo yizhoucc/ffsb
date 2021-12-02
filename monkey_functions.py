@@ -112,7 +112,7 @@ def data_iter(batch_size,states,actions,tasks):
         yield itemgetter(*batchinds)(states),itemgetter(*batchinds)(actions),itemgetter(*batchinds)(tasks)
 
 
-def monkey_data_downsampled(df,factor=0.0025):
+def monkey_data_downsampled_(df,factor=0.0025):
     states = []
     actions = []
     tasks=[]
@@ -141,6 +141,39 @@ def monkey_data_downsampled(df,factor=0.0025):
                 actions.append(action)
                 tasks.append(task)
         except:
+            index+=1
+            continue
+        index+=1
+    return states, actions, tasks
+
+def monkey_data_downsampled(df,factor=0.0025):
+    states = []
+    actions = []
+    tasks=[]
+    index=0
+    while index<df.shape[0]:
+        trial=df.iloc[index]
+        try:
+            if len(trial.action_v)>2:
+                xs=convert_unit(torch.tensor(trial.pos_y, dtype=torch.float), factor=factor)
+                ys=-convert_unit(torch.tensor(trial.pos_x, dtype=torch.float), factor=factor)
+                hs=pi/180*torch.tensor(trial.head_dir, dtype=torch.float)-pi/2
+                vs=convert_unit(torch.tensor(trial.pos_v, dtype=torch.float),factor=factor)
+                ws=pi/180*torch.tensor(trial.pos_w, dtype=torch.float)
+                state=torch.stack([xs,ys,hs,vs,ws]).t()
+                
+                wctrls=torch.tensor(trial.action_w).float()
+                vctrls=torch.tensor(trial.action_v).float()
+                action=[vctrls,wctrls]
+                action=torch.stack(action).t()
+
+                task=[convert_unit(trial.target_y,factor=factor),-convert_unit(trial.target_x,factor=factor)]
+
+                states.append(state)
+                actions.append(action)
+                tasks.append(task)
+        except:
+            print('no',index)
             index+=1
             continue
         index+=1

@@ -1576,7 +1576,7 @@ def inverse_trajectory_monkey(theta_trajectory,
     with torch.no_grad():
 
         # plot trajectory
-        fig = plt.figure(figsize=[8, 8])
+        fig = plt.figure(figsize=[3, 3])
         ax = fig.add_subplot()
         data_matrix=column_feature_data(theta_trajectory)
         mu=np.mean(data_matrix,0)
@@ -1631,7 +1631,7 @@ def inverse_trajectory_monkey(theta_trajectory,
             ax.plot(score[row_cursor-1:row_cursor+1,0],
                     score[row_cursor-1:row_cursor+1,1],
                     '-',
-                    linewidth=0.1,
+                    linewidth=0.5,
                     color='w') # line
             if row_cursor%20==0 or row_cursor==1:
                 ax.quiver(score[row_cursor-1, 0], score[row_cursor-1, 1],
@@ -1640,7 +1640,8 @@ def inverse_trajectory_monkey(theta_trajectory,
         ax.scatter(score[row_cursor, 0], score[row_cursor, 1], marker=(5, 1), s=200, color=[1, .5, .5])
         ax.set_xlabel('projected parameters')
         ax.set_ylabel('projected parameters')
-
+        ax.set_xticks([-0.3,0,0.3])
+        ax.set_yticks([-0.3,0,0.3])
         # plot hessian
         if H is not None:
             cov=theta_cov(H)
@@ -1649,6 +1650,7 @@ def inverse_trajectory_monkey(theta_trajectory,
 
 
         return background_data
+
 
 def plot_background(
     ax, 
@@ -2068,22 +2070,54 @@ def histdfcol():
 
 
 # test color gradient line
-from matplotlib.collections import LineCollection
-x    = np.linspace(0,1, 100)
-y    = np.linspace(0,1, 100)
-cols = np.linspace(0,1,len(x))
+def testcolorgradient():
+    from matplotlib.collections import LineCollection
+    x    = np.linspace(0,1, 100)
+    y    = np.linspace(0,1, 100)
+    cols = np.linspace(0,1,len(x))
 
-points = np.array([x, y]).T.reshape(-1, 1, 2)
-segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    points = np.array([x, y]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
-fig, ax = plt.subplots()
-lc = LineCollection(segments, cmap='viridis')
-lc.set_array(cols)
-lc.set_linewidth(2)
-line = ax.add_collection(lc)
-fig.colorbar(line,ax=ax)
+    fig, ax = plt.subplots()
+    lc = LineCollection(segments, cmap='viridis')
+    lc.set_array(cols)
+    lc.set_linewidth(2)
+    line = ax.add_collection(lc)
+    fig.colorbar(line,ax=ax)
 
+# inferred obs vs density
+def obsvsdensity(noiseparam):
+    x,y=[],[]
+    for k,v in noiseparam.items():
+        x.append(k)
+        y.append(v)
+    y=np.array(y)[:,:,0]
 
+    fig=plt.figure(figsize=(5,5))
+    ax=fig.add_subplot(111)
+    ax.plot(y[:,0],label='pro v')
+    ax.plot(y[:,1],label='pro w')
+    ax.plot(y[:,2],label='obs v')
+    ax.plot(y[:,3],label='obs w')
+    ax.set_xticks([i for i in range(4)])
+    ax.set_xticklabels(["0.0001", "0.0005", "0.001", "0.005"])
+    ax.legend(fontsize=16)
+    ax.set_ylabel('noise std',fontsize=16)
+    ax.set_xlabel('density',fontsize=16)
+    ax.set_title('inferred noise level vs ground density',fontsize=20)
+
+    fig=plt.figure(figsize=(5,5))
+    ax=fig.add_subplot(111)
+    ax.plot(y[:,0]/y[:,2],label='forward v')
+    ax.plot(y[:,1]/y[:,3],label='angular w')
+    # ax.set_xscale('log')
+    ax.set_xticks([i for i in range(4)])
+    ax.set_xticklabels(["0.0001", "0.0005", "0.001", "0.005"])
+    ax.legend(fontsize=16)
+    ax.set_ylabel('noise std',fontsize=16)
+    ax.set_xlabel('density',fontsize=16)
+    ax.set_title('inferred observation reliable degree vs ground density',fontsize=20)
 
 
 env=ffacc_real.FireFlyPaper(arg)
@@ -2098,15 +2132,64 @@ agent=agent_.actor.mu.cpu()
 
 
 # load inverse data
-inverse_data=load_inverse_data("debugmem18_18_49")
+inverse_data=load_inverse_data("bpert41_9_25")
 theta_trajectory=inverse_data['theta_estimations']
 theta_estimation=theta_trajectory[-1]
-theta=torch.tensor(theta_estimation)
+"theta"=torch.tensor(theta_estimation)
 phi=torch.tensor(inverse_data['phi'])
 H=inverse_data['Hessian'] 
 print(H)
-stds=inverse_data['theta_std']
 plot_inverse_trend(inverse_data)
+
+# vis the inverses of differnt density
+inverse_data=load_inverse_data("brunonorm129_7_58")
+plot_inverse_trend(inverse_data)
+inverse_data=load_inverse_data("brunonorm229_7_57")
+plot_inverse_trend(inverse_data)
+
+inversedensityfiles=[
+    'brunonorm129_7_58',
+    'brunonorm229_7_57',
+    'brunonorm329_7_57',
+    'brunonorm429_7_57',
+]
+noiseparam={}
+for eachdensity,inversefile in zip([0.0001, 0.0005, 0.001, 0.005],inversedensityfiles):
+    noiseparam[eachdensity]=load_inverse_data(inversefile)['theta_estimations'][-2][2:6]
+obsvsdensity(noiseparam)
+
+for eachdensity,inversefile in zip([0.0001, 0.0005, 0.001, 0.005],inversedensityfiles):
+    tempdf=df[df.floor_density==eachdensity]
+    states, actions, tasks=monkey_data_downsampled(tempdf,factor=0.0025)
+    sample_states, sample_actions, sample_tasks=sample_batch(states=states,actions=actions,tasks=tasks,batch_size=20)
+    theta=torch.tensor(load_inverse_data(inversefile)['theta_estimations'][-2])
+    H=torch.autograd.functional.hessian(monkey_loss_wrapped(env=env, 
+        agent=agent, 
+        phi=phi, 
+        num_episodes=9,
+        action_var=1e-4,
+        states=sample_states,
+        actions=sample_actions,
+        tasks=sample_tasks,),theta,strict=True)
+    H=H[:,0,:,0]
+    print(stderr(torch.inverse(H)))
+    inverse_data['Hessian']=H
+    save_inverse_data(inverse_data)
+    print(load_inverse_data(inversefile)['theta_estimations'][-2][6])
+
+for inversefile in  inversedensityfiles:
+    theta=torch.tensor(load_inverse_data(inversefile)['theta_estimations'][-2])
+    H=inverse_data['Hessian']
+    print(stderr(torch.inverse(H)))
+
+
+# count reward %
+for eachdensity in [0.0001, 0.0005, 0.001, 0.005]:  
+    print('density {}, reward% '.format(eachdensity),len(df[df.floor_density==eachdensity][df.rewarded])/len(df[df.floor_density==eachdensity]))
+
+
+
+
 
 H=torch.autograd.functional.hessian(monkey_loss_wrapped(env=env, 
         agent=agent, 
@@ -2117,19 +2200,7 @@ H=torch.autograd.functional.hessian(monkey_loss_wrapped(env=env,
         actions=sample_actions,
         tasks=sample_tasks,),theta)
 H=H[:,0,:,0]
-stderr(torch.inverse(H))   
-
-if H==[]:
-    H=compute_H_monkey(env, 
-                    agent, 
-                    theta, 
-                    phi, 
-                    H_dim=11, 
-                    num_episodes=22,
-                    num_samples=9,
-                    action_var=1e-8,
-                    monkeydata=(states, actions, tasks))  
-stderr(torch.inverse(H))         
+stderr(torch.inverse(H))          
 inverse_data['Hessian']=H
 save_inverse_data(inverse_data)
 ev, evector=torch.eig(H,eigenvectors=True)
@@ -2145,11 +2216,11 @@ with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
         agent=agent, 
         phi=phi, 
         num_episodes=9,
-        action_var=1e-8,
+        action_var=1e-2,
         states=sample_states,
         actions=sample_actions,
         tasks=sample_tasks,), 
-    number_pixels=15, 
+    number_pixels=5, 
     alpha=0.5,
     scale=0.01,
     background_data=None)
@@ -2168,7 +2239,7 @@ plt.plot(logll1d)
 # inverse_data['grad']
 
 # load agent
-agent_=TD3_torch.TD3.load('trained_agent/repaper_13.zip')
+agent_=TD3_torch.TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
 policygiventheta()
 policygiventhetav2(env.decision_info.shape[-1])
@@ -2216,9 +2287,26 @@ with suppress():
 plotoverhead(res)
 plotctrl(res)
 
+number_pixels=5
+background_data=inverse_trajectory_monkey(
+                    theta_trajectory,
+                    env=env,
+                    agent=agent,
+                    phi=phi,
+                    background_data=None,
+                    H=None,
+                    background_contour=True,
+                    number_pixels=number_pixels,
+                    background_look='contour',
+                    ax=None,
+                    action_var=0.01,
+                    loss_sample_size=10)
+inverse_data['background_data']={number_pixels:background_data}
+save_inverse_data(inverse_data)
 
 
-
+c=plt.imshow(background_data)
+plt.colorbar(c)
 
 # 1. warpped up of agents with diff theta in a row
 phi=torch.tensor([[0.5000],
@@ -2566,7 +2654,7 @@ background_data=inverse_trajectory_monkey(
                     number_pixels=number_pixels,
                     background_look='contour',
                     ax=None,
-                    action_var=1e-8,
+                    action_var=0.001,
                     loss_sample_size=20)
 inverse_data['background_data']={number_pixels:background_data}
 save_inverse_data(inverse_data)

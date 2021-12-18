@@ -89,31 +89,28 @@ output.set_zlabel('prob')
 plt.show()
 
 
-
+%gui qt
 import os
 os.environ["QT_API"] = "pyqt5"
 from mayavi import mlab
 
-x = np.arange(-2, 2, 0.1)
-y = np.arange(-2, 2, 0.1)
-mx, my = np.meshgrid(x, y, indexing='ij')
-mz1 = np.abs(mx) + np.abs(my)
-mz2 = mx ** 2 + my ** 2
 
 def v2_mayavi(transparency):
     from mayavi import mlab
-    fig = mlab.figure()
 
-    ax_ranges = [-2, 2, -2, 2, 0, 8]
-    ax_scale = [1.0, 1.0, 0.4]
+    fig = mlab.figure(size=(999,999))
+    X, Y = np.mgrid[-0.3:0.3:0.01, -0.3:0.3:0.01]
+    # Z = np.exp(-0.5 * (cov_inv[0,0]*X**2 + (cov_inv[0,1] + cov_inv[1,0])*X*Y + cov_inv[1,1]*Y**2))*0.6/55
+    # s = surf(X, Y, Z,colormap='Blues')
+    ax_ranges = [-0.3, 0.3, -0.3, 0.3, 0, 0.02]
+    ax_scale = [1.0, 1.0, 50.0]
     ax_extent = ax_ranges * np.repeat(ax_scale, 2)
 
-    surf3 = mlab.surf(mx, my, mz1, colormap='Blues')
-    surf4 = mlab.surf(mx, my, mz2, colormap='Oranges')
-
+    surf3 = mlab.surf(X, Y, Z, colormap='Blues')
+    surf4 = mlab.surf(X, Y, Zin, colormap='Oranges')
     surf3.actor.actor.scale = ax_scale
     surf4.actor.actor.scale = ax_scale
-    mlab.view(60, 74, 17, [-2.5, -4.6, -0.3])
+    mlab.view(1, 1, 1, [-1.5, -1.6, -0.3])
     mlab.outline(surf3, color=(.7, .7, .7), extent=ax_extent)
     mlab.axes(surf3, color=(.7, .7, .7), extent=ax_extent,
               ranges=ax_ranges,
@@ -125,3 +122,6 @@ def v2_mayavi(transparency):
         fig.scene.renderer.use_depth_peeling = 1
 
 v2_mayavi(False)
+
+
+

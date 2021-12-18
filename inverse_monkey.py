@@ -44,11 +44,11 @@ arg.presist_phi=False
 arg.cost_scale=1
 
 arg.fixed_param_ind=[6]
-arg.action_var=0.001
-arg.ADAM_LR = 0.007
-arg.LR_STOP=0.001
-arg.sample = 5 # samples for 1 mk trial
-arg.batch = 22
+arg.action_var=0.01
+arg.ADAM_LR = 0.001
+arg.LR_STOP=0.0001
+arg.sample = 11 # samples for 1 mk trial
+arg.batch = 10
 arg.NUM_IT = 100 # iteration of all data
 number_updates=1 # update per batch
 
@@ -66,8 +66,8 @@ agent_=TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
 
 print('loading data')
-note='bnorm4'
-with open("C:/Users/24455/Desktop/bruno_normal_downsample",'rb') as f:
+note='testdcont'
+with open("C:/Users/24455/Desktop/bruno_pert_downsample",'rb') as f:
         df = pickle.load(f)
 df=datawash(df)
 df=df[df.category=='normal']
@@ -96,10 +96,10 @@ phi=torch.tensor([[0.5],
 
 theta=torch.tensor([[0.5],   
         [1.6],   
-        [0.4],   
-        [0.4],   
-        [0.4405],   
-        [0.4],   
+        [0.5],   
+        [0.5],   
+        [0.5],   
+        [0.5],   
         [0.13],   
         [0.1],   
         [0.1],   
@@ -107,18 +107,18 @@ theta=torch.tensor([[0.5],
         [0.1]])
 
 theta_estimation=torch.tensor(
-[[0.5],
-        [1.4210],
-        [0.7],
-        [0.7],
-        [0.9],
-        [0.9],
-        [0.13],
-        [0.0],
-        [0.0],
-        [0.001],
-        [0.001]]
-         )
+[[0.8353011012077332],
+ [2.23036789894104],
+ [0.4379126727581024],
+ [0.065259650349617],
+ [0.0010000000474974513],
+ [0.005447442177683115],
+ [0.13],
+ [0.5920934677124023],
+ [0.6594878435134888],
+ [1.00711989402771],
+ [0.7560240030288696]]
+ )
 
 print('start inverse')
 for i in range(1):

@@ -30,6 +30,11 @@ class Config:
         # acc control, vt+1 = a*vt + b*ut
         self.tau_range=             [1e-2,1] #*5 to normalize
         self.init_uncertainty_range=[1e-8,1]
+        self.cost_scale=1
+        self.presist_phi=False
+        self.agent_knows_phi=False
+        self.dev_v_cost_range=[0,1]
+        self.dev_w_cost_range=[0,1]
         # --------------previous in use, old version---------------------------
         self.WORLD_SIZE=1.0
         self.DELTA_T = self.dt

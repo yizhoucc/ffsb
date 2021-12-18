@@ -1,7 +1,8 @@
 
 from inspect import EndOfBlock
 from pickle import HIGHEST_PROTOCOL
-
+import multiprocessing
+from matplotlib.collections import LineCollection
 from numpy.core.numeric import NaN
 from scipy.ndimage.measurements import label
 from torch.nn import parameter
@@ -13,7 +14,6 @@ import matplotlib.patches as mpatches
 import torch
 import warnings
 import random
-from contextlib import contextmanager
 from astropy.convolution import convolve
 from numpy import pi
 # from numba import njit
@@ -32,7 +32,7 @@ cmaps['Qualitative'] = ['Pastel1', 'Pastel2', 'Paired', 'Accent',
                         'tab10', 'tab20', 'tab20b', 'tab20c']
 global color_settings
 color_settings={
-    'v':'teal',
+    'v':'tab:blue',
     'w':'orange',
     'cov':'blue',
     'b':'b',
@@ -136,7 +136,50 @@ arg.lr_gamma = 0.95
 arg.PI_STD=1
 arg.presist_phi=False
 arg.cost_scale=1
-number_updates=10000
+
+phi=torch.tensor([[0.5],
+        [pi/2],
+        [0.001],
+        [0.001],
+        [0.001],
+        [0.001],
+        [0.13],
+        [0.001],
+        [0.001],
+        [0.001],
+        [0.001],
+])
+
+
+# illustrate perterb trial
+def pertexample():
+    with initiate_plot(3,3,300) as fig:
+        ax=fig.add_subplot()
+        ax.plot(df.iloc[0].pos_v,color=color_settings['v'],label='real v')
+        ax.plot([i*200 for i in df.iloc[0].action_v ],'--',color=color_settings['v'],label='v control')
+        ax.plot(df.iloc[0].pos_w ,color=color_settings['w'],label='real w')
+        ax.plot([i*200 for i in df.iloc[0].action_w ],'--',color=color_settings['w'],label='w control')
+        ax.legend()
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xlabel('time [dt]')
+        ax.set_ylabel('velocity [cm/s and degree/s]')
+
+# illustrate density
+def densityexample():
+    densities=[0.0001, 0.0005, 0.001, 0.005]
+    marker = itertools.cycle(('v', '^', '<', '>')) 
+    with initiate_plot(8,2,300) as fig:
+        for i,density in enumerate(densities):
+            ax=fig.add_subplot(1,4,i+1)    
+            ax.set_xticks([]);ax.set_yticks([])
+            x=torch.zeros(int(10000*3*density)).uniform_()
+            y=torch.zeros(int(10000*3*density)).uniform_()
+            for xx,yy in zip(x,y):
+                plt.plot(xx,yy, marker = next(marker), linestyle='',color='k')
+            ax.set_xlabel('density={}'.format(density))
+
+            
 
 
 # assume the wrong gain and agent makes sense 
@@ -1139,7 +1182,8 @@ def plot_inverse_trend(inverse_data):
             y=[t[n] for t in inverse_data['grad']]
             ax.plot(y)
             maxvalue=max(abs(min(y)),abs(max(y)))
-            ax.set_ylim(-maxvalue,maxvalue)
+            # ax.set_ylim(-maxvalue,maxvalue)
+            ax.set_ylim(-100,100)
             ax.plot([i for i in range(len(y))],[0]*len(y))
     plt.show()
     # loss
@@ -1559,7 +1603,8 @@ def inverse_trajectory_monkey(theta_trajectory,
                     number_pixels=10,
                     background_look='contour',
                     ax=None, 
-                    loss_sample_size=100, 
+                    num_episodes=2,
+                    loss_sample_size=2, 
                     H=None,
                     action_var=0.1,
                     **kwargs):
@@ -1602,7 +1647,8 @@ def inverse_trajectory_monkey(theta_trajectory,
         states=sample_states,
         actions=sample_actions,
         action_var=action_var,
-        tasks=sample_tasks,)
+        tasks=sample_tasks,
+        num_episodes=num_episodes)
         finaltheta=score[row_cursor, 0], score[row_cursor, 1]
         current_xrange=list(ax.get_xlim())
         current_xrange[0]-=0.1
@@ -1648,9 +1694,7 @@ def inverse_trajectory_monkey(theta_trajectory,
             cov_pc=evectors[:,:2].transpose()@np.array(cov)@evectors[:,:2]
             plot_cov_ellipse(cov_pc,pos=score[-1,:2],alpha_factor=0.5,ax=ax)
 
-
         return background_data
-
 
 def plot_background(
     ax, 
@@ -1672,20 +1716,78 @@ def plot_background(
                     score=np.array([u,v])
                     reconstructed_theta=score@evectors.transpose()[:2,:]+mu
                     reconstructed_theta=torch.tensor(reconstructed_theta).float()
-                    print(reconstructed_theta)
-                    # if not np.array_equal(reconstructed_theta,reconstructed_theta.clip(1e-8,999)):
-                    #     background_data[i,j]=np.nan
-                    #     print(reconstructed_theta)
-                    # else:
-                    #     # reconstructed_theta=nn.Parameter(torch.Tensor(reconstructed_theta))
+                    reconstructed_theta.clamp(0.001,3)
                     background_data[i,j]=loss_function(reconstructed_theta)
+                    print(background_data[i,j],reconstructed_theta)
         if look=='contour':
             c=ax.contourf(X,Y,background_data.transpose(),alpha=alpha,zorder=1)
-            fig.colorbar(c)
+            plt.colorbar(c,ax=ax)
         # elif look=='pixel':
         #     im=ax.imshow(X,Y,background_data,alpha=alpha,zorder=1)
         #     add_colorbar(im)
         return background_data
+
+
+# TODO
+def plot_background_par(
+    ax, 
+    xyrange,
+    mu, 
+    evectors, 
+    loss_function, 
+    number_pixels=10, 
+    look='contour', 
+    alpha=1,
+    background_data=None,
+    **kwargs):
+
+    def _cal(u,v,i,j):
+        with torch.no_grad():
+            score=np.array([u,v])
+            reconstructed_theta=score@evectors.transpose()[:2,:]+mu
+            reconstructed_theta=torch.tensor(reconstructed_theta).float()
+            reconstructed_theta.clamp(0.001,3)
+            background_data[i,j]=loss_function(reconstructed_theta)
+
+    def _cal(u,v,i,j,background_data):
+        print([u,v,i,j])
+
+
+    X,Y=np.meshgrid(np.linspace(xyrange[0][0],xyrange[0][1],number_pixels),np.linspace(xyrange[1][0],xyrange[1][1],number_pixels))
+    if background_data is None:
+        background_data=np.zeros((number_pixels,number_pixels))
+        pool = multiprocessing.Pool(4)
+        jobparam=[(u,v,i,j,background_data) for (i,u),(j,v) in zip(enumerate(np.linspace(xyrange[1][0],xyrange[1][1],number_pixels)),enumerate(np.linspace(xyrange[0][0],xyrange[0][1],number_pixels)))]
+        pool.map_async(_cal, (job for job in jobparam)).get(timeout=10)
+
+            
+        if look=='contour':
+            c=ax.contourf(X,Y,background_data.transpose(),alpha=alpha,zorder=1)
+            fig.colorbar(c,ax=ax)
+    return background_data
+
+
+    pool = multiprocessing.Pool(4)
+    jobs=list(range(10))
+    def _cal(x):
+        return x**2
+    res=pool.map_async(_cal, (job for job in jobs))
+    w = sum(res.get(timeout=10))
+    print(w)
+
+    import multiprocessing
+    def start_process():
+        print ('Starting', multiprocessing.current_process().name)
+
+    pool_size =2
+    pool = multiprocessing.Pool(processes=pool_size,
+                                initializer=start_process,
+                                )
+
+    pool_outputs = pool.map(_cal,jobs)
+    pool.close() # no more tasks
+    pool.join()  # wrap up current tasks
+
 
 def monkey_loss_wrapped(
                 env=None, 
@@ -2069,37 +2171,71 @@ def histdfcol():
     plt.show()
 
 
-# test color gradient line
-def testcolorgradient():
-    from matplotlib.collections import LineCollection
-    x    = np.linspace(0,1, 100)
-    y    = np.linspace(0,1, 100)
-    cols = np.linspace(0,1,len(x))
-
+def colorgrad_line(x,y,z,ax=None, linewidth=2):
+    x,y,z=np.array(x),np.array(y),np.array(z)
     points = np.array([x, y]).T.reshape(-1, 1, 2)
     segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    colors=np.array(z)
+    if ax:
+        lc = LineCollection(segments, cmap='viridis')
+        lc.set_array(colors)
+        lc.set_linewidth(linewidth)
+        line = ax.add_collection(lc)
+        plt.colorbar(line,ax=ax)
+    else:
+        fig, ax = plt.subplots()
+        lc = LineCollection(segments, cmap='viridis')
+        lc.set_array(colors)
+        lc.set_linewidth(linewidth)
+        line = ax.add_collection(lc)
+        fig.colorbar(line,ax=ax)
+    return ax
 
-    fig, ax = plt.subplots()
-    lc = LineCollection(segments, cmap='viridis')
-    lc.set_array(cols)
-    lc.set_linewidth(2)
-    line = ax.add_collection(lc)
-    fig.colorbar(line,ax=ax)
+def colorgrad_inverse_traj(inverse_data):
+        # plot trajectory
+        fig = plt.figure(figsize=[3, 3])
+        ax = fig.add_subplot()
+        data_matrix=column_feature_data(inverse_data['theta_estimations'])
+        mu=np.mean(data_matrix,0)
+        try:
+            score, evectors, evals = pca(data_matrix)
+        except np.linalg.LinAlgError:
+            score, evectors, evals = pca(data_matrix)
+        x=score[:,0]
+        y=score[:,1]
+        z=inverse_data['loss']
+        z=np.array(z)*-1
+        z= (z-min(z))/(max(z)-min(z))
+        # z=np.log(z)
+        ax.set_xlim(min(x),max(x))
+        ax.set_ylim(min(y),max(y))
+        colorgrad_line(x,y,z,ax=ax)
+        ax.set_xlabel('projected parameters')
+        ax.set_ylabel('projected parameters')
+        ax.set_title('inverse trajectory, color for likelihood')
 
 # inferred obs vs density
 def obsvsdensity(noiseparam):
+    errbar=False
     x,y=[],[]
+    err=[]
     for k,v in noiseparam.items():
         x.append(k)
-        y.append(v)
+        y.append(v['param'])
+        if 'std' in v:
+            err.append(v['std'])
+            errbar=True
     y=np.array(y)[:,:,0]
-
+    err=np.array(err)
     fig=plt.figure(figsize=(5,5))
     ax=fig.add_subplot(111)
-    ax.plot(y[:,0],label='pro v')
-    ax.plot(y[:,1],label='pro w')
-    ax.plot(y[:,2],label='obs v')
-    ax.plot(y[:,3],label='obs w')
+    lables=['pro v','pro w','obs v','obs w']
+    if errbar:
+        for i in range(4):
+            ax.errorbar( [i for i in range(4)],y[:,i],err[:,i],label=lables[i])
+    else:
+        for i in range(4):
+            ax.plot(y[:,i],label=lables[i])
     ax.set_xticks([i for i in range(4)])
     ax.set_xticklabels(["0.0001", "0.0005", "0.001", "0.005"])
     ax.legend(fontsize=16)
@@ -2121,61 +2257,96 @@ def obsvsdensity(noiseparam):
 
 
 env=ffacc_real.FireFlyPaper(arg)
-# load monkey data
-with open("C:/Users/24455/Desktop/bruno_pert_downsample",'rb') as f: 
-    df = pickle.load(f)
-df=datawash(df)
-states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
-# dfnormal=df[df.perturb_start_time.isna()]
 agent_=TD3_torch.TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
 
 
+# load monkey data
+print('loading data')
+note='bnorm4rand'
+with open("C:/Users/24455/Desktop/bruno_normal_downsample",'rb') as f:
+        df = pickle.load(f)
+df=datawash(df)
+df=df[df.category=='normal']
+# df=df[df.target_r>250]
+df=df[df.floor_density==0.005]
+# floor density are in [0.0001, 0.0005, 0.001, 0.005]
+df=df[:-100]
+print('process data')
+states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
+print('done process data')
+sample_states, sample_actions, sample_tasks=sample_batch(states=states,actions=actions,tasks=tasks,batch_size=20)
+loss_function=monkey_loss_wrapped(env=env, 
+        agent=agent, 
+        phi=phi, 
+        num_episodes=5,
+        action_var=0.001,
+        states=sample_states,
+        actions=sample_actions,
+        tasks=sample_tasks,)
+
+
+
 # load inverse data
-inverse_data=load_inverse_data("bpert41_9_25")
+inverse_data=load_inverse_data("testdcont2_16_45")
 theta_trajectory=inverse_data['theta_estimations']
 theta_estimation=theta_trajectory[-1]
-"theta"=torch.tensor(theta_estimation)
+theta=torch.tensor(theta_estimation)
 phi=torch.tensor(inverse_data['phi'])
 H=inverse_data['Hessian'] 
 print(H)
 plot_inverse_trend(inverse_data)
+colorgrad_inverse_traj(inverse_data)
+
 
 # vis the inverses of differnt density
-inverse_data=load_inverse_data("brunonorm129_7_58")
+inverse_data=load_inverse_data("testdefstart2_12_43")
 plot_inverse_trend(inverse_data)
-inverse_data=load_inverse_data("brunonorm229_7_57")
+inverse_data=load_inverse_data("test2_12_40")
 plot_inverse_trend(inverse_data)
 
 inversedensityfiles=[
-    'brunonorm129_7_58',
-    'brunonorm229_7_57',
-    'brunonorm329_7_57',
-    'brunonorm429_7_57',
+    'varfixnorm12_0_51',
+    'varfixnorm22_0_51',
+    'varfixnorm32_0_52',
+    'varfixnorm42_0_52',
 ]
+
 noiseparam={}
 for eachdensity,inversefile in zip([0.0001, 0.0005, 0.001, 0.005],inversedensityfiles):
-    noiseparam[eachdensity]=load_inverse_data(inversefile)['theta_estimations'][-2][2:6]
+    noiseparam[eachdensity]={}
+    noiseparam[eachdensity]['param']=load_inverse_data(inversefile)['theta_estimations'][-2][2:6]
+    H=load_inverse_data(inversefile)['Hessian']
+    if H!=[]:
+        noiseparam[eachdensity]['std']=stderr(torch.inverse(H))[2:6]
 obsvsdensity(noiseparam)
 
-for eachdensity,inversefile in zip([0.0001, 0.0005, 0.001, 0.005],inversedensityfiles):
-    tempdf=df[df.floor_density==eachdensity]
-    states, actions, tasks=monkey_data_downsampled(tempdf,factor=0.0025)
-    sample_states, sample_actions, sample_tasks=sample_batch(states=states,actions=actions,tasks=tasks,batch_size=20)
-    theta=torch.tensor(load_inverse_data(inversefile)['theta_estimations'][-2])
-    H=torch.autograd.functional.hessian(monkey_loss_wrapped(env=env, 
-        agent=agent, 
-        phi=phi, 
-        num_episodes=9,
-        action_var=1e-4,
-        states=sample_states,
-        actions=sample_actions,
-        tasks=sample_tasks,),theta,strict=True)
-    H=H[:,0,:,0]
-    print(stderr(torch.inverse(H)))
-    inverse_data['Hessian']=H
-    save_inverse_data(inverse_data)
-    print(load_inverse_data(inversefile)['theta_estimations'][-2][6])
+
+%%time
+with open("C:/Users/24455/Desktop/bruno_normal_downsample",'rb') as f:
+    df = pickle.load(f)
+    df=datawash(df)
+    df=df[df.category=='normal']
+    for eachdensity,inversefile in zip([0.0001, 0.0005, 0.001, 0.005],inversedensityfiles):
+        tempdf=df[df.floor_density==eachdensity]
+        states, actions, tasks=monkey_data_downsampled(tempdf,factor=0.0025)
+        sample_states, sample_actions, sample_tasks=sample_batch(states=states,actions=actions,tasks=tasks,batch_size=20)
+        theta=torch.tensor(load_inverse_data(inversefile)['theta_estimations'][-2])
+        _loss_function=monkey_loss_wrapped(env=env, 
+            agent=agent, 
+            phi=phi, 
+            num_episodes=5,
+            action_var=0.001,
+            states=sample_states,
+            actions=sample_actions,
+            tasks=sample_tasks,)
+        H=torch.autograd.functional.hessian(_loss_function,theta,strict=True)
+        H=H[:,0,:,0]   
+        noiseparam[eachdensity]={}  
+        noiseparam[eachdensity]['std']=stderr(torch.inverse(H))[2:6]   
+        inverse_data=load_inverse_data(inversefile)
+        inverse_data['Hessian']=H    
+        save_inverse_data(inverse_data)
 
 for inversefile in  inversedensityfiles:
     theta=torch.tensor(load_inverse_data(inversefile)['theta_estimations'][-2])
@@ -2188,23 +2359,17 @@ for eachdensity in [0.0001, 0.0005, 0.001, 0.005]:
     print('density {}, reward% '.format(eachdensity),len(df[df.floor_density==eachdensity][df.rewarded])/len(df[df.floor_density==eachdensity]))
 
 
-
-
-
-H=torch.autograd.functional.hessian(monkey_loss_wrapped(env=env, 
-        agent=agent, 
-        phi=phi, 
-        num_episodes=9,
-        action_var=1e-8,
-        states=sample_states,
-        actions=sample_actions,
-        tasks=sample_tasks,),theta)
+# calculate H
+%%time
+H=torch.autograd.functional.hessian(loss_function,theta,strict=True)
 H=H[:,0,:,0]
 stderr(torch.inverse(H))          
 inverse_data['Hessian']=H
 save_inverse_data(inverse_data)
 ev, evector=torch.eig(H,eigenvectors=True)
 env=ffacc_real.FireFlyPaper(arg)
+
+# background in eigen axis
 with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
     warnings.simplefilter('ignore')
     ax = fig.add_subplot(111)
@@ -2215,7 +2380,7 @@ with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
     loss_function=monkey_loss_wrapped(env=env, 
         agent=agent, 
         phi=phi, 
-        num_episodes=9,
+        num_episodes=50,
         action_var=1e-2,
         states=sample_states,
         actions=sample_actions,
@@ -2287,6 +2452,7 @@ with suppress():
 plotoverhead(res)
 plotctrl(res)
 
+%%time
 number_pixels=5
 background_data=inverse_trajectory_monkey(
                     theta_trajectory,
@@ -2299,8 +2465,9 @@ background_data=inverse_trajectory_monkey(
                     number_pixels=number_pixels,
                     background_look='contour',
                     ax=None,
-                    action_var=0.01,
-                    loss_sample_size=10)
+                    action_var=0.2,
+                    loss_sample_size=5,
+                    num_episodes=13)
 inverse_data['background_data']={number_pixels:background_data}
 save_inverse_data(inverse_data)
 
@@ -2395,7 +2562,7 @@ single_trial_overhead()
 
 #---------------------------------------------------------------------
 # plot one monkey trial using index
-ind=torch.randint(low=100,high=5000,size=(1,))
+ind=torch.randint(low=100,high=300,size=(1,))
 with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
     warnings.simplefilter('ignore')
     ax = fig.add_subplot(111)
@@ -2409,7 +2576,7 @@ with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
 
 #---------------------------------------------------------------------
 # 3. monkey and inferred agent act similar on similar trials
-ind=torch.randint(low=100,high=1111,size=(1,))
+ind=torch.randint(low=0,high=888,size=(1,))
 indls=similar_trials(ind, tasks, actions)
 indls=indls[:20]
 with torch.no_grad():
@@ -2452,7 +2619,7 @@ ax.get_figure()
 
 #---------------------------------------------------------------------
 # 3. monkey and inferred agent act similar on similar trials, given mk states
-ind=torch.randint(low=100,high=1111,size=(1,))
+ind=torch.randint(low=0,high=999,size=(1,))
 indls=similar_trials(ind, tasks, actions)
 indls=indls[:20]
 with torch.no_grad():
@@ -2490,6 +2657,86 @@ with torch.no_grad():
     plotoverhead(resmk)
     plotctrl(resmk)
 
+alllogll=[]
+for true, est in zip(resmk['mk_actions'],resmk['agent_actions']):
+    eplogll=[0.]
+    for t,e in zip(true,est):
+        eplogll.append(torch.sum(logll(t,e,std=0.01)))
+    alllogll.append(sum(eplogll))
+print(np.mean(alllogll))
+
+for a in resmk['mk_actions']:
+    plt.plot(a[:,0],c='tab:blue',alpha=0.5)
+for a in resmk['agent_actions']:
+    plt.plot(a[:,0],c='tab:orange',alpha=0.5)
+
+for a in resmk['mk_actions']:
+    plt.plot(a[:,1],c='royalblue',alpha=0.5)
+for a in resmk['agent_actions']:
+    plt.plot(a[:,1],c='orangered',alpha=0.5)
+plt.xlabel('time [dt]')
+plt.ylabel('control v and w')
+
+
+plt.plot(actions[indls[-1]])
+plt.plot(resmk['agent_actions'][-1])
+
+true=actions[indls[-1]]
+est=resmk['agent_actions'][-1]
+
+sumlogll=0.
+for t,e in zip(true,est):
+    sumlogll+=logll(t,e,std=0.001)
+
+
+# use irc action
+ind=torch.randint(low=100,high=1111,size=(1,))
+indls=similar_trials(ind, tasks, actions)
+indls=indls[:20]
+maxlen=max([len(actions[i]) for i in indls])
+for ind in indls:
+    env.reset(goal_position=tasks[ind],theta=theta,phi=phi)
+    vw=[]
+    done=False
+    with torch.no_grad():
+        while not done and env.trial_timer<=maxlen:
+            action=agent(env.decision_info)
+            vw.append(action)
+            _,_,done,_=env.step(action)
+    vw=torch.stack(vw)[:,0,:]
+
+    plt.plot(vw,c='orange',alpha=0.5)
+    plt.plot(actions[ind],c='tab:blue',alpha=0.5)
+plt.plot(vw,c='orange',alpha=1,label='agent')
+plt.plot(actions[ind],c='tab:blue',alpha=1,label='monkey')
+plt.xlabel('time [dt]')
+plt.ylabel('control v and w')
+plt.legend()
+
+
+# use mkaction, same as in inverse
+ind=torch.randint(low=100,high=1111,size=(1,))
+indls=similar_trials(ind, tasks, actions)
+indls=indls[:20]
+for ind in indls:
+    env.reset(goal_position=tasks[ind],theta=theta,phi=phi)
+    vw=[]
+    done=False
+    mkactionep=actions[ind][1:]
+    with torch.no_grad():
+        while not done and env.trial_timer<len(mkactionep):
+            action=agent(env.decision_info)
+            vw.append(action)
+            _,_,done,_=env.step(mkactionep[int(env.trial_timer)])
+    vw=torch.stack(vw)[:,0,:]
+
+    plt.plot(vw,c='orange',alpha=0.5)
+    plt.plot(actions[ind],c='tab:blue',alpha=0.5)
+plt.plot(vw,c='orange',alpha=1,label='agent')
+plt.plot(actions[ind],c='tab:blue',alpha=1,label='monkey')
+plt.xlabel('time [dt]')
+plt.ylabel('control v and w')
+plt.legend()
 
 
 
@@ -3005,3 +3252,4 @@ with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
     add_colorbar(c)
     ax.set_ylabel('distance')
     ax.set_xlabel('angle')
+

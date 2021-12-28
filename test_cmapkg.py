@@ -122,9 +122,12 @@ for generation in range(50):
 
 
 
+
+
+
 # loading
 import pickle
-with open('cmapk56fixlossnorm1_', 'rb') as f:
+with open('cmapk56fixgoalrnorm1_', 'rb') as f:
     log = pickle.load(f)
 
 # theta bar
@@ -269,11 +272,8 @@ theta=torch.tensor(optimizer._mean).view(-1,1)
 finaltheta=theta
 cov=optimizer._C
 finalcov=torch.tensor(cov)
-H=torch.inverse(torch.tensor(cov))
-ev, evector=torch.eig(H,eigenvectors=True)
-ev=ev[:,0]
-ev,esortinds=ev.sort(descending=True)
-evector=evector[esortinds].float()
+
+
 
 eval = CMA(mean=np.array(optimizer._mean), sigma=0.5,population_size=16*4)
 eval.set_bounds(np.array([[0.01]*11,[1.,2,1,1,1,1,0.2,1,1,1,1]],dtype='float32').transpose())
@@ -297,7 +297,6 @@ c = plt.colorbar()
 inds=[1,3,5,8,0,2,4,7,6,9,10]
 with initiate_plot(5,5,300) as fig:
     ax=fig.add_subplot(1,1,1)
-    cov=theta_cov(H)
     cov=torch.tensor(cov)
     im=plt.imshow(cov[inds].t()[inds].t(),cmap=plt.get_cmap('bwr'),
         vmin=-torch.max(cov),vmax=torch.max(cov))
@@ -324,7 +323,7 @@ with initiate_plot(5,5,300) as fig:
 
 
 # eig cov heatmap
-ev, evector=torch.eig(H,eigenvectors=True)
+ev, evector=torch.eig(torch.tensor(cov),eigenvectors=True)
 ev=ev[:,0]
 ev,esortinds=ev.sort(descending=False)
 evector=evector[esortinds]
@@ -350,7 +349,7 @@ with initiate_plot(5,1,300) as fig:
     ax.set_xticks([])
     ax.set_yscale('log')
     # ax.set_ylim(min(plotdata),max(plotdata))
-    ax.set_yticks([0.1,100,1e4])
+    ax.set_yticks([0.1,100])
     ax.set_xlabel('eigen values, log scale')
     plt.tick_params(axis='y', which='minor')
     ax.yaxis.set_minor_formatter(FormatStrFormatter("%.1f"))

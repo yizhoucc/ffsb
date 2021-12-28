@@ -293,6 +293,68 @@ plt.ylabel('projected parameters')
 c = plt.colorbar()
 
 
+# covariance heatmap
+inds=[1,3,5,8,0,2,4,7,6,9,10]
+with initiate_plot(5,5,300) as fig:
+    ax=fig.add_subplot(1,1,1)
+    cov=theta_cov(H)
+    cov=torch.tensor(cov)
+    im=plt.imshow(cov[inds].t()[inds].t(),cmap=plt.get_cmap('bwr'),
+        vmin=-torch.max(cov),vmax=torch.max(cov))
+    ax.set_title('covariance matrix', fontsize=20)
+    x_pos = np.arange(len(theta_names))
+    plt.yticks(x_pos, [theta_names[i] for i in inds],ha='right')
+    plt.xticks(x_pos, [theta_names[i] for i in inds],rotation=45,ha='right')
+    add_colorbar(im)
+
+# correlation heatmap
+b=torch.diag(torch.tensor(cov),0)
+S=torch.diag(torch.sqrt(b))
+Sinv=torch.inverse(S)
+correlation=Sinv@cov@Sinv
+with initiate_plot(5,5,300) as fig:
+    ax=fig.add_subplot(1,1,1)
+    im=ax.imshow(correlation[inds].t()[inds].t(),cmap=plt.get_cmap('bwr'),
+        vmin=-torch.max(correlation),vmax=torch.max(correlation))
+    ax.set_title('correlation matrix', fontsize=20)
+    x_pos = np.arange(len(theta_names))
+    plt.yticks(x_pos, [theta_names[i] for i in inds],ha='right')
+    plt.xticks(x_pos, [theta_names[i] for i in inds],rotation=45,ha='right')
+    add_colorbar(im)
+
+
+# eig cov heatmap
+ev, evector=torch.eig(H,eigenvectors=True)
+ev=ev[:,0]
+ev,esortinds=ev.sort(descending=False)
+evector=evector[esortinds]
+with initiate_plot(5,5,300) as fig:
+    ax=fig.add_subplot(1,1,1)
+    img=ax.imshow(evector[:,inds].t(),cmap=plt.get_cmap('bwr'),
+            vmin=-torch.max(evector),vmax=torch.max(evector))
+    add_colorbar(img)
+    ax.set_title('eigen vectors of Hessian')
+    x_pos = np.arange(len(theta_names))
+    plt.yticks(x_pos, [theta_names[i] for i in inds],ha='right')
+
+
+with initiate_plot(5,1,300) as fig:
+    ax=fig.add_subplot(1,1,1)
+    x_pos = np.arange(len(theta_names))
+    # Create bars and choose color
+    ax.bar(x_pos, ev, color = 'blue')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    # ax.spines['left'].set_visible(False)
+    ax.set_xticks([])
+    ax.set_yscale('log')
+    # ax.set_ylim(min(plotdata),max(plotdata))
+    ax.set_yticks([0.1,100,1e4])
+    ax.set_xlabel('eigen values, log scale')
+    plt.tick_params(axis='y', which='minor')
+    ax.yaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
+    plt.gca().invert_yaxis()
 
 
 

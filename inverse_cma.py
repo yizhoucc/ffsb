@@ -1,3 +1,5 @@
+import os
+os.chdir(r"C:\Users\24455\iCloudDrive\misc\ffsb")
 import numpy as np
 from cmaes import CMA
 import copy
@@ -20,9 +22,9 @@ from InverseFuncs import *
 from monkey_functions import *
 from FireflyEnv import ffacc_real
 from Config import Config
-from cma_mpi_helper import run
+# from cma_mpi_helper import run
 import ray
-ray.init(log_to_driver=False,ignore_reinit_error=True,include_dashboard=True)
+ray.init(address='192.168.0.177:6379', _redis_password='5241590000000000', log_to_driver=False,ignore_reinit_error=True,_node_ip_address='192.168.0.119')
 
 
 arg = Config()
@@ -44,12 +46,12 @@ agent=agent_.actor.mu.cpu()
 
 print('loading data')
 note='testdcont'
-with open("C:/Users/24455/Desktop/bruno_normal_downsample",'rb') as f:
+with open("C:/Users/24455/Desktop/victor_normal_downsample",'rb') as f:
         df = pickle.load(f)
 df=datawash(df)
 df=df[df.category=='normal']
-df=df[df.target_r>250]
-df=df[df.floor_density==0.0001]
+# df=df[df.target_r>250]
+# df=df[df.floor_density==0.0005]
 # floor density are in [0.0001, 0.0005, 0.001, 0.005]
 # df=df[500:600]
 print('process data')
@@ -57,7 +59,7 @@ states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
 print('done process data')
 
 # misc
-savename='cmafull1_'
+savename='cmafull_vic2'
 phi=torch.tensor([[0.5],
         [pi/2],
         [0.001],
@@ -92,7 +94,7 @@ cur_cov=init_cov
 @ray.remote
 def getlogll(x):
     with torch.no_grad():
-        return  monkeyloss_(agent, actions, tasks, phi, torch.tensor(x).t(), env, action_var=0.01,num_iteration=1, states=states, samples=5,gpu=False).item()
+        return  monkeyloss(agent, actions, tasks, phi, torch.tensor(x).t(), env, action_var=0.01,num_iteration=1, states=states, samples=5,gpu=False).item()
 
 
 
@@ -111,9 +113,9 @@ for generation in range(50):
     solutions=[[x,s] for x,s in zip(xs,solutions)]
     optimizer.tell(solutions)
     log.append([copy.deepcopy(optimizer), xs, solutions])
-    plt.imshow(optimizer._C)
-    plt.colorbar()
-    plt.show()
+    # plt.imshow(optimizer._C)
+    # plt.colorbar()
+    # plt.show()
     with open(savename, 'wb') as handle:
             pickle.dump(log, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print(generation,optimizer._mean,'\n',np.diag(optimizer._C)**0.5,)

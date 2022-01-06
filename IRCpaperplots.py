@@ -2322,7 +2322,7 @@ if __name__=='__main__':
     obsvsdensity(noiseparam)
 
 
-    %%time
+
     with open("C:/Users/24455/Desktop/bruno_normal_downsample",'rb') as f:
         df = pickle.load(f)
         df=datawash(df)
@@ -2360,7 +2360,7 @@ if __name__=='__main__':
 
 
     # calculate H
-    %%time
+
     H=torch.autograd.functional.hessian(loss_function,theta,strict=True)
     H=H[:,0,:,0]
     stderr(torch.inverse(H))          
@@ -2452,7 +2452,7 @@ if __name__=='__main__':
     plotoverhead(res)
     plotctrl(res)
 
-    %%time
+
     number_pixels=5
     background_data=inverse_trajectory_monkey(
                         theta_trajectory,

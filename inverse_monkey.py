@@ -71,7 +71,7 @@ with open("C:/Users/24455/Desktop/bruno_pert_downsample",'rb') as f:
         df = pickle.load(f)
 df=datawash(df)
 df=df[df.category=='normal']
-# df=df[df.target_r>250]
+df=df[df.target_r>250]
 df=df[df.floor_density==0.005]
 # floor density are in [0.0001, 0.0005, 0.001, 0.005]
 df=df[:-100]

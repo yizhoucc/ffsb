@@ -24,8 +24,18 @@ from FireflyEnv import ffacc_real
 from Config import Config
 # from cma_mpi_helper import run
 import ray
-ray.init(address='192.168.0.177:6379', _redis_password='5241590000000000', log_to_driver=False,ignore_reinit_error=True,_node_ip_address='192.168.0.119')
+from pathlib import Path
 
+
+# use cluster
+# ray.init(address='192.168.0.177:6379', _redis_password='5241590000000000', 
+# log_to_driver=False,ignore_reinit_error=True,_node_ip_address='192.168.0.119')
+
+# ray.init(address="ray://192.168.0.177:6379", _redis_password='5241590000000000', 
+# log_to_driver=False,ignore_reinit_error=True,_node_ip_address='192.168.0.119')
+
+# use localhost
+ray.init(log_to_driver=False,ignore_reinit_error=True)
 
 arg = Config()
 import os
@@ -44,10 +54,25 @@ env=ffacc_real.FireFlyPaper(arg)
 agent_=TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
 
+# new way
+datapath=Path("D:\mkdata\\bruno_pert")
+sessions=list(datapath.glob('*ds'))
+df=None
+for session in sessions:
+    # savename=str(session.name)+'_inv'
+    with open(session,'rb') as f:
+        df_ = pickle.load(f)
+    if df is None:
+        df=df_
+    else:
+        df=df.append(df_)
+
+
 print('loading data')
-note='testdcont'
-with open("C:/Users/24455/Desktop/victor_normal_downsample",'rb') as f:
-        df = pickle.load(f)
+# note='testdcont'
+savename='cmafull_s_pert'
+# with open("C:/Users/24455/Desktop/victor_normal_downsample",'rb') as f:
+#         df = pickle.load(f)
 df=datawash(df)
 df=df[df.category=='normal']
 # df=df[df.target_r>250]
@@ -59,14 +84,13 @@ states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
 print('done process data')
 
 # misc
-savename='cmafull_vic2'
 phi=torch.tensor([[0.5],
         [pi/2],
         [0.001],
         [0.001],
         [0.001],
         [0.001],
-        [0.13],
+        # [0.13],
         [0.001],
         [0.001],
         [0.001],
@@ -84,6 +108,7 @@ init_theta=torch.tensor([[0.5],
         [0.5],   
         [0.5],   
         [0.5]])
+init_theta=torch.tensor([0.8901243,  1.6706846,  0.858392,   0.37444177, 0.05250579, 0.08552641, 0.12986924, 0.20578894, 0.7251345,  0.4741538,  0.40967906]).view(-1,1)
 dim=init_theta.shape[0]
 init_cov=torch.diag(torch.ones(dim))*0.3
 cur_mu=init_theta.view(-1)
@@ -94,7 +119,7 @@ cur_cov=init_cov
 @ray.remote
 def getlogll(x):
     with torch.no_grad():
-        return  monkeyloss(agent, actions, tasks, phi, torch.tensor(x).t(), env, action_var=0.01,num_iteration=1, states=states, samples=5,gpu=False).item()
+        return  monkeyloss_(agent, actions, tasks, phi, torch.tensor(x).t(), env, action_var=0.01,num_iteration=1, states=states, samples=5,gpu=False).item()
 
 
 

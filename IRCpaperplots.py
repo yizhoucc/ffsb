@@ -1244,7 +1244,7 @@ def xy2pol(*args, rotation=True): # rotated for the task
     else:
         x=args[0]; y=args[1]
     d = np.sqrt(x**2 + y**2)
-    a = np.arctan2(y, x)-pi/2 if rotation else  np.arctan2(y, x)
+    a = np.arctan2(y, x)+pi/2 if rotation else  np.arctan2(y, x)
     return d, a
 
 

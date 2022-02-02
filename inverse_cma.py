@@ -58,8 +58,7 @@ agent=agent_.actor.mu.cpu()
 datapath=Path("Z:\\schro_pert")
 sessions=list(datapath.glob('*ds'))
 df=None
-for session in sessions[0:1]:
-    # savename=str(session.name)+'_inv'
+for session in sessions:
     with open(session,'rb') as f:
         df_ = pickle.load(f)
     if df is None:

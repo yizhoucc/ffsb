@@ -55,7 +55,7 @@ agent_=TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
 
 # new way
-datapath=Path("D:\mkdata\\bruno_pert")
+datapath=Path("Z:\\schro_pert")
 sessions=list(datapath.glob('*ds'))
 df=None
 for session in sessions:
@@ -70,7 +70,7 @@ for session in sessions:
 
 print('loading data')
 # note='testdcont'
-savename='cmafull_s_pert'
+savename=datapath/'cmafull_s_pert'
 # with open("C:/Users/24455/Desktop/victor_normal_downsample",'rb') as f:
 #         df = pickle.load(f)
 df=datawash(df)
@@ -108,7 +108,7 @@ init_theta=torch.tensor([[0.5],
         [0.5],   
         [0.5],   
         [0.5]])
-init_theta=torch.tensor([0.8901243,  1.6706846,  0.858392,   0.37444177, 0.05250579, 0.08552641, 0.12986924, 0.20578894, 0.7251345,  0.4741538,  0.40967906]).view(-1,1)
+# init_theta=torch.tensor([0.8901243,  1.6706846,  0.858392,   0.37444177, 0.05250579, 0.08552641, 0.12986924, 0.20578894, 0.7251345,  0.4741538,  0.40967906]).view(-1,1)
 dim=init_theta.shape[0]
 init_cov=torch.diag(torch.ones(dim))*0.3
 cur_mu=init_theta.view(-1)
@@ -142,7 +142,7 @@ for generation in range(50):
     # plt.colorbar()
     # plt.show()
     with open(savename, 'wb') as handle:
-            pickle.dump(log, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(log, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print(generation,optimizer._mean,'\n',np.diag(optimizer._C)**0.5,)
 
 

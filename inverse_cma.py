@@ -58,7 +58,7 @@ agent=agent_.actor.mu.cpu()
 datapath=Path("Z:\\schro_pert")
 sessions=list(datapath.glob('*ds'))
 df=None
-for session in sessions:
+for session in sessions[0:1]:
     # savename=str(session.name)+'_inv'
     with open(session,'rb') as f:
         df_ = pickle.load(f)
@@ -66,11 +66,12 @@ for session in sessions:
         df=df_
     else:
         df=df.append(df_)
+del df_
 
 
 print('loading data')
 # note='testdcont'
-savename=datapath/'cmafull_s_pert'
+savename=datapath/('cmafull_'+datapath.name)
 # with open("C:/Users/24455/Desktop/victor_normal_downsample",'rb') as f:
 #         df = pickle.load(f)
 df=datawash(df)
@@ -90,7 +91,7 @@ phi=torch.tensor([[0.5],
         [0.001],
         [0.001],
         [0.001],
-        # [0.13],
+        [0.13],
         [0.001],
         [0.001],
         [0.001],
@@ -143,6 +144,8 @@ for generation in range(50):
     # plt.show()
     with open(savename, 'wb') as handle:
         pickle.dump(log, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    print(generation,optimizer._mean,'\n',np.diag(optimizer._C)**0.5,)
+    print("generation: ",generation)
+    print(["{0:0.2f}".format(i) for i in optimizer._mean])
+    print(["{0:0.2f}".format(i) for i in np.diag(optimizer._C)**0.5])
 
 

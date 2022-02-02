@@ -26,6 +26,7 @@ import numpy as np
 import itertools
 from concurrent import futures
 from monkey_functions import data_iter
+from tqdm import tqdm
 
 def reset_theta_log(gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
     '''
@@ -406,7 +407,7 @@ def monkeyloss_(agent=None,
             states=None, 
             samples=1, 
             gpu=False,
-            action_var=0.1):
+            action_var=0.1,):
     if gpu:
         logPr = torch.zeros(1).cuda()[0] #torch.FloatTensor([])
     else:
@@ -467,7 +468,7 @@ def monkeyloss_(agent=None,
         return logPr_ep/samples/env.trial_timer.item()
 
     tik=time.time()
-    for ep, task in enumerate(tasks):
+    for ep, task in enumerate(tqdm(tasks)):
         logPr_ep=_wrapped_call(ep, task)
         logPr += logPr_ep
         del logPr_ep

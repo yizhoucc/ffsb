@@ -17,7 +17,8 @@ from monkey_functions import *
 
 # loading
 import pickle
-with open('cmapk56fixgoalrnorm1_', 'rb') as f:
+data_path=Path("07-18-2017_ds_inv")
+with open(data_path.parent/'07-18-2017_ds_inv', 'rb') as f:
     log = pickle.load(f)
 
 # theta bar

@@ -468,7 +468,7 @@ def monkeyloss_(agent=None,
         return logPr_ep/samples/env.trial_timer.item()
 
     tik=time.time()
-    for ep, task in enumerate(tqdm(tasks)):
+    for ep, task in enumerate((tasks)):
         logPr_ep=_wrapped_call(ep, task)
         logPr += logPr_ep
         del logPr_ep

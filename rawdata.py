@@ -9,6 +9,21 @@ from rult import *
 from monkey_functions import down_sampling, dfdownsample
 
 
+# new way to use unpacked data
+# datapath=Path("Z:\\bruno_pert")
+# sessions=list(datapath.glob('*ds'))
+# df=None
+# for session in sessions:
+#     with open(session,'rb') as f:
+#         df_ = pickle.load(f)
+#     if df is None:
+#         df=df_
+#     else:
+#         df=df.append(df_)
+# del df_
+
+
+
 def smooth(y, box_pts):
     box = np.ones(box_pts)/box_pts
     y_smooth = np.convolve(y, box, mode='same')

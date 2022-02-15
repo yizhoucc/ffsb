@@ -1,4 +1,5 @@
 from scipy.ndimage.measurements import label
+from torch.nn.modules.linear import Linear
 from IRCpaperplots import xy2pol
 from os import stat
 import pickle
@@ -1499,3 +1500,53 @@ marker_all.append(marker)
 
 channel_signal_all = channel_signal_all
 marker_all = marker_all
+
+
+
+
+
+
+
+
+
+
+
+
+
+# hw code
+import torch
+from torch import nn
+from collections import OrderedDict
+from matplotlib import pyplot as plt
+
+nlayers=torch.randint(high=10,low=2,size=(1,))
+nnodes=[torch.randint(high=10,low=2,size=(1,)) for i in range(nlayers)]
+
+
+def makemodel(nnodes):
+    arch=[]
+    prev=2
+    for ind,each in enumerate(nnodes):
+        arch=arch+[('linear'+str(ind), nn.Linear(prev,each))]
+        prev=each
+        arch=arch+[('tanh'+str(ind), nn.Tanh())]
+    arch.append(('linearout', nn.Linear(prev,1)))
+    arch.append(('tanh',nn.Tanh()))
+    model=nn.Sequential(OrderedDict(arch))
+    return model
+
+model=makemodel(nnodes)
+
+
+x=torch.zeros((1000,2)).uniform_(-1,1)
+
+with torch.no_grad():
+    y=model(x)
+
+cbar=plt.scatter(x[:,0], x[:,1],c=y.view(-1).tolist(), cmap='bwr')
+plt.colorbar(cbar,label='y out')
+plt.xlabel('x1')
+plt.ylabel('x2')
+plt.show()
+
+

@@ -1,5 +1,8 @@
+from FireflyEnv import ffacc_real
+from matplotlib.pyplot import xlabel
 import pandas as pd
 import numpy as np
+from scipy.ndimage.measurements import label
 import torch
 from scipy.signal import medfilt
 from scipy.stats import norm
@@ -9,18 +12,70 @@ from rult import *
 from monkey_functions import down_sampling, dfdownsample
 
 
-# new way to use unpacked data
-# datapath=Path("Z:\\bruno_pert")
-# sessions=list(datapath.glob('*ds'))
-# df=None
-# for session in sessions:
-#     with open(session,'rb') as f:
-#         df_ = pickle.load(f)
-#     if df is None:
-#         df=df_
-#     else:
-#         df=df.append(df_)
-# del df_
+
+
+
+
+# check two mk difference,use bruno index 0 as test
+
+print('loading data')
+datapath=Path("Z:\\bruno_pert\\packed_bruno_pert")
+savename=datapath.parent/('cmafull_'+datapath.name)
+with open(datapath,'rb') as f:
+    df = pickle.load(f)
+df=datawash(df)
+df=df[df.category=='normal']
+df[~df.perturb_start_time.isnull()]
+print('process data')
+bs, ba, bt=monkey_data_downsampled(df,factor=0.0025)
+print('done process data')
+
+print('loading data')
+datapath=Path("Z:\\schro_pert\\packed_schro_pert")
+savename=datapath.parent/('cmafull_'+datapath.name)
+with open(datapath,'rb') as f:
+    df = pickle.load(f)
+df=datawash(df)
+df=df[df.category=='normal']
+df[~df.perturb_start_time.isnull()]
+print('process data')
+ss, sa, st=monkey_data_downsampled(df,factor=0.0025)
+print('done process data')
+
+
+ind=np.random.randint(0,min(len(bt),len(st)))
+thistask=bt[ind]
+thisaction=ba[ind][0]
+btrials=similar_trials(ind,bt,ba)
+strials=similar_trials2this(st,sa,thistask,thisaction)
+
+
+for bind in btrials:
+    plt.plot(ba[bind][:,1],color='blue',alpha=0.6)
+for sind in strials:
+    plt.plot(sa[sind][:,1],color='red',alpha=0.6)
+
+for bind in btrials:
+    plt.plot(ba[bind][:,0],color='tab:blue',alpha=0.6)
+for sind in strials:
+    plt.plot(sa[sind][:,0],color='orange',alpha=0.6)
+
+fig = plt.figure(figsize=[3, 3])
+ax = fig.add_subplot()
+for bind in btrials:
+    ax.plot(bs[bind][:,0],bs[bind][:,1],color='tab:blue',alpha=0.6, label='Bruno')
+for sind in strials:
+    ax.plot(ss[sind][:,0],ss[sind][:,1],color='orange',alpha=0.6, label='Schro')
+plt.xlabel('world x')
+plt.ylabel('world y')
+goalcircle = plt.Circle((bt[btrials[0]][0],bt[btrials[0]][1]),0.13, color='y', alpha=0.5)
+ax.add_patch(goalcircle)
+plt.axis('scaled')
+handles, labels = plt.gca().get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+plt.legend(by_label.values(), by_label.keys())
+
+
 
 
 
@@ -788,5 +843,219 @@ plt.plot(x, smooth(y,20), lw=2,label='reward rate')
 
 
 
+# new trial data function
+'''
+    we need:
+    given mk data, return what agent will do given mk situation
 
- 
+    given task data, return what agent do on himself
+
+'''
+
+
+# first make something that can take perturbation
+
+
+
+
+# print(result['task'][trial_i])
+if input['use_mk_data']:
+    env.reset(phi=input['phi'],theta=input['theta'],
+    goal_position=result['task'][trial_i],
+    vctrl=input['mkdata']['actions'][trial_i][0][0], 
+    wctrl=input['mkdata']['actions'][trial_i][0][1])
+else:
+    env.reset(phi=input['phi'],
+    theta=input['theta'],
+    goal_position=result['task'][trial_i])
+# prepare trial var
+epbliefs=[]
+epbcov=[]
+epactions=[]
+epstates=[]
+
+
+
+
+
+
+env.trial_timer
+
+plt.plot(df.iloc[ind].perturb_v/200)
+plt.plot(df.iloc[ind].perturb_w/180*pi)
+
+
+plt.plot(down_sampling(df.iloc[ind].perturb_v/200,0.0012,0.1))
+df[~df.perturb_start_time.isnull()]
+
+
+ind=torch.randint(size=(),low=0,high=1000,).item()
+given_state=states[ind]
+given_action=actions[ind]
+
+pertv=0.5
+pertw=0.5
+given_state[:,3]+=torch.ones(given_state.shape[0])*pertv
+given_state[:,4]+=torch.ones(given_state.shape[0])*pertw
+
+
+
+
+env.reset(phi=phi,theta=theta,goal_position=tasks[ind])
+epactions,epbliefs,epbcov,epstates=run_trial(agent=agent,env=env,given_state=given_state,given_action=given_action)
+
+env.reset(phi=phi,theta=theta,goal_position=tasks[ind])
+epactions,epbliefs,epbcov,epstates=run_trial(agent=agent,env=env,given_state=given_state,given_action=None)
+
+env.reset(phi=phi,theta=theta,goal_position=tasks[ind])
+epactions,epbliefs,epbcov,epstates=run_trial(agent=agent,env=env,given_state=None,given_action=given_action)
+
+env.reset(phi=phi,theta=theta,goal_position=tasks[ind])
+epactions,epbliefs,epbcov,epstates=run_trial(agent=agent,env=env,given_state=None,given_action=None)
+
+#  state same
+fig=plt.figure()
+ax=fig.add_subplot(111)
+plt.plot(given_state[:,0],given_state[:,1])
+plt.plot(torch.cat(epstates,1).t()[:,0],torch.cat(epstates,1).t()[:,1])
+plt.plot(torch.cat(epbliefs,1).t()[:,0],torch.cat(epbliefs,1).t()[:,1])
+goal=plt.Circle(tasks[ind],0.13)
+ax.add_patch(goal)
+ax.axis('equal')
+
+
+#  action same
+plt.plot(given_action[:,0])
+plt.plot(given_action[:,1])
+plt.plot(torch.stack(epactions)[:,0])
+plt.plot(torch.stack(epactions)[:,1])
+
+env.s
+env.observations(env.s)
+
+
+env.reset(phi=phi,theta=phi)
+env.noise_scale
+env.theta
+env.phi
+
+theta=torch.tensor([[0.5],
+        [1.5],
+        [0.9],
+        [0.9],
+        [0.1],
+        [0.1],
+        [0.1300],
+        [0.4641],
+        [0.8830],
+        [0.4254],
+        [0.2342]])
+
+
+
+# conclusion, this is not a good way
+# either state-action pair, or nothing
+# should add obs input. the obs is the noise or bias.;
+
+
+env.trial_timer
+env.debug=1
+env.obs_traj=torch.ones(40,2)
+env.pro_traj=torch.ones(99)
+
+env.episode_len=70
+
+
+v=actions[ind][:,0][1:]
+w=actions[ind][:,1][1:]
+pertv=down_sampling(df.iloc[ind].perturb_v/200,0.0012,0.1)
+pertw=down_sampling(df.iloc[ind].perturb_w/180*pi,0.0012,0.1)
+v,w,pertv,pertw=torch.tensor(v),torch.tensor(w),torch.tensor(pertv).float(),torch.tensor(pertw).float()
+overlap=min(len(v),len(pertv))
+pertv=pertv[:overlap] +v[:overlap]
+pertw=pertw[:overlap] +w[:overlap]
+v,w=v[:overlap],w[:overlap]
+plotpert_fill(v,pertv, w, pertw, ax=None,alpha=0.8)
+
+
+
+
+
+fig=plt.figure()
+ax=fig.add_subplot(111)
+plt.plot(given_state[:,0],given_state[:,1])
+plt.plot(torch.cat(epstates,1).t()[:,0],torch.cat(epstates,1).t()[:,1])
+plt.plot(torch.cat(epbliefs,1).t()[:,0],torch.cat(epbliefs,1).t()[:,1])
+goal=plt.Circle(tasks[ind],0.13)
+ax.add_patch(goal)
+ax.axis('equal')
+
+def pert_overhead(state,pertstate,belief, pertbelief, ax=None,alpha=0.7):
+    with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        if ax is None:
+            ax = fig.add_subplot(111)
+        ax.plot(torch.cat(state,1).t()[:,0],torch.cat(state,1).t()[:,1], label='no pert')
+        ax.plot(torch.cat(pertstate,1).t()[:,0],torch.cat(pertstate,1).t()[:,1],label='pert')
+        # ax.plot(torch.cat(belief,1).t()[:,0],torch.cat(belief,1).t()[:,1])
+        # ax.plot(torch.cat(pertbelief,1).t()[:,0],torch.cat(pertbelief,1).t()[:,1])
+        goal=plt.Circle(tasks[ind],0.13,color=color_settings['goal'], alpha=alpha,label='target')
+        ax.add_patch(goal)
+        ax.axis('equal')
+        ax.set_xlabel('world x')
+        ax.set_ylabel('world y')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        # ax.spines['bottom'].set_visible(False)
+        # ax.spines['left'].set_visible(False)
+        # legend and label
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys())
+
+    return ax
+pertv=down_sampling(df.iloc[ind].perturb_v/200,0.0012,0.1)
+pertw=down_sampling(df.iloc[ind].perturb_w/180*pi,0.0012,0.1)
+torch.tensor(pertv).float()
+torch.tensor(pertw).float()
+pert=torch.stack([torch.tensor(pertv).float(),torch.tensor(pertw).float()]).t()
+
+env.reset(phi=phi,theta=theta,goal_position=tasks[ind])
+epactions,epbliefs,epbcov,epstates=run_trial(agent=agent,env=env)
+
+env.reset(phi=phi,theta=theta,goal_position=tasks[ind])
+epactions,epbliefs,epbcov,epstatespert,epactionpert=run_trial_pert(agent,env,pert)
+
+pert_overhead(epstates,epstatespert,epstates,epstatespert)
+
+
+
+
+def run_trial_pert(agent,env,pert):
+
+    def _collect():
+        epactions.append(action)
+        epbliefs.append(env.b)
+        epbcov.append(env.P)
+        epstates.append(env.s)
+        if t<len(pert):
+            epactionpert.append(action+pert[t])
+
+    # saves
+    epactions,epbliefs,epbcov,epstates, epactionpert=[],[],[],[],[]
+    with torch.no_grad():
+            done=False
+            t=0
+            while not done:
+                action = agent(env.decision_info)[0]
+                if t<len(pert):
+                    action+pert[t]
+                _collect()
+                _,_,done,_=env.step(torch.tensor(action).reshape(1,-1)) 
+                t+=1
+    return epactions,epbliefs,epbcov,epstates,epactionpert
+
+
+
+
+

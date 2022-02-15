@@ -47,4 +47,66 @@ t3=[1000]
 ....
 t=?
 
-## 
+## make status report thing for commitee meeting at feb 15
+
+1. what direction is useful 
+2. what groups are the potential targets
+3. skill set that i can prepare for them 
+
+current researh, mathmetical mind reading of subject driving in VR
+so far more focus on behavior than neural data.
+
+potential directions:
+
+    neural data
+    预期只能解释一小部分latent variable， 用处？相同的方法用在eeg？
+        1. neural encoding/representation. eg position, uncertainty
+        2. neural dynamic, state transition
+        3. neural policy
+
+
+    representation related, relational or casual graph
+    广泛来说用处更大？万一能发nips （目前没有graph state with uncertainty RL， 但是拼一个好像不难）
+    选择1 拼装几个现有的关于graph的work之后用在这个task
+    选择2 搞个全新的representation解决cov size是n**2的问题
+    选择3 representation learning with 
+        1. representation leraning, efficient representation for multi ff, 
+        2. graph representation and dynamic with uncertainty and use in rl
+        3. 
+
+
+    multi sensory integration related
+    比较简单 model应该不会动 主要是等新的验证data， 可以是side project
+        1. additional experiement to map information source
+        2
+
+
+
+
+
+
+
+
+
+
+
+
+预算1000-1700的1b+1b+ 想找个性价比高的, 不是想找最便宜的
+必要:
+大于750 sqft
+噪音(这个不好估计是吧, 不是高速路边或者一圈公寓空调外机很吵那种应该都还行)
+安全些 车可能被砸那种就算了
+
+加分项:
+天花板高或者loft
+1楼 出门就是停车位那种
+有个阳台 或者1楼有个放椅子的空地
+离288近 或者离中国城近
+
+其他备注:
+很少去tmc 离的远没关系
+停车楼太不方便了 那种可以停门前不远地方的最好了
+预算1000-1700, 想找个性价比高的, 不是想找最便宜的
+
+
+

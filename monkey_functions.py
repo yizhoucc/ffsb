@@ -146,6 +146,7 @@ def monkey_data_downsampled_(df,factor=0.0025):
         index+=1
     return states, actions, tasks
 
+
 def monkey_data_downsampled(df,factor=0.0025):
     states = []
     actions = []
@@ -383,6 +384,36 @@ def get_wlim(df):
 
     print(min_w,max_w)
     return min_w, max_w
+
+
+
+def pack_data(datapath, expression):
+    # new way to use unpacked data
+    # datapath=Path("Z:\\bruno_pert")
+    # sessions=list(datapath.glob('*ds'))
+    # df=None
+    # for session in sessions:
+    #     with open(session,'rb') as f:
+    #         df_ = pickle.load(f)
+    #     if df is None:
+    #         df=df_
+    #     else:
+    #         df=df.append(df_)
+    # del df_
+    print('loading data')
+    files=list(datapath.glob(expression))
+    df=None
+    for each in files:
+        with open(each,'rb') as f:
+            _df = pickle.load(f)
+        if df is None:
+            df=_df
+        else:
+            df=df.append(_df)
+    print('done loading data')
+    return df
+    
+
 
 
 

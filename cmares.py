@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
+
+from numpy.linalg.linalg import svd
 warnings.filterwarnings('ignore')
 import pickle
 import numpy as np
@@ -13,68 +15,29 @@ torch.manual_seed(42)
 from numpy import pi
 from InverseFuncs import *
 from monkey_functions import *
-
+from pathlib import Path
+from plot_ult import *
 
 # loading
 import pickle
-data_path=Path("07-18-2017_ds_inv")
-with open(data_path.parent/'07-18-2017_ds_inv', 'rb') as f:
+data_path=Path("Z:\\schro_normal")
+with open(data_path/'packed', 'rb') as f:
     log = pickle.load(f)
 
-# theta bar
+with open('cmafull_vic2', 'rb') as f:
+    log = pickle.load(f)
+
+# theta hist
 optimizer=log[-1][0]
 cov=optimizer._C
 theta=torch.tensor(optimizer._mean).view(-1,1)
 finaltheta=theta
 cov=optimizer._C
 finalcov=torch.tensor(cov)
-theta_names = [ 'pro gain v',
-                'pro gain w',
-                'pro noise v',
-                'pro noise w',
-                'obs noise v',
-                'obs noise w',
-                'goal radius',
-                'action cost v',      
-                'action cost w',      
-                'init uncertainty x',      
-                'init uncertainty y',      
-                ]
-fig=plt.figure(figsize=[3,2])
-ax = fig.add_subplot(111)
-# Create bars and choose color
-ax.bar([i for i in range(11)], finaltheta,yerr=torch.diag(finalcov)**0.5,color = 'tab:blue')
-# title and axis names
-ax.set_ylabel('inferred parameter value')
-ax.set_xticks([i for i in range(11)])
-ax.set_xticklabels(theta_names, rotation=45, ha='right')
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+theta_bar(finaltheta,finalcov)
 
-theta_mean=np.array([
-    0.5,
-    1.57,
-    0.5,
-    0.5,
-    0.5,
-    0.5,
-    0.13,
-    0.5,
-    0.5,
-    0.5,
-    0.5    
-])
-# plt.bar([i for i in range(11)], torch.diag(finalcov)**0.5*1/theta_mean)
-fig=plt.figure(figsize=[3,2])
-ax = fig.add_subplot(111)
-# Create bars and choose color
-ax.bar([i for i in range(11)], torch.diag(finalcov)**0.5*1/theta_mean, color = 'tab:blue')
-# title and axis names
-ax.set_ylabel('inferred parameter uncertainty (std/mean)')
-ax.set_xticks([i for i in range(11)])
-ax.set_xticklabels(theta_names, rotation=45, ha='right')
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+# theta confidence hist
+thetaconfhist(finalcov)
 
 
 # density obs
@@ -142,16 +105,23 @@ res=[l[2] for l in log]
 alltheta=[]
 loglls=[]
 for r in res:
-    genloglls=[]
-    gentheta=[]
     for point in r:
-        gentheta.append(point[0])
-        genloglls.append(point[1])
-    loglls.append(genloglls)
-    alltheta.append(torch.tensor(gentheta))
-alltheta=[torch.tensor(a) for a in alltheta]
-alltheta=torch.tensor(alltheta)
+        alltheta.append(torch.tensor(point[0]))
+        loglls.append(torch.tensor(point[1]))
+alltheta=torch.stack(alltheta)
 loglls=torch.tensor(loglls).flatten()
+
+projectedparam=torch.pca_lowrank(torch.tensor(alltheta),2)
+projectedparam=projectedparam[0]
+# pc space scatter logll
+s = plt.scatter(projectedparam[:,0], projectedparam[:,1], c=loglls,alpha=0.3,edgecolors=None, cmap='jet')
+plt.clim(min(loglls), max(loglls)) 
+plt.xlabel('projected parameters')
+plt.ylabel('projected parameters')
+c = plt.colorbar()
+
+
+
 
 
 np.set_printoptions(precision=2)
@@ -163,25 +133,6 @@ theta=torch.tensor(optimizer._mean).view(-1,1)
 finaltheta=theta
 cov=optimizer._C
 finalcov=torch.tensor(cov)
-
-
-
-eval = CMA(mean=np.array(optimizer._mean), sigma=0.5,population_size=16*4)
-eval.set_bounds(np.array([[0.01]*11,[1.,2,1,1,1,1,0.2,1,1,1,1]],dtype='float32').transpose())
-xs=[]
-for _ in range(16*20):
-    x = eval.ask().astype('float32')
-    xs.append(x)
-solutions=ray.get([getlogll.remote(p) for p in xs])
-
-projectedparam=torch.pca_lowrank(torch.tensor(xs),2)
-projectedparam=projectedparam[0]
-# pc space scatter logll
-s = plt.scatter(projectedparam[:,0], projectedparam[:,1], c=solutions,alpha=0.3,edgecolors=None, cmap='jet')
-plt.clim(min(solutions), max(solutions)) 
-plt.xlabel('projected parameters')
-plt.ylabel('projected parameters')
-c = plt.colorbar()
 
 
 # covariance heatmap
@@ -245,6 +196,135 @@ with initiate_plot(5,1,300) as fig:
     plt.tick_params(axis='y', which='minor')
     ax.yaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
     plt.gca().invert_yaxis()
+
+
+
+
+# compare 2 monkeys
+data_path=Path("Z:\\schro_pert")
+with open(data_path/'longonlypacked_schro_pert', 'rb') as f:
+    slog = pickle.load(f)
+
+data_path=Path("Z:\\bruno_pert")
+with open(data_path/'cmafull_packed_bruno_pert', 'rb') as f:
+    blog = pickle.load(f)
+
+# remove goal radius param
+theta_names=theta_names[:6]+theta_names[-4:]
+theta_mean=theta_mean[:6]+theta_mean[-4:]
+
+# two monkey theta hist and confidence hist
+log=slog
+finalcov=torch.tensor(log[-1][0]._C)
+finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
+finaltheta=torch.cat([finaltheta[:6],finaltheta[-4:]])
+finalcov = finalcov[torch.arange(finalcov.size(0))!=6] 
+finalcov = finalcov[:,torch.arange(finalcov.size(1))!=6] 
+theta_bar(finaltheta,finalcov)
+thetaconfhist(finalcov)
+
+log=blog
+finalcov=torch.tensor(log[-1][0]._C)
+finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
+finaltheta=torch.cat([finaltheta[:6],finaltheta[-4:]])
+finalcov = finalcov[torch.arange(finalcov.size(0))!=6] 
+finalcov = finalcov[:,torch.arange(finalcov.size(1))!=6] 
+theta_bar(finaltheta,finalcov)
+thetaconfhist(finalcov)
+
+# totegher hist
+x = np.random.normal(1, 2, 99)
+y = np.random.normal(-1, 3, 99)
+bins = np.linspace(-10, 10, 11)
+
+plt.hist([t1.flatten(), t2.flatten()], label=['x', 'y'])
+
+plt.bar([i for i in range(len(finaltheta))], finaltheta,yerr=torch.diag(finalcov)**0.5,color = 'tab:blue')
+
+plt.legend(loc='upper right')
+plt.show()
+
+
+
+
+a=theta_bar(t1,c1, label='schro',width=0.5,shift=-0.2)
+theta_bar(t2,c2,ax=a, label='bruno',width=0.5,shift=0.2)
+a.get_figure()
+
+
+
+
+
+
+# density
+densities=[0.0001, 0.0005, 0.001, 0.005]
+filenamecommom=Path('Z:\\schro_normal')
+logs=[None]*4
+for i, density in enumerate(densities):
+    try:
+        with open(filenamecommom/('d'+str(i+1)+'_packed'), 'rb') as f:
+            log = pickle.load(f)
+        logs[i]=log
+    except:
+        continue
+filenamecommom=Path('Z:\\bruno_normal')
+logs=[None]*4
+for i, density in enumerate(densities):
+    try:
+        with open(filenamecommom/('d'+str(i+1)), 'rb') as f:
+            log = pickle.load(f)
+        logs[i]=log
+    except:
+        continue
+
+xs,ys,errs=d_process(logs)
+d_noise()
+d_obs_degree()
+
+
+gauss_div(ys[0,2],errs[0,2],ys[0,4],errs[0,4])
+gauss_div(ys[1,2],errs[1,2],ys[1,4],errs[1,4])
+
+gauss_div(0,1,1,2)
+
+
+
+# uncertainty growth rate
+log=slog
+sc=torch.tensor(log[-1][0]._C)
+st=torch.tensor(log[-1][0]._mean).view(-1,1)
+sv=st[2]**2*st[4]**2/(st[2]**2+st[4]**2)
+sw=st[3]**2*st[5]**2/(st[3]**2+st[5]**2)
+
+
+def isum(a,b):
+    return a*b/a+b
+
+isum(sc[2]**2,sc[4]**2)
+
+log=blog
+bc=torch.tensor(log[-1][0]._C)
+bt=torch.tensor(log[-1][0]._mean).view(-1,1)
+bv=bt[2]**2*bt[4]**2/(bt[2]**2+bt[4]**2)
+bw=bt[3]**2*bt[5]**2/(bt[3]**2+bt[5]**2)
+
+
+
+trialtypes=['pert','non pert']
+a=barpertacc([63.36783413567739,55.58846184159118],trialtypes,label='schro',shift=-0.2)
+barpertacc([57.37014305912993,43.945449613900934],trialtypes,label='bruno',shift=0.2,ax=a)
+a.get_figure()
+
+
+slog[-1][0]._C
+slog[-1][1]
+np.array(slog[-1][1]).transpose()
+np.cov(np.array(slog[-1][1]).transpose())
+plt.imshow(np.cov(np.array(slog[-1][1]).transpose()))
+plt.imshow(slog[-1][0]._C)
+[i**0.5 for i in np.diag(slog[-1][0]._C)]
+[i**0.5 for i in np.diag(np.cov(np.array(blog[-1][1]).transpose()))]
+
 
 
 

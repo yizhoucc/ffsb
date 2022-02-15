@@ -2724,8 +2724,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
 
         self.previous_action=torch.tensor([[vctrl,wctrl]])
         self.s = torch.tensor(
-        [[torch.distributions.Normal(0,torch.ones(1)).sample()*0.05*self.theta[9]],
-        [torch.distributions.Normal(0,torch.ones(1)).sample()*0.05*self.theta[10]],
+        [[0.],
+        [0.],
         [0.],
         [vctrl*self.phi[0]],
         [wctrl*self.phi[1]]])
@@ -2735,8 +2735,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.P[0,0]=(self.theta[9]*0.05)**2 # sigma xx
         self.P[1,1]=(self.theta[10]*0.05)**2 # sigma yy
         self.b = torch.tensor(
-        [[0.],
-        [0.],
+        [[torch.distributions.Normal(0,torch.ones(1)).sample()*0.05*self.theta[9]],
+        [torch.distributions.Normal(0,torch.ones(1)).sample()*0.05*self.theta[10]],
         [0.],
         [vctrl*self.theta[0]],
         [wctrl*self.theta[1]]])
@@ -2881,8 +2881,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         noisev=torch.distributions.Normal(0,torch.ones(1)).sample()*self.pro_noisev*self.noise_scale   
         noisew=torch.distributions.Normal(0,torch.ones(1)).sample()*self.pro_noisew*self.noise_scale 
         if self.debug and self.pro_traj is not None:
-            noisev=self.pro_traj[int(self.episode_time.item())]*self.noise_scale 
-            noisew=self.pro_traj[int(self.episode_time.item())]*self.noise_scale
+            noisev=self.pro_traj[int(self.trial_timer.item())]*self.noise_scale 
+            noisew=self.pro_traj[int(self.trial_timer.item())]*self.noise_scale
         # else:
         #     noisev=self.pro_traj[int(self.episode_time.item())]#*self.pro_noise  
         #     noisew=self.pro_traj[int(self.episode_time.item())]#*self.pro_noise  
@@ -3089,13 +3089,14 @@ class FireFlyReady(gym.Env, torch.nn.Module):
 
     def observations(self, state): 
         s=state.clone()
+        vw = s.view(-1)[-2:] # 1,5 to vector and take last two
         noisev = torch.distributions.Normal(0,torch.tensor(1.)).sample()*self.obs_noisev*self.noise_scale 
         noisew = torch.distributions.Normal(0,torch.tensor(1.)).sample()*self.obs_noisew*self.noise_scale 
         if self.debug and self.obs_traj is not None:
             noise = self.obs_traj[int(self.trial_timer.item())]*self.noise_scale 
-        # else:
-        #     noise = self.obs_traj[int(self.trial_timer.item())]#*self.obs_noise
-        vw = s.view(-1)[-2:] # 1,5 to vector and take last two
+            vw[0] =  vw[0] + noise[0]
+            vw[1] =  vw[1] + noise[1]
+            return vw.view(-1,1)
         vw[0] =  vw[0] + noisev
         vw[1] =  vw[1] + noisew
         return vw.view(-1,1)

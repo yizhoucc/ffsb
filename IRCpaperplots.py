@@ -1249,17 +1249,19 @@ def xy2pol(*args, rotation=True): # rotated for the task
 
 
 # TODO return n most nearest trials
-def similar_trials(ind, tasks, actions):
-  indls=[]
-  for i in range(len(tasks)):
-      if tasks[i][0]>tasks[ind][0]-0.05 \
-      and tasks[i][0]<tasks[ind][0]+0.05 \
-      and tasks[i][1]>tasks[ind][1]-0.03 \
-      and tasks[i][1]<tasks[ind][1]+0.03 \
-      and actions[i][0][0]>actions[ind][0][0]-0.1 \
-      and actions[i][0][1]<actions[ind][0][1]+0.1:
-          indls.append(i)
-  return indls
+def similar_trials(ind, tasks, actions=None):
+    indls=[]
+    for i in range(len(tasks)):
+        if tasks[i][0]>tasks[ind][0]-0.05 \
+        and tasks[i][0]<tasks[ind][0]+0.05 \
+        and tasks[i][1]>tasks[ind][1]-0.03 \
+        and tasks[i][1]<tasks[ind][1]+0.03:
+            if actions is not None and actions[i][0][0]>actions[ind][0][0]-0.1 \
+            and actions[i][0][1]<actions[ind][0][1]+0.1:
+                indls.append(i)
+            elif actions is None:
+                indls.append(i)
+    return indls
 
 
 def normalizematrix(data):
@@ -3253,4 +3255,9 @@ if __name__=='__main__':
         add_colorbar(c)
         ax.set_ylabel('distance')
         ax.set_xlabel('angle')
+
+
+
+# perturbation example
+
 

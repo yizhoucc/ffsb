@@ -6,8 +6,8 @@ import numpy as np
 from cmaes import CMA
 import copy
 import matplotlib.pyplot as plt
-from numpy.core.defchararray import array
-from FireflyEnv.env_utils import is_pos_def
+# from numpy.core.defchararray import array
+# from FireflyEnv.env_utils import is_pos_def
 import warnings
 warnings.filterwarnings('ignore')
 import pickle
@@ -71,14 +71,14 @@ agent=agent_.actor.mu.cpu()
 
 
 print('loading data')
-datapath=Path("Z:\schro_pert/packed_schro_pert")
-savename=datapath.parent/('cmafull_'+datapath.name)
+datapath=Path("Z:\\schro_pert\\packed_schro_pert")
+savename=datapath.parent/('longonly'+datapath.name)
 with open(datapath,'rb') as f:
     df = pickle.load(f)
 df=datawash(df)
 df=df[df.category=='normal']
-# df=df[df.target_r>200]
-# df=df[df.floor_density==0.0005]
+df=df[df.target_r>180]
+# df=df[df.floor_density==0.001]
 # floor density are in [0.0001, 0.0005, 0.001, 0.005]
 # df=df[500:600]
 print('process data')
@@ -88,6 +88,7 @@ print('done process data')
 
 
 # decide if to continue
+optimizer=None
 log=[]
 if savename.is_file():
     print('continue on previous inverse...')
@@ -144,5 +145,7 @@ for generation in range(len(log),len(log)+50):
     print("generation: ",generation)
     print(["{0:0.2f}".format(i) for i in optimizer._mean])
     print(["{0:0.2f}".format(i) for i in np.diag(optimizer._C)**0.5])
+    if optimizer.should_stop():
+        print('stop at {}th generation'.format(str(generation)))
 
 

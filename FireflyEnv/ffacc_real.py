@@ -2674,8 +2674,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 phi=None,
                 theta=None,
                 goal_position=None,
-                vctrl=torch.zeros(1).uniform_(0., 1.),
-                wctrl=torch.zeros(1).uniform_(-1., 1.),
+                vctrl=None,
+                wctrl=None,
                 obs_traj=None,
                 pro_traj=None,
                 ): 
@@ -2697,6 +2697,10 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.trial_timer = torch.zeros(1)
         self.trial_sum_cost=0.
         self.trial_sum_reward=0.
+        vctrl=vctrl if vctrl else abs(torch.zeros(1).normal_(0., 0.3))
+        wctrl=wctrl if wctrl else torch.zeros(1).normal_(0., 0.3)
+        # vctrl=torch.zeros(1)
+        # wctrl=torch.zeros(1)
         self.reset_state(goal_position=goal_position,vctrl=vctrl,wctrl=wctrl)
         self.reset_belief()
         self.o=torch.tensor([[0],[0]])
@@ -2826,7 +2830,10 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             self.agent_start=True
         if self.agent_start:
             self.stop=True if self.if_agent_stop(sys_vel=self.sys_vel) else False 
-        end_current_ep= self.rewarded() or self.trial_timer>=self.episode_len
+        if not self.debug:
+            end_current_ep= self.rewarded() or self.trial_timer>=self.episode_len
+        else:
+            end_current_ep=self.stop or self.trial_timer>=self.episode_len
         # dynamic
         if next_state is None:
             self.s=self.state_step(action,self.s)
@@ -2865,12 +2872,12 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 self.recent_rewarded_trials=0
                 self.recent_skipped_trials=0
                 self.recent_trials=0
-            print(
+            # print(
             # 'distance, ', "{:.1f}".format((self.get_distance()[1]-self.goal_r).item()),
             # 'stop',self.stop,
-            # 'reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost),
-            'rate {:.1f}'.format((self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5).item()) 
-            )
+            print('reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost))
+            # 'rate {:.1f}'.format((self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5).item()) 
+            # )
             # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}
         self.previous_action=action
         return self.decision_info, signal, end_current_ep, {}
@@ -2933,8 +2940,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
     def caculate_reward(self):
         reward=torch.tensor([0.])
         cost=self.action_cost(self.a, self.previous_action)
-        # _,d= self.get_distance(state=self.b)
-        if self.rewarded(): # only evaluate reward when stop near enough.
+        
+        if self.if_agent_stop(): 
             rew_std = self.goal_r/2 
             mu = torch.Tensor([self.goalx,self.goaly])-self.b[:2,0]
             R = torch.eye(2)*rew_std**2 
@@ -2956,7 +2963,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 print('R', R)
             reward = self.reward * reward  
             # reward+=(1-self.cost_scale)*self.dt # stop reward, no matter what
-        # reward+(self.prev_d-d)*(1-self.cost_scale)*self.dt # approaching reward
+        # _,d= self.get_distance(state=self.b)
+        # reward+=(self.prev_d-d)*(1-self.cost_scale)*self.dt # approaching reward
         # reward-=torch.norm(self.a)*self.dt
         return reward.item(), cost.item()
 
@@ -2988,7 +2996,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         mincost=2
         scalar=self.reward/mincost
         cost=cost*scalar
-        return cost*self.cost_scale
+        return cost*self.cost_scale+1
 
     def unpack_theta(self):
         self.pro_gainv=self.phi[0]
@@ -3357,7 +3365,7 @@ class FireFlyPaper(FireFlyReady):
         r=rotationmatrix(angle)
         P = P[:2,:2]
         rotatedP=r.t()@P@r
-        rotatedP=rotatedP.view(-1)[[0,1,3]] #discrod the yx entry.
+        rotatedP=rotatedP.view(-1)[[0,1,3]] # discrod the yx entry.
         mu = b[:2,0]-torch.Tensor([self.goalx,self.goaly])
         alpha = -0.5 * mu @ P.inverse() @ mu.t()
         reward_prob = torch.exp(alpha).view(-1)
@@ -3375,6 +3383,7 @@ class FireFlyPaper(FireFlyReady):
             task_param.view(-1)])
             
         return decision_info.view(1, -1)
+
 
 class FireFlyPaperv2(FireFlyReady): 
     # return only few things:
@@ -3420,4 +3429,5 @@ class FireFlyPaperv2(FireFlyReady):
             task_param[4:7].view(-1)])
             
         return decision_info.view(1, -1)
+
 

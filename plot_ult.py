@@ -1,4 +1,6 @@
+
 import numpy as np
+import scipy.stats
 from numpy import pi
 from torch import nn
 import matplotlib.pyplot as plt
@@ -83,13 +85,41 @@ color_settings={
     'v':'tab:blue',
     'w':'orange',
     'cov':'blue',
-    'b':'b',
-    's':'r',
+    'b':'purple',
+    's':'blue',
     'goal':'yellow',
     '':'',
 }
+
 global theta_names
 theta_names = [ 'pro gain v',
+                'pro gain w',
+                'pro noise v',
+                'pro noise w',
+                'obs noise v',
+                'obs noise w',
+                'action cost v',      
+                'action cost w',      
+                'init uncertainty x',      
+                'init uncertainty y',      
+                ]
+
+global theta_mean
+theta_mean=[
+    0.4,
+    1.57,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5    
+]
+
+global theta_names_
+theta_names_ = [ 'pro gain v',
                 'pro gain w',
                 'pro noise v',
                 'pro noise w',
@@ -102,8 +132,8 @@ theta_names = [ 'pro gain v',
                 'init uncertainty y',      
                 ]
 
-global theta_mean
-theta_mean=[
+global theta_mean_
+theta_mean_=[
     0.4,
     1.57,
     0.5,
@@ -134,6 +164,13 @@ parameter_range=[
 
 # from InverseFuncs import *
 
+def mean_confidence_interval(data, confidence=0.95):
+    # ci of the mean
+    a = 1.0 * np.array(data)
+    n = len(a)
+    m, se = np.mean(a), scipy.stats.sem(a)
+    h = se * scipy.stats.t.ppf((1 + confidence) / 2., n-1)
+    return m, m-h, m+h
 
 # illustrate perterb trial
 def pertexample():
@@ -157,10 +194,10 @@ def densityexample():
         for i,density in enumerate(densities):
             ax=fig.add_subplot(1,4,i+1)    
             ax.set_xticks([]);ax.set_yticks([])
-            x=torch.zeros(int(10000*3*density)).uniform_()
-            y=torch.zeros(int(10000*3*density)).uniform_()
+            x=torch.zeros(int(10000*1*density)).uniform_()
+            y=torch.zeros(int(10000*1*density)).uniform_()
             for xx,yy in zip(x,y):
-                plt.plot(xx,yy, marker = next(marker), linestyle='',color='k')
+                plt.plot(xx,yy, markersize=3,marker = next(marker), linestyle='',color='k')
             ax.set_xlabel('density={}'.format(density))
 
           
@@ -1287,7 +1324,7 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
     agent_mag_costs=[]
     with torch.no_grad():
       for trial_i in range(num_trials):
-        env.reset(phi=phi,theta=theta,goal_position=etask[0])
+        env.reset(phi=phi,theta=theta,goal_position=etask[0],vctrl=torch.zeros(1), wctrl=torch.zeros(1))
         epbliefs=[]
         epbcov=[]
         epactions=[]
@@ -1931,8 +1968,9 @@ def overhead_skip_density(input):
 
         fig.tight_layout(pad=0)
 
-def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
-  def sample_trials(agent, env, theta, phi, etask, num_trials=5):
+
+def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[[0.7,-0.3]],initv=0.,initw=0.,mkactions=None):
+  def sample_trials(agent, env, theta, phi, etask, num_trials=5,initv=0.,initw=0.):
     # print(theta)
     agent_actions=[]
     agent_beliefs=[]
@@ -1942,21 +1980,21 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
     agent_mag_costs=[]
     with torch.no_grad():
       for trial_i in range(num_trials):
-        env.reset(phi=phi,theta=theta,goal_position=etask[0])
+        env.reset(phi=phi,theta=theta,goal_position=etask,vctrl=initv, wctrl=initw)
         epbliefs=[]
         epbcov=[]
         epactions=[]
         epstates=[]
-        t=0
         done=False
         while not done:
           action = agent(env.decision_info)[0]
-          _,_,done,_=env.step(torch.tensor(action).reshape(1,-1)) 
+          noise=torch.normal(torch.zeros(2),0.1)
+          _action=(action+noise).clamp(-1,1)
+          _,_,done,_=env.step(_action) 
           epactions.append(action)
           epbliefs.append(env.b)
           epbcov.append(env.P)
           epstates.append(env.s)
-          t=t+1
         agent_dev_costs.append((env.trial_costs))
         # agent_mag_costs.append(torch.stack(env.trial_mag_costs))
         agent_actions.append(torch.stack(epactions))
@@ -1979,36 +2017,44 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
   delta=(theta_final-theta_init)/(nplots-1)
   fig = plt.figure(figsize=[20, 20])
   # curved trails
-  etask=[[0.7,-0.3]]
   for n in range(nplots):
     ax1 = fig.add_subplot(6,nplots,n+1)
     theta=(n-1)*delta+theta_init
-    ax1.set_xlabel('world x, cm')
-    ax1.set_ylabel('world y, cm')
-    ax1.set_title('state plot')
-    data=sample_trials(agent, env, theta, phi, etask, num_trials=1)
+    ax1.set_xlabel('world x [cm]')
+    ax1.set_ylabel('world y [cm]')
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    # ax1.set_title('state plot')
+    data=sample_trials(agent, env, theta, phi, etask, num_trials=1,initv=initv,initw=initw)
     estate=data['estate']
-    ax1.plot(estate[0,:],estate[1,:], color='r',alpha=0.5)
-    goalcircle = plt.Circle((etask[0][0],etask[0][1]), theta[6], color='y', alpha=0.5)
+    ax1.plot(estate[0,:]*200,estate[1,:]*200, color='r',alpha=0.5)
+    goalcircle = plt.Circle((etask[0]*200,etask[1]*200), 65, color='y', alpha=0.5)
     ax1.add_patch(goalcircle)
-    ax1.set_xlim([-0.1,1.1])
-    ax1.set_ylim([-0.6,0.6])
+    ax1.set_aspect('equal')
+    # ax1.set_xlim([-0.1,1.1])
+    # ax1.set_ylim([-0.6,0.6])
     agent_beliefs=data['agent_beliefs']
     for t in range(len(agent_beliefs[0][:,:,0])):
-      cov=data['agent_covs'][0][t][:2,:2]
-      pos=  [agent_beliefs[0][:,:,0][t,0],
-              agent_beliefs[0][:,:,0][t,1]]
-      plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
+      cov=data['agent_covs'][0][t][:2,:2]*200*200
+      pos=  [agent_beliefs[0][:,:,0][t,0]*200,
+              agent_beliefs[0][:,:,0][t,1]*200]
+      plot_cov_ellipse(cov, pos, nstd=3, color=None, ax=ax1,alpha=0.2)
 
   # v and w
     ax2 = fig.add_subplot(6,nplots,n+nplots+1)
-    ax2.set_xlabel('t')
-    ax2.set_ylabel('w')
-    ax2.set_title('w control')
+    ax2.set_xlabel('t [s]')
+    ax2.set_ylabel('control amplitude')
+    # ax2.set_title('w control')
     agent_actions=data['agent_actions']
     for i in range(len(agent_actions)):
-      ax2.plot(agent_actions[i],alpha=0.7)
+      ax2.plot(np.arange(len(agent_actions[i]))/10,agent_actions[i],alpha=0.7)
     ax2.set_ylim([-1.1,1.1])
+    ax2.set_yticks([-1.,0,1.])
+    ax2.set_xlim(left=0.)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    if n==2 and mkactions is not None:
+          ax2.plot(np.arange(len(mkactions))/10,mkactions,alpha=0.7)
 #   # dev and mag costs
 #     ax2 = fig.add_subplot(6,nplots,n+nplots*2+1)
 #     ax2.set_xlabel('t')
@@ -2018,38 +2064,38 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,):
 #       ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
 #       # ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
 
-  # straight trails
-  etask=[[0.7,0.0]]
-  for n in range(nplots):
-    ax1 = fig.add_subplot(6,nplots,n+nplots*3+1)
-    theta=(n-1)*delta+theta_init
-    ax1.set_xlabel('world x, cm')
-    ax1.set_ylabel('world y, cm')
-    ax1.set_title('state plot')
-    data=sample_trials(agent, env, theta, phi, etask, num_trials=1)
-    estate=data['estate']
-    ax1.plot(estate[0,:],estate[1,:], color='r',alpha=0.5)
-    goalcircle = plt.Circle((etask[0][0],etask[0][1]), theta[6], color='y', alpha=0.5)
-    ax1.add_patch(goalcircle)
-    ax1.set_xlim([-0.1,1.1])
-    ax1.set_ylim([-0.6,0.6])
-    agent_beliefs=data['agent_beliefs']
-    for t in range(len(agent_beliefs[0][:,:,0])):
-      cov=data['agent_covs'][0][t][:2,:2]
-      pos=  [agent_beliefs[0][:,:,0][t,0],
-              agent_beliefs[0][:,:,0][t,1]]
-      plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
+#   straight trails
+#   etask=[[0.7,0.0]]
+#   for n in range(nplots):
+#     ax1 = fig.add_subplot(6,nplots,n+nplots*3+1)
+#     theta=(n-1)*delta+theta_init
+#     ax1.set_xlabel('world x, cm')
+#     ax1.set_ylabel('world y, cm')
+#     ax1.set_title('state plot')
+#     data=sample_trials(agent, env, theta, phi, etask, num_trials=1)
+#     estate=data['estate']
+#     ax1.plot(estate[0,:],estate[1,:], color='r',alpha=0.5)
+#     goalcircle = plt.Circle((etask[0][0],etask[0][1]), theta[6], color='y', alpha=0.5)
+#     ax1.add_patch(goalcircle)
+#     ax1.set_xlim([-0.1,1.1])
+#     ax1.set_ylim([-0.6,0.6])
+#     agent_beliefs=data['agent_beliefs']
+#     for t in range(len(agent_beliefs[0][:,:,0])):
+#       cov=data['agent_covs'][0][t][:2,:2]
+#       pos=  [agent_beliefs[0][:,:,0][t,0],
+#               agent_beliefs[0][:,:,0][t,1]]
+#       plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
 
-  # v and w
-    ax2 = fig.add_subplot(6,nplots,n+nplots*4+1)
-    ax2.set_xlabel('t')
-    ax2.set_ylabel('w')
-    ax2.set_title('w control')
-    data.keys()
-    agent_actions=data['agent_actions']
-    for i in range(len(agent_actions)):
-      ax2.plot(agent_actions[i],alpha=0.7)
-    ax2.set_ylim([-1.1,1.1])
+#   # v and w
+#     ax2 = fig.add_subplot(6,nplots,n+nplots*4+1)
+#     ax2.set_xlabel('t')
+#     ax2.set_ylabel('w')
+#     ax2.set_title('w control')
+#     data.keys()
+#     agent_actions=data['agent_actions']
+#     for i in range(len(agent_actions)):
+#       ax2.plot(agent_actions[i],alpha=0.7)
+#     ax2.set_ylim([-1.1,1.1])
 
     # # dev and mag costs
     # ax2 = fig.add_subplot(6,nplots,n+nplots*5+1)
@@ -2514,6 +2560,22 @@ def inversed_uncertainty_bar(inverse_data):
 
 # 2.1 overhead view, monkey's belief and state in one trial
 def single_trial_overhead():
+    input={
+        'agent':agent,
+        'theta':theta,
+        'phi':phi,
+        'env': env,
+        'num_trials':1,
+        # 'task':tasks[:20],
+        'mkdata':{
+                        # 'trial_index': list(range(1)),               
+                        'trial_index': ind,               
+                        'task': [tasks[ind]],                  
+                        'actions': [actions[ind]],                 
+                        'states':[states[ind]],
+                        },                      
+        'use_mk_data':True
+    }
     # load data
     etask=input['mkdata']['task'][0]
     initv=input['mkdata']['actions'][0][0][0]  
@@ -2552,7 +2614,7 @@ def single_trial_overhead():
                     epbcov.append(env.P)
                     epstates.append(env.s)
                     t=t+1
-                print(env.get_distance(env.s))
+                # print(env.get_distance(env.s))
                 # agent_dev_costs.append(torch.stack(env.trial_dev_costs))
                 # agent_mag_costs.append(torch.stack(env.trial_mag_costs))
                 agent_actions.append(torch.stack(epactions))
@@ -2564,13 +2626,13 @@ def single_trial_overhead():
                 estate[:,1]=estate[:,1]-estate[0,1]
                 # agent path, red
                 print('ploting')
-                ax1.plot(estate[:,0],estate[:,1], color='r',alpha=0.5)
+                ax1.plot(estate[:,0],estate[:,1], color=color_settings['s'],alpha=0.5)
                 # agent belief path
                 for t in range(len(agent_beliefs[0][:,:,0])-1):
                     cov=agent_covs[0][t][:2,:2]
                     pos=  [agent_beliefs[0][:,:,0][t,0],
                             agent_beliefs[0][:,:,0][t,1]]
-                    plot_cov_ellipse(cov, pos, nstd=2, color='orange', ax=ax1,alpha_factor=0.7/num_trials)
+                    plot_cov_ellipse(cov, pos, nstd=2, color=color_settings['b'], ax=ax1,alpha_factor=0.7/num_trials)
         # mk state, blue
         ax1.plot(input['mkdata']['states'][0][:,0],input['mkdata']['states'][0][:,1],alpha=0.5)
 
@@ -2618,7 +2680,7 @@ def agentvsmk_skip(num_trials=10):
     # plotoverhead_skip(res2)
 
 
-def plot_critic_polar(  dmin=0.1,
+def plot_critic_polar(  dmin=0.2,
                         dmax=1.0):
     critic=agent_.critic.qf0.cpu()
     nbin=10
@@ -3048,25 +3110,24 @@ def trial_data(input):
     'mk_states':[],
     }
     # check
+    action_std=0.1 if 'action_std' not in input else input['action_std']
     if input['use_mk_data'] and not input['mkdata']: #TODO more careful check
         warnings.warn('need to input monkey data when using monkey data')
     if 'task' not in input:
         warnings.warn('random targets')
 
-    if input['use_mk_data']:
-        result['mk_trial_index']=input['mkdata']['trial_index']
-        result['task']=[input['mkdata']['task'][i] for i in input['mkdata']['trial_index']]
-        result['mk_actions']=[input['mkdata']['actions'][i] for i in input['mkdata']['trial_index']]
-        result['mk_states']=[input['mkdata']['states'][i] for i in input['mkdata']['trial_index']]
+    result['mk_trial_index']=input['mkdata']['trial_index']
+    result['task']=[input['mkdata']['task'][i] for i in input['mkdata']['trial_index']]
+    result['mk_actions']=[input['mkdata']['actions'][i] for i in input['mkdata']['trial_index']]
+    result['mk_states']=[input['mkdata']['states'][i] for i in input['mkdata']['trial_index']]
 
-    else:
-        if 'task' not in input:
+    if 'task' not in input: # random some task
             for trial_i in range(input['num_trials']):
                 distance=torch.ones(1).uniform_(0.3,1)
                 angle=torch.ones(1).uniform_(-pi/5,pi/5)
                 task=[(torch.cos(angle)*distance).item(),(torch.sin(angle)*distance).item()]
                 result['task'].append(task)
-        else:
+    else:  # use the task given
             if len(input['task'])==2:
                 result['task']=input['task']*input['num_trials']
             else:
@@ -3075,15 +3136,20 @@ def trial_data(input):
     with torch.no_grad():
         for trial_i in range(input['num_trials']):
             # print(result['task'][trial_i])
-            if input['use_mk_data']:
+            if input['use_mk_data']: # reset based on mk init condition
                 env.reset(phi=input['phi'],theta=input['theta'],
                 goal_position=result['task'][trial_i],
-                vctrl=input['mkdata']['actions'][trial_i][0][0], 
-                wctrl=input['mkdata']['actions'][trial_i][0][1])
-            else:
+                vctrl=result['mk_actions'][trial_i][0][0], 
+                wctrl=result['mk_actions'][trial_i][0][1])
+                # print('mk action', input['mkdata']['actions'][trial_i][0])
+                # print('prev action',env.previous_action)
+            else: # still reset based on mk init condition
                 env.reset(phi=input['phi'],
                 theta=input['theta'],
-                goal_position=result['task'][trial_i])
+                goal_position=result['task'][trial_i],
+                vctrl=result['mk_actions'][trial_i][0][0], 
+                wctrl=result['mk_actions'][trial_i][0][1])
+
             # prepare trial var
             epbliefs=[]
             epbcov=[]
@@ -3092,7 +3158,9 @@ def trial_data(input):
             if input['use_mk_data']: # using mk data
                 t=0
                 while t<len(result['mk_actions'][trial_i]):
-                    action = agent(env.decision_info)[0]
+                    noise=np.random.normal(0,action_std,size=(2))
+                    action = (agent(env.decision_info)[0] +noise).float()
+                    action.clamp_(-1,1)
                     if  t+1<result['mk_states'][trial_i].shape[0]:
                         env.step(torch.tensor(result['mk_actions'][trial_i][t]).reshape(1,-1),
                         next_state=result['mk_states'][trial_i][t+1].view(-1,1)) 
@@ -3109,12 +3177,12 @@ def trial_data(input):
                 done=False
                 t=0
                 while not done:
-                    action = agent(env.decision_info)[0]
-                    if 'states' in input['mkdata']:
-                        _,_,done,_=env.step(torch.tensor(action).reshape(1,-1),
-                        next_state=input['mkdata']['states'][trial_i][t]) 
-                    else:
-                        _,_,done,_=env.step(torch.tensor(action).reshape(1,-1)) 
+                    noise=np.random.normal(0,action_std,size=(2))
+                    action = (agent(env.decision_info)[0] +noise).float()
+                    action.clamp_(-1,1)
+                    if 'pert' in input['mkdata']:
+                        action+=input['mkdata']['pert'][t]
+                    _,_,done,_=env.step(torch.tensor(action).reshape(1,-1)) 
                     epactions.append(action)
                     epbliefs.append(env.b)
                     epbcov.append(env.P)
@@ -3387,12 +3455,18 @@ def is_skip(task,state,dthreshold=0.26,sthreshold=None):
 
 
 def plotctrl(input,**kwargs):
+    labels=[' v', ' w']
     with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
         if 'ax' in kwargs:
             ax = kwargs['ax'] 
         else:
             ax = fig.add_subplot(111)
+        if 'color' in kwargs:
+            color=kwargs['color']
+        else:
+            color=[color_settings['v'],color_settings['w']]
+        prefix=kwargs['prefix'] if 'prefix' in kwargs else ''
         # ax.set_aspect('equal')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -3400,18 +3474,52 @@ def plotctrl(input,**kwargs):
         ax.set_ylabel('control magnitude')
         # plot data
         for trial_i in range(input['num_trials']):
-            ax.plot(input['agent_actions'][trial_i][:,0],color=color_settings['v'],alpha=1/input['num_trials']**.3)
-            ax.plot(input['agent_actions'][trial_i][:,1],color=color_settings['w'],alpha=1/input['num_trials']**.3)
+            ax.plot(input['agent_actions'][trial_i][:,0],color=color[0],alpha=1/input['num_trials']**.3, label=prefix+labels[0])
+            ax.plot(input['agent_actions'][trial_i][:,1],color=color[1],alpha=1/input['num_trials']**.3, label=prefix+labels[1])
         # legend and label
-        teal_patch = mpatches.Patch(color=color_settings['v'], label='forward')
-        orange_patch = mpatches.Patch(color=color_settings['w'], label='angular')
-        ax.legend(handles=[teal_patch,orange_patch],loc='upper right',fontsize=6)
-        ax.set_xlim(0,40)
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+        ax.set_xlim(left=0.)
         ax.set_ylim(-1,1)
+        ax.set_yticks([-1,0,1])
         return  ax
 
+
+def plotctrl_mk(indls,**kwargs):
+    labels=[' v', ' w']
+    with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        if 'ax' in kwargs:
+            ax = kwargs['ax'] 
+        else:
+            ax = fig.add_subplot(111)
+        if 'color' in kwargs:
+            color=kwargs['color']
+        else:
+            color=[color_settings['v'],color_settings['w']]
+        prefix=kwargs['prefix'] if 'prefix' in kwargs else ''
+        # ax.set_aspect('equal')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xlabel('time, dt')
+        ax.set_ylabel('control magnitude')
+        # plot data
+        for trial_i in indls:
+            ax.plot(actions[trial_i][1:,0],color=color[0],alpha=1/len(indls)**.3, label=prefix+labels[0])
+            ax.plot(actions[trial_i][1:,1],color=color[1],alpha=1/len(indls)**.3, label=prefix+labels[1])
+        # legend and label
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+        ax.set_xlim(left=0.)
+        ax.set_ylim(-1,1)
+        ax.set_yticks([-1,0,1])
+        return  ax
+
+
 #----overhead----------------------------------------------------------------
-def plotoverhead(input,**kwargs):
+def plotoverhead(input,alpha=0.8,**kwargs):
     '''
         input:
         'theta':            input['theta'],
@@ -3447,29 +3555,30 @@ def plotoverhead(input,**kwargs):
         ax.text(-130, 0, s=r'$100cm$', fontsize=fontsize)
         ax.plot(np.linspace(0, 230 + 7),
                 np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
-        
+        goal=plt.Circle(np.array(input['task'][0])@np.array([[0,1],[-1,0]])*400,65,color=color_settings['goal'], alpha=alpha,label='target')
+        ax.add_patch(goal)
         for trial_i in range(input['num_trials']):
             input['agent_states'][trial_i][:,0]=input['agent_states'][trial_i][:,0]-input['agent_states'][trial_i][0,0]
             input['agent_states'][trial_i][:,1]=input['agent_states'][trial_i][:,1]-input['agent_states'][trial_i][0,1]
             ax.plot(-input['agent_states'][trial_i][:,1]*400,input['agent_states'][trial_i][:,0]*400, 
                 c=pathcolor, lw=0.1, ls='-')
             # calculate if rewarded
-            dy=input['agent_states'][trial_i][-1,0]*400-input['task'][trial_i][0]*400
-            dx=input['agent_states'][trial_i][-1,1]*400-input['task'][trial_i][1]*400
-            d2goal=(dx**2+dy**2)**0.5
-            if d2goal<=65: # reached goal
-                ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
-                    c='g', marker='.', s=1, lw=1)
-            elif d2goal>65 and d2goal< 130:
-                ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
-                    c='k', marker='.', s=1, lw=1)
-                # yellow error line
-                ax.plot([-input['agent_states'][trial_i][-1,1]*400,-input['task'][trial_i][1]*400],
-                            [input['agent_states'][trial_i][-1,0]*400,input['task'][trial_i][0]*400],color='yellow',alpha=0.3, linewidth=1)
+            # dy=input['agent_states'][trial_i][-1,0]*400-input['task'][trial_i][0]*400
+            # dx=input['agent_states'][trial_i][-1,1]*400-input['task'][trial_i][1]*400
+            # d2goal=(dx**2+dy**2)**0.5
+            # if d2goal<=65: # reached goal
+            #     ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
+            #         c='g', marker='.', s=1, lw=1)
+            # elif d2goal>65 and d2goal< 130:
+            #     ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
+            #         c='k', marker='.', s=1, lw=1)
+            #     # yellow error line
+            #     ax.plot([-input['agent_states'][trial_i][-1,1]*400,-input['task'][trial_i][1]*400],
+            #                 [input['agent_states'][trial_i][-1,0]*400,input['task'][trial_i][0]*400],color='yellow',alpha=0.3, linewidth=1)
 
-            else: # skipped
-                ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
-                    c='r', marker='.', s=1, lw=1)
+            # else: # skipped
+            #     ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
+            #         c='r', marker='.', s=1, lw=1)
 
     else:
         with initiate_plot(1.8, 1.8, 300) as fig:
@@ -3492,29 +3601,88 @@ def plotoverhead(input,**kwargs):
             fig.tight_layout(pad=0)
             ax.plot(np.linspace(0, 230 + 7),
                     np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
+            goal=plt.Circle(np.array(input['task'][0])@np.array([[0,1],[-1,0]])*400,65,color=color_settings['goal'], alpha=alpha,label='target')
+            ax.add_patch(goal)
             
             for trial_i in range(input['num_trials']):
                 input['agent_states'][trial_i][:,0]=input['agent_states'][trial_i][:,0]-input['agent_states'][trial_i][0,0]
                 input['agent_states'][trial_i][:,1]=input['agent_states'][trial_i][:,1]-input['agent_states'][trial_i][0,1]
                 ax.plot(-input['agent_states'][trial_i][:,1]*400,input['agent_states'][trial_i][:,0]*400, 
                     c=pathcolor, lw=0.1, ls='-')
-                # calculate if rewarded
-                dy=input['agent_states'][trial_i][-1,0]*400-input['task'][trial_i][0]*400
-                dx=input['agent_states'][trial_i][-1,1]*400-input['task'][trial_i][1]*400
-                d2goal=(dx**2+dy**2)**0.5
-                if d2goal<=65: # reached goal
-                    ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
-                        c='g', marker='.', s=1, lw=1)
-                elif d2goal>65 and d2goal< 130:
-                    ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
-                        c='k', marker='.', s=1, lw=1)
-                    # yellow error line
-                    ax.plot([-input['agent_states'][trial_i][-1,1]*400,-input['task'][trial_i][1]*400],
-                                [input['agent_states'][trial_i][-1,0]*400,input['task'][trial_i][0]*400],color='yellow',alpha=0.3, linewidth=1)
+                # # calculate if rewarded
+                # dy=input['agent_states'][trial_i][-1,0]*400-input['task'][trial_i][0]*400
+                # dx=input['agent_states'][trial_i][-1,1]*400-input['task'][trial_i][1]*400
+                # d2goal=(dx**2+dy**2)**0.5
+                # if d2goal<=65: # reached goal
+                #     ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
+                #         c='g', marker='.', s=1, lw=1)
+                # elif d2goal>65 and d2goal< 130:
+                #     ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
+                #         c='k', marker='.', s=1, lw=1)
+                #     # yellow error line
+                #     ax.plot([-input['agent_states'][trial_i][-1,1]*400,-input['task'][trial_i][1]*400],
+                #                 [input['agent_states'][trial_i][-1,0]*400,input['task'][trial_i][0]*400],color='yellow',alpha=0.3, linewidth=1)
 
-                else: # skipped
-                    ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
-                        c='r', marker='.', s=1, lw=1)
+                # else: # skipped
+                #     ax.scatter(-input['task'][trial_i][1]*400, input['task'][trial_i][0]*400, 
+                #         c='r', marker='.', s=1, lw=1)
+    return ax
+
+
+def plotoverhead_mk(indls, alpha=0.3,**kwargs):
+    pathcolor='gray' if 'color' not in kwargs else kwargs['color'] 
+    fontsize = 9
+    if 'ax' in kwargs:
+        ax = kwargs['ax'] 
+        ax.set_aspect('equal')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.axes.xaxis.set_ticks([]); ax.axes.yaxis.set_ticks([])
+        ax.set_xlim([-235, 235]); ax.set_ylim([-2, 430])
+        x_temp = np.linspace(-235, 235)
+        ax.plot(x_temp, np.sqrt(420**2 - x_temp**2), c='k', ls=':')
+        ax.text(-10, 425, s=r'$70\degree$', fontsize=fontsize)
+        ax.text(130, 150, s=r'$400cm$', fontsize=fontsize)
+        ax.plot(np.linspace(-230, -130), np.linspace(0, 0), c='k')
+        ax.plot(np.linspace(-230, -230), np.linspace(0, 100), c='k')
+        ax.text(-230, 100, s=r'$100cm$', fontsize=fontsize)
+        ax.text(-130, 0, s=r'$100cm$', fontsize=fontsize)
+        ax.plot(np.linspace(0, 230 + 7),
+                np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
+        for trial_i in indls:
+            ax.plot(-states[trial_i][:,1]*400,states[trial_i][:,0]*400, 
+                c=pathcolor, lw=0.1, ls='-')
+    
+    else:
+        with initiate_plot(1.8, 1.8, 300) as fig:
+            ax = fig.add_subplot(111)
+            ax.set_aspect('equal')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.axes.xaxis.set_ticks([]); ax.axes.yaxis.set_ticks([])
+            ax.set_xlim([-235, 235]); ax.set_ylim([-2, 430])
+            x_temp = np.linspace(-235, 235)
+            ax.plot(x_temp, np.sqrt(420**2 - x_temp**2), c='k', ls=':')
+            ax.text(-10, 425, s=r'$70\degree$', fontsize=fontsize)
+            ax.text(130, 150, s=r'$400cm$', fontsize=fontsize)
+            ax.plot(np.linspace(-230, -130), np.linspace(0, 0), c='k')
+            ax.plot(np.linspace(-230, -230), np.linspace(0, 100), c='k')
+            ax.text(-230, 100, s=r'$100cm$', fontsize=fontsize)
+            ax.text(-130, 0, s=r'$100cm$', fontsize=fontsize)
+            fig.tight_layout(pad=0)
+            ax.plot(np.linspace(0, 230 + 7),
+                    np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
+            goal=plt.Circle(np.array(tasks[indls[0]])@np.array([[0,1],[-1,0]])*400,65,color=color_settings['goal'], alpha=alpha,label='target')
+            ax.add_patch(goal)
+            
+            for trial_i in indls:
+                ax.plot(-states[trial_i][:,1]*400,states[trial_i][:,0]*400, 
+                c=pathcolor, lw=0.1, ls='-')
+
     return ax
 
 
@@ -3901,10 +4069,10 @@ def plotpert(v, w, ax=None,alpha=0.8):
         return  ax
 
 
-def quickoverhead(statelike):
+def quickoverhead(statelike,ax=None,alpha=0.5):
   with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
     warnings.simplefilter('ignore')
-    ax = fig.add_subplot(111)
+    ax = fig.add_subplot(111) if not ax else ax
     # ax.plot(given_state[:,0],given_state[:,1])
     for key,value in statelike.items():
       ax.plot(torch.cat(value,1).t()[:,0],torch.cat(value,1).t()[:,1], label=key)
@@ -3925,17 +4093,36 @@ def quickoverhead(statelike):
     ax.legend(by_label.values(), by_label.keys(),loc=2, prop={'size': 6})
 
 
-def theta_bar(finaltheta,finalcov, ax=None, label=None,shift=0,width=0.5):
+def theta_bar(finaltheta,finalcov=None,xlabels=theta_names,err=None, ax=None, label=None,shift=0,width=0.5):
+    err=torch.diag(finalcov)**0.5 if err is None else err
     with initiate_plot(6, 4, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
         if ax is None:
             ax = fig.add_subplot(111)
         # Create bars and choose color
-        ax.bar([i+shift for i in range(len(finaltheta))], finaltheta,width,yerr=torch.diag(finalcov)**0.5,label=label,capsize=2)
+        ax.bar([i+shift for i in range(len(xlabels))], finaltheta,width,yerr=err,label=label)
         # title and axis names
         ax.set_ylabel('inferred parameter value')
-        ax.set_xticks([i for i in range(len(finaltheta))])
-        ax.set_xticklabels(theta_names, rotation=45, ha='right')
+        ax.set_xticks([i for i in range(len(xlabels))])
+        ax.set_xticklabels(xlabels, rotation=45, ha='right')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.legend()
+    return ax
+
+
+def firstevector_bar(finaltheta,xlabels=theta_names, ax=None, label=None,shift=0,width=0.5):
+    
+    with initiate_plot(6, 4, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        if ax is None:
+            ax = fig.add_subplot(111)
+        # Create bars and choose color
+        ax.bar([i+shift for i in range(len(xlabels))], finaltheta,width,label=label)
+        # title and axis names
+        ax.set_ylabel('most constrained eigen vector parameter value')
+        ax.set_xticks([i for i in range(len(xlabels))])
+        ax.set_xticklabels(xlabels, rotation=45, ha='right')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.legend()
@@ -3962,7 +4149,7 @@ g = lambda x,pos : "${}$".format(sf._formatSciNotation('%1e' % x))
 fmt = mticker.FuncFormatter(g)
 
 
-def d_process(logs):
+def d_process(logs,densities):
     means=[log[-1][0]._mean if log else None for log in logs]
     stds=[np.diag(log[-1][0]._C)**0.5 if log else None for log in logs]
     xs,ys,errs=[],[],[]
@@ -3974,7 +4161,7 @@ def d_process(logs):
     return xs,ys,errs
 
 
-def d_noise():
+def d_noise(xs,ys,errs):
     lables=['pro v','pro w','obs v','obs w']
     with initiate_plot(2.8, 1.8, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
@@ -3991,23 +4178,48 @@ def d_noise():
         ax.legend(fontsize=8)
 
 
-def d_obs_degree():
+def d_kalman_gain(xs,ys,errs,conf=20,alpha=0.9):
     with initiate_plot(3, 3, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
         ax = fig.add_subplot(111)
-        ax.hlines(y=1, xmin=0, xmax=len(xs)-1,linestyle='--', linewidth=2, color='black',alpha=0.8)
-        ax.plot(ys[:,2]/ys[:,4],label='forward v')
-        ax.plot(ys[:,3]/ys[:,5],label='angular w')
+
+        # angular w
+        pn_sample=np.random.normal(ys[:,3],errs[:,3],size=(100,ys.shape[0])).clip(1e-3,)
+        on_sample=np.random.normal(ys[:,5],errs[:,5],size=(100,ys.shape[0])).clip(1e-3,)
+        k_sample=pn_sample**2/(pn_sample**2+on_sample**2)
+        mu=np.array([np.mean(k_sample[:,i]) for i in range(k_sample.shape[1])])
+        lb=[np.percentile(k_sample[:,i],conf) for i in range(k_sample.shape[1]) ]
+        hb=[np.percentile(k_sample[:,i],100-conf) for i in range(k_sample.shape[1]) ]
+        cibound=np.array([lb,hb])
+        err=np.array([ np.abs(mu.T-cibound[0,:] ), np.abs(cibound[1,:]-mu.T) ] )
+        ax.errorbar(np.arange(len(xs))-0.1,y=mu,yerr=err,label='angular w',alpha=alpha)
+
+        # forward v
+        pn_sample=np.random.normal(ys[:,2],errs[:,2],size=(100,ys.shape[0])).clip(1e-3,)
+        on_sample=np.random.normal(ys[:,4],errs[:,4],size=(100,ys.shape[0])).clip(1e-3,)
+        k_sample=pn_sample**2/(pn_sample**2+on_sample**2)
+        mu=np.array([np.mean(k_sample[:,i]) for i in range(k_sample.shape[1])])
+        lb=[np.percentile(k_sample[:,i],conf) for i in range(k_sample.shape[1]) ]
+        hb=[np.percentile(k_sample[:,i],100-conf) for i in range(k_sample.shape[1]) ]
+        cibound=np.array([lb,hb])
+        err=np.array([ np.abs(mu.T-cibound[0,:] ), np.abs(cibound[1,:]-mu.T) ] )
+        ax.errorbar(np.arange(len(xs))+0.1,y=mu,yerr=err,label='forward v',alpha=alpha)
+
+        # ax.hlines(y=0.5, xmin=0, xmax=len(xs)-1,linestyle='--', linewidth=2, color='black',alpha=0.8)
+        # ax.plot(ys[:,2]/ys[:,4],label='forward v')
+        # ax.plot(ys[:,2]**2/(ys[:,2]**2+ys[:,4]**2),label='forward v')
+        # ax.plot(ys[:,3]**2/(ys[:,3]**2+ys[:,5]**2),label='angular w')
+        # ax.plot(ys[:,3]/ys[:,5],label='angular w')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax.set_yscale('log')
-        ax.set_xticks([i for i in range(len(xs))])
+        # ax.set_yscale('log')
+        ax.set_yticks([0.,0.5,1.0])
+        ax.set_xticks(list(range(len(xs))))
         ax.set_xticklabels([fmt(i.item()) for i in xs])
         ax.legend(fontsize=12)
-        ax.set_ylabel('observation reliable degree',fontsize=12)
+        ax.set_ylabel('Kalman gain',fontsize=12)
         ax.set_xlabel('density',fontsize=12)
-        ax.set_title('observation reliable degree',fontsize=16)
-
+        # ax.set_title('observation reliable degree',fontsize=16)
 
 
 def barpertacc(accs,trialtype, ax=None, label=None,shift=0,width=0.4):
@@ -4026,6 +4238,7 @@ def barpertacc(accs,trialtype, ax=None, label=None,shift=0,width=0.4):
         ax.legend()
     return ax
 
+
 def barpertacc(accs,trialtype, ax=None, label=None,shift=0,width=0.4):
     with initiate_plot(3, 3, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
@@ -4041,6 +4254,7 @@ def barpertacc(accs,trialtype, ax=None, label=None,shift=0,width=0.4):
         ax.spines['right'].set_visible(False)
         ax.legend()
     return ax
+
 
 def mybar(data,xlabels, ax=None, label=None,shift=0,width=0.4):
     with initiate_plot(3, 3, 300) as fig, warnings.catch_warnings():
@@ -4059,35 +4273,256 @@ def mybar(data,xlabels, ax=None, label=None,shift=0,width=0.4):
     return ax
 
 
-
 def gauss_div(m1,s1,m2,s2):
     newm=1/(1/s1-1/s2)*(m1/s1-m2/s2)
     news=1/(1/s1-1/s2)
     return newm, news
 
 
+def dfoverhead_single(df,ind=None,alpha=0.5):
+    ind=np.random.randint(0,len(df)) if not ind else ind
+    with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+        ax.plot(df.iloc[ind].pos_x,df.iloc[ind].pos_y, label='path')
+        goal=plt.Circle([df.iloc[ind].target_x,df.iloc[ind].target_y],65,facecolor=color_settings['goal'],edgecolor='none', alpha=alpha,label='target')
+        ax.plot(0.,0., "*", color='black',label='start')
+        ax.add_patch(goal)
+        ax.axis('equal')
+        ax.set_xlabel('world x [cm]')
+        ax.set_ylabel('world y [cm]')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        # legend and label
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(),loc=2, prop={'size': 6})
 
 
+def dfctrl_single(df,ind=None,alpha=0.5):
+    ind=np.random.randint(0,len(df)) if not ind else ind
+    with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+        ts=np.arange(len(df.iloc[ind].action_v))/10
+        ax.plot(ts,df.iloc[ind].action_v, label='forward v control')
+        ax.plot(ts,df.iloc[ind].action_w, label='angular w control')
+        # ax.plot(0.,0., "*", color='black',label='start')
+        ax.set_xlabel('time [s]')
+        ax.set_ylabel('control magnitude')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xlim(left=0.)
+        ax.set_ylim(-1.,1)
+        ax.set_yticks([-1,0,1])
+        # print(ax.xaxis.get_ticklabels())
+        # for n, label in enumerate(ax.xaxis.get_ticklabels()):
+        #     if n % 4 != 0:
+        #         label.set_visible(False)
+        # ax.axhline(0., dashes=[1,2], color='black', alpha=0.3)
+        ax.spines['bottom'].set_position(('data', 0.))
+        # legend and label
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(),loc='upper right', prop={'size': 6})
 
 
+def smooth(y, box_pts):
+    box = np.ones(box_pts)/box_pts
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
 
 
+def plotmetatrend(df):
+    data=list(df.category)
+    vocab={'skip':0,'normal':1,"crazy":2,'lazy':3,'wrong_target':4}
+    data=[vocab[each] for each in data]
+    x = [i for i in range(len(data))]
+    # plt.plot(y)
+    plt.plot(x, smooth(data,30), lw=2,label='trial type')
+    plt.xlabel('trial number')
+    plt.ylabel('reward, reward rate and trial type')
+    plt.legend()
+    data=list(df.rewarded)
+    data=[1 if each else 0 for each in data]
+    plt.plot(x, smooth(data,30), lw=2,label='reward')
+    print(vocab)
 
 
+def ovbystate():
+    ind=torch.randint(low=100,high=300,size=(1,))
+    with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+        ax.plot(states[ind][:,0],states[ind][:,1], color='r',alpha=0.5)
+        goalcircle = plt.Circle([tasks[ind][0],tasks[ind][1]], 0.13, color='y', alpha=0.5)
+        ax.add_patch(goalcircle)
+        ax.set_xlim(0,1)
+        ax.set_ylim(-0.6,0.6)
 
 
+def get_ci(log, low=5, high=95, threshold=2):
+    res=[l[2] for l in log]
+    mean=log[-1][0]._mean
+    allsamples=[]
+    for r in res:
+        for point in r:
+            allsamples.append([point[1],point[0]])
+    allsamples.sort(key=lambda x: x[0])
+    aroundsolution=allsamples[:len(allsamples)//threshold]
+    aroundsolution.sort(key=lambda x: x[0])
+    alltheta=np.vstack([x[1] for x in aroundsolution])
+
+    lower_ci=[np.percentile(alltheta[:,i],low) for i in range(alltheta.shape[1])]
+    upper_ci=[np.percentile(alltheta[:,i],high) for i in range(alltheta.shape[1])]
+    asymmetric_error = np.array(list(zip(lower_ci, upper_ci))).T
+    res=np.array([ np.abs(mean.T-asymmetric_error[0,:] ), np.abs(asymmetric_error[1,:]-mean.T) ] )
+    return res
+    
+
+def twodatabar(data1,data2,err1=None,err2=None,labels=None,shift=0.4,width=0.5,ylabel=None,xlabel=None,color=['b','r'],xname=''):
+    xs=list(range(max(len(data1),len(data2))))
+    label1=labels[0] if labels else None
+    label2=labels[1] if labels else None
+    with initiate_plot(6, 4, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+        # Create bars and choose color
+        ax.bar(xs, data1,width,yerr=err1,label=label1,color=color[0])
+        ax.bar([i+shift for i in range(len(xs))], data2,width,yerr=err2,label=label2,color=color[1])
+        # title and axis names
+        ax.set_ylabel(ylabel)
+        ax.set_xticks([i for i in range(max(len(data1),len(data2)))])
+        if xlabel:
+            ax.set_xticklabels(xlabel, rotation=45, ha='right')
+        ax.set_xlabel(xname)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.legend()
+   
+
+def conditional_cov(covyy,covxx, covxy):
+    # return the conditional cov of y|x
+    # here use covxy==covyx as no causal here
+    return covyy-covxy@np.linalg.inv(covxx)@covxy.T
 
 
+def conditional_cov_block(cov, paramindex):
+    cov=np.asfarray(cov)
+    covxy=np.array(list(cov[:,paramindex][:paramindex]) + list(cov[:,paramindex][paramindex+1:]))
+    covyy=np.diag(cov)[paramindex]
+    temp=np.delete(cov,(paramindex),axis=0)
+    covxx=np.delete(temp,(paramindex),axis=1)
+    return covyy-covxy@np.linalg.inv(covxx)@covxy.T
 
 
+def scatter_hist(x,y):
+    def _scatter_hist(x, y, ax, ax_histx, ax_histy):
+        # no labels
+        ax_histx.tick_params(axis="x", labelbottom=False)
+        ax_histy.tick_params(axis="y", labelleft=False)
+
+        # the scatter plot:
+        ax.scatter(x, y,alpha=0.3)
+
+        # now determine nice limits by hand:
+        binwidth = 0.5
+        xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
+        lim = (int(xymax/binwidth)*1.1) * binwidth
+
+        bins = np.arange(-lim, lim + binwidth, binwidth)
+        ax_histx.hist(x, bins=22)
+        ax_histy.hist(y, bins=22, orientation='horizontal')
+
+    left, width = 0.1, 0.65
+    bottom, height = 0.1, 0.65
+    spacing = 0.005
+    rect_scatter = [left, bottom, width, height]
+    rect_histx = [left, bottom + height + spacing, width, 0.2]
+    rect_histy = [left + width + spacing, bottom, 0.2, height]
+    # start with a square Figure
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_axes(rect_scatter)
+    ax_histx = fig.add_axes(rect_histx, sharex=ax)
+    ax_histy = fig.add_axes(rect_histy, sharey=ax)
+    # use the previously defined function
+    _scatter_hist(x, y, ax, ax_histx, ax_histy)
+    plt.show()
 
 
+def overheaddf_tar(df, alpha=1,**kwargs):
+    fontsize = 9
+    with initiate_plot(1.8, 1.8, 300) as fig:
+        ax = fig.add_subplot(111)
+        ax.set_aspect('equal')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.axes.xaxis.set_ticks([]); ax.axes.yaxis.set_ticks([])
+        ax.set_xlim([-235, 235]); ax.set_ylim([-2, 430])
+        x_temp = np.linspace(-235, 235)
+        ax.plot(x_temp, np.sqrt(420**2 - x_temp**2), c='k', ls=':')
+        ax.text(-10, 425, s=r'$70\degree$', fontsize=fontsize)
+        ax.text(130, 150, s=r'$400cm$', fontsize=fontsize)
+        ax.plot(np.linspace(-230, -130), np.linspace(0, 0), c='k')
+        ax.plot(np.linspace(-230, -230), np.linspace(0, 100), c='k')
+        ax.text(-230, 100, s=r'$100cm$', fontsize=fontsize)
+        ax.text(-130, 0, s=r'$100cm$', fontsize=fontsize)
+        fig.tight_layout(pad=0)
+        ax.plot(np.linspace(0, 230 + 7),
+                np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
+        ax.scatter(df[df.rewarded].target_x,df[df.rewarded].target_y, c='k',alpha=alpha, edgecolors='none',marker='.', s=2, lw=1)
+        ax.scatter(df[~df.rewarded].target_x,df[~df.rewarded].target_y, c='r',alpha=alpha,edgecolors='none', marker='.', s=2, lw=1)
 
 
+def overheaddf_path(df,indls, alpha=0.5,**kwargs):
+    pathcolor='gray' if 'color' not in kwargs else kwargs['color'] 
+    fontsize = 9
+    with initiate_plot(1.8, 1.8, 300) as fig:
+        ax = fig.add_subplot(111)
+        ax.set_aspect('equal')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.axes.xaxis.set_ticks([]); ax.axes.yaxis.set_ticks([])
+        ax.set_xlim([-235, 235]); ax.set_ylim([-2, 430])
+        x_temp = np.linspace(-235, 235)
+        ax.plot(x_temp, np.sqrt(420**2 - x_temp**2), c='k', ls=':')
+        ax.text(-10, 425, s=r'$70\degree$', fontsize=fontsize)
+        ax.text(130, 150, s=r'$400cm$', fontsize=fontsize)
+        ax.plot(np.linspace(-230, -130), np.linspace(0, 0), c='k')
+        ax.plot(np.linspace(-230, -230), np.linspace(0, 100), c='k')
+        ax.text(-230, 100, s=r'$100cm$', fontsize=fontsize)
+        ax.text(-130, 0, s=r'$100cm$', fontsize=fontsize)
+        fig.tight_layout(pad=0)
+        ax.plot(np.linspace(0, 230 + 7),
+                np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
+
+        for trial_i in indls:
+            ax.plot(df.iloc[trial_i].pos_x,df.iloc[trial_i].pos_y,c=pathcolor, lw=0.1, ls='-', alpha=alpha)
 
 
+def conditional_cov(covyy,covxx, covxy):
+    # return the conditional cov of y|x
+    # here use covxy==covyx as no causal here
+    return covyy-covxy@np.linalg.inv(covxx)@covxy.T
 
 
+def conditional_cov_block(cov, paramindex):
+    cov=np.asfarray(cov)
+    covxy=np.array(list(cov[:,paramindex][:paramindex]) + list(cov[:,paramindex][paramindex+1:]))
+    covyy=np.diag(cov)[paramindex]
+    temp=np.delete(cov,(paramindex),axis=0)
+    covxx=np.delete(temp,(paramindex),axis=1)
+    return covyy-covxy@np.linalg.inv(covxx)@covxy.T
 
 
-
+def correlation_from_covariance(covariance):
+    v = np.sqrt(np.diag(covariance)) # std
+    outer_v = np.outer(v, v)
+    correlation = covariance / outer_v
+    correlation[covariance == 0] = 0
+    return correlation

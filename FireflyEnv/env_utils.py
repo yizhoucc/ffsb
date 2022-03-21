@@ -25,12 +25,14 @@ def row_vector(vector):
     elif type(vector) == np.ndarray:
         return torch.Tensor(vector).view(1,-1)
 
+
 def col_vector(vector):
     # input, np array or torch tensor, ouput to tensor col vector
     if type(vector) == torch.Tensor:
         return vector.view(-1,1)
     elif type(vector) == np.ndarray:
         return torch.Tensor(vector).view(-1,1)
+
 
 def is_pos_def(x):
     """
@@ -50,6 +52,7 @@ def is_pos_def(x):
 
     return yes
 
+
 def tril_mask(size):
     """
     Returns a lower triangular mask
@@ -57,6 +60,7 @@ def tril_mask(size):
     """
     mask = torch.tril(torch.ones(size, size, dtype=torch.uint8)) # ByteTensor
     return mask
+
 
 def vectorLowerCholesky(P):
     """
@@ -66,6 +70,7 @@ def vectorLowerCholesky(P):
     L = torch.cholesky(P, upper=False)
     mask = tril_mask(P.size(0))
     return torch.masked_select(L, mask > 0)
+
 
 def inverseCholesky(vecL):
     """
@@ -80,6 +85,7 @@ def inverseCholesky(vecL):
     P = L.mm(L.t())
     return P
 
+
 def range_angle(ang):
     """
     Adjusts the range of angle from -pi to pi
@@ -87,6 +93,7 @@ def range_angle(ang):
     ang = torch.remainder(ang, 2*pi)
     ang = ang if ang < pi else (ang -2*pi)
     return ang
+
 
 def pos_init(box=2.):
     """
@@ -99,6 +106,7 @@ def pos_init(box=2.):
     #pos = torch.cat((r, ang)) # polar coordinates
     rel_ang = torch.zeros(1).uniform_(-pi/4, pi/4)
     return (r, ang, rel_ang)
+
 
 def ellipse(mu, cov, n=100, conf_int=5.991, torch=False):
     """
@@ -128,6 +136,7 @@ def ellipse(mu, cov, n=100, conf_int=5.991, torch=False):
     y = X[:,1] + mu[1]
     return x, y
 
+
 def sample_exp(min, max, scale = np.e):
     """sample a random number with exponetial distribution
     the number should be in a range [min, max]
@@ -145,6 +154,7 @@ def norm_parameter(parameter,param_range, given_range=[0.001,0.999]):
     c=k*min(param_range)-min(given_range)
     parameter=parameter*k-c
     return parameter
+
 
 def denorm_parameter(parameter,param_range, given_range=[0.001,0.999]):
     'denormalize the paramter range to a range'

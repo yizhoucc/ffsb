@@ -1,33 +1,64 @@
+# plotting of immedite inverse result, using cmaes.
+
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
-
 from numpy.linalg.linalg import svd
 warnings.filterwarnings('ignore')
 import pickle
-import numpy as np
 import torch
-import heapq
 from torch.distributions.multivariate_normal import MultivariateNormal
-from matplotlib import pyplot as plt
-import time
 torch.manual_seed(42)
 from numpy import pi
 from InverseFuncs import *
 from monkey_functions import *
 from pathlib import Path
 from plot_ult import *
+from stable_baselines3 import TD3
+torch.manual_seed(42)
+from FireflyEnv import ffacc_real
+from Config import Config
+np.set_printoptions(precision=3)
 
-# loading
-import pickle
+
+# load model
+arg = Config()
+env=ffacc_real.FireFlyPaper(arg)
+env.debug=True
+phi=torch.tensor([[0.5],
+            [pi/2],
+            [0.001],
+            [0.001],
+            [0.001],
+            [0.001],
+            [0.13],
+            [0.001],
+            [0.001],
+            [0.001],
+            [0.001],
+    ])
+agent_=TD3.load('trained_agent/re1re1repaper_3_199_198.zip')
+# agent_=TD3.load('trained_agent/paper.zip')
+agent=agent_.actor.mu.cpu()
+
+# loading data
 data_path=Path("Z:\\schro_normal")
 with open(data_path/'packed', 'rb') as f:
+    df = pickle.load(f)
+print('process data')
+states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
+print('done process data')
+
+
+
+
+
+# bar plots of inferred theta -----------------------------------------------
+
+with open('Z:\\q_normal/cmad1_packed', 'rb') as f:
     log = pickle.load(f)
 
-with open('cmafull_vic2', 'rb') as f:
-    log = pickle.load(f)
-
-# theta hist
+# theta hist fig
 optimizer=log[-1][0]
 cov=optimizer._C
 theta=torch.tensor(optimizer._mean).view(-1,1)
@@ -36,11 +67,10 @@ cov=optimizer._C
 finalcov=torch.tensor(cov)
 theta_bar(finaltheta,finalcov)
 
-# theta confidence hist
+# confidence hist fig
 thetaconfhist(finalcov)
 
-
-# density obs
+# density obs fig
 densities=[0.0001, 0.0005, 0.001, 0.005]
 filenamecommom='cmapk56fixgoalrnorm'
 logs=[None]*4
@@ -59,11 +89,10 @@ for i in range(4):
         x,y,err=densities[i],means[i],stds[i]
         xs.append(x);ys.append(y);errs.append(err)
 ys=np.array(ys)
-plt.plot(xs,ys[:,2:4])
-plt.plot(xs,ys[:,4:6])
-plt.plot(xs,ys[:,2:4]/ys[:,4:6])
-plt.plot(xs,ys[:,6])
-
+# plt.plot(xs,ys[:,2:4])
+# plt.plot(xs,ys[:,4:6])
+# plt.plot(xs,ys[:,2:4]/ys[:,4:6])
+# plt.plot(xs,ys[:,6])
 fig=plt.figure()
 ax=fig.add_subplot(111)
 ax.plot(xs,ys[:,2]/ys[:,4])
@@ -73,7 +102,12 @@ ax.set_title('forward observation noise vs optical flow density', fontsize=16)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 
-# log ll vs gen
+
+
+# trend plots of inferred theta ---------------------------------------------------
+
+# log ll vs gen fig
+optimizer=log[-1][0]
 res=[l[2] for l in log]
 loglls=[]
 for r in res:
@@ -100,53 +134,117 @@ for i in range(11):
 plt.xlabel('number updates')
 plt.ylabel('parameter value')
 
+
+# converge and heatmaps plot ---------------------------------------------------
+
 # pca space of all samples
 res=[l[2] for l in log]
+allsamples=[]
 alltheta=[]
 loglls=[]
 for r in res:
     for point in r:
         alltheta.append(torch.tensor(point[0]))
         loglls.append(torch.tensor(point[1]))
+        allsamples.append([point[1],point[0]])
 alltheta=torch.stack(alltheta)
-loglls=torch.tensor(loglls).flatten()
+logllsall=torch.tensor(loglls).flatten()
+allsamples.sort(key=lambda x: x[0])
 
 projectedparam=torch.pca_lowrank(torch.tensor(alltheta),2)
-projectedparam=projectedparam[0]
-# pc space scatter logll
-s = plt.scatter(projectedparam[:,0], projectedparam[:,1], c=loglls,alpha=0.3,edgecolors=None, cmap='jet')
-plt.clim(min(loglls), max(loglls)) 
-plt.xlabel('projected parameters')
-plt.ylabel('projected parameters')
-c = plt.colorbar()
+transition=projectedparam[2] # the V
+projectedparamall=projectedparam[0] # the U
+
+mu=torch.mean(projectedparamall,axis=0)
+aroundsolution=allsamples[:len(allsamples)//2]
+aroundsolution.sort(key=lambda x: x[0])
+alltheta=np.vstack([x[1] for x in aroundsolution])
+loglls=[x[0] for x in aroundsolution]
+pccov=transition.T@torch.tensor(np.cov(alltheta.T)).float()@transition
+
+with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    ax = fig.add_subplot(111)
+    plot_cov_ellipse(pccov, mu, alpha_factor=1,nstd=1,ax=ax)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    s = ax.scatter(projectedparamall[:,0], projectedparamall[:,1], c=(logllsall),alpha=0.5,edgecolors='None', cmap='jet')
+    ax.set_xlabel('projected parameters')
+    ax.set_ylabel('projected parameters')
+    c = fig.colorbar(s, ax=ax)
+    ax.locator_params(nbins=3, axis='y')
+    ax.locator_params(nbins=3, axis='x')
+    # c.clim(min(np.log(loglls)), max(np.log(loglls))) 
+    c.set_label('- log likelihood')
+    # c.set_ticks([min((loglls)),max((loglls))])
+    c.ax.locator_params(nbins=4)
 
 
 
+# conditional uncertainty
+# case 0, use math
+# two monkey theta hist and confidence hist
+# compare 2 monkeys
+data_path=Path("Z:\\schro_pert")
+with open(data_path/'longonlypacked_schro_pert', 'rb') as f:
+    slog = pickle.load(f)
+
+data_path=Path("Z:\\bruno_pert")
+with open(data_path/'cmafull_packed_bruno_pert', 'rb') as f:
+    blog = pickle.load(f)
+log=slog
+finalcov=torch.tensor(log[-1][0]._C)
+finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
+st=torch.cat([finaltheta[:6],finaltheta[-4:]])
+finalcov = finalcov[torch.arange(finalcov.size(0))!=6] 
+sc = finalcov[:,torch.arange(finalcov.size(1))!=6] 
+
+log=blog
+finalcov=torch.tensor(log[-1][0]._C)
+finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
+bt=torch.cat([finaltheta[:6],finaltheta[-4:]])
+finalcov = finalcov[torch.arange(finalcov.size(0))!=6] 
+bc = finalcov[:,torch.arange(finalcov.size(1))!=6] 
+
+# paramindex=0
+# covyy=np.diag(cov)[paramindex]
+# covxy=np.concatenate((np.diag(cov)[:paramindex], np.diag(cov)[paramindex+1:]))
+# fullcov=np.asfarray(cov)
+# temp = fullcov[np.arange(fullcov.shape[0])!=paramindex] 
+# covxx = temp[:,np.arange(temp.shape[1])!=paramindex] 
+# conditional_cov(covyy,covxx, covxy)
+
+plt.bar(list(range(sc.shape[0])),np.sqrt(np.array([conditional_cov_block(sc, paramindex) for paramindex in range(sc.shape[0])])))
+plt.bar(list(range(sc.shape[0])),np.sqrt(np.diag(sc)))
+
+conderr=np.sqrt(np.array([conditional_cov_block(sc, paramindex) for paramindex in range(sc.shape[0])]))
+stderr=np.sqrt(np.diag(sc))
+twodatabar(conderr,stderr,labels=['conditional std','marginal std'],ylabel='param value')
+
+theta_bar(st.view(-1),err=conderr)
+theta_bar(st,sc )
 
 
-np.set_printoptions(precision=2)
-print((optimizer._mean))
 
-optimizer=log[-1][0]
-cov=optimizer._C
-theta=torch.tensor(optimizer._mean).view(-1,1)
-finaltheta=theta
-cov=optimizer._C
-finalcov=torch.tensor(cov)
-
+corr=correlation_from_covariance(cov)
 
 # covariance heatmap
-inds=[1,3,5,8,0,2,4,7,6,9,10]
+inds=[1, 3, 5, 7, 0, 2, 4,6, 8, 9]
+theta_names=theta_names[:6]+theta_names[-4:]
+theta_mean=theta_mean[:6]+theta_mean[-4:]
+
 with initiate_plot(5,5,300) as fig:
     ax=fig.add_subplot(1,1,1)
     cov=torch.tensor(cov)
     im=plt.imshow(cov[inds].t()[inds].t(),cmap=plt.get_cmap('bwr'),
         vmin=-torch.max(cov),vmax=torch.max(cov))
     ax.set_title('covariance matrix', fontsize=20)
+    c=plt.colorbar(im,fraction=0.046, pad=0.04)
+    c.set_label('covariance')
     x_pos = np.arange(len(theta_names))
     plt.yticks(x_pos, [theta_names[i] for i in inds],ha='right')
     plt.xticks(x_pos, [theta_names[i] for i in inds],rotation=45,ha='right')
-    add_colorbar(im)
+    
 
 # correlation heatmap
 b=torch.diag(torch.tensor(cov),0)
@@ -158,10 +256,12 @@ with initiate_plot(5,5,300) as fig:
     im=ax.imshow(correlation[inds].t()[inds].t(),cmap=plt.get_cmap('bwr'),
         vmin=-torch.max(correlation),vmax=torch.max(correlation))
     ax.set_title('correlation matrix', fontsize=20)
+    c=plt.colorbar(im,fraction=0.046, pad=0.04)
+    c.set_label('correlation')
     x_pos = np.arange(len(theta_names))
     plt.yticks(x_pos, [theta_names[i] for i in inds],ha='right')
+    # plt.yticks(x_pos, [theta_names[i] for i in inds],ha='right')
     plt.xticks(x_pos, [theta_names[i] for i in inds],rotation=45,ha='right')
-    add_colorbar(im)
 
 
 # eig cov heatmap
@@ -173,40 +273,39 @@ with initiate_plot(5,5,300) as fig:
     ax=fig.add_subplot(1,1,1)
     img=ax.imshow(evector[:,inds].t(),cmap=plt.get_cmap('bwr'),
             vmin=-torch.max(evector),vmax=torch.max(evector))
-    add_colorbar(img)
-    ax.set_title('eigen vectors of Hessian')
+    c=plt.colorbar(img,fraction=0.046, pad=0.04)
+    c.set_label('parameter weight')
+    ax.set_title('eigen vectors of covariance matrix')
     x_pos = np.arange(len(theta_names))
     plt.yticks(x_pos, [theta_names[i] for i in inds],ha='right')
-
+    ax.set_xticks([])
 
 with initiate_plot(5,1,300) as fig:
     ax=fig.add_subplot(1,1,1)
     x_pos = np.arange(len(theta_names))
     # Create bars and choose color
-    ax.bar(x_pos, ev, color = 'blue')
+    ax.bar(x_pos, torch.sqrt(ev), color = 'blue')
+    for i, v in enumerate(torch.sqrt(ev)):
+        ax.text( i-0.4,v+0.2 , '{:.2f}'.format(v.item()), color='blue')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     # ax.spines['left'].set_visible(False)
     ax.set_xticks([])
-    ax.set_yscale('log')
+    # ax.set_yscale('log')
     # ax.set_ylim(min(plotdata),max(plotdata))
-    ax.set_yticks([0.1,100])
-    ax.set_xlabel('eigen values, log scale')
-    plt.tick_params(axis='y', which='minor')
+    # ax.set_yticks([0.1,100])
+    ax.set_xlabel('sqrt of eigen values')
+    # plt.tick_params(axis='y', which='minor')
     ax.yaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
     plt.gca().invert_yaxis()
 
 
+# compare 2 monkeys --------------------------------------------------------------
 
-
-# compare 2 monkeys
-data_path=Path("Z:\\schro_pert")
-with open(data_path/'longonlypacked_schro_pert', 'rb') as f:
+with open(Path("Z:\\schro_pert")/'longonlypacked_schro_pert', 'rb') as f:
     slog = pickle.load(f)
-
-data_path=Path("Z:\\bruno_pert")
-with open(data_path/'cmafull_packed_bruno_pert', 'rb') as f:
+with open(Path("Z:\\bruno_pert")/'cmafull_packed_bruno_pert', 'rb') as f:
     blog = pickle.load(f)
 
 # remove goal radius param
@@ -217,45 +316,47 @@ theta_mean=theta_mean[:6]+theta_mean[-4:]
 log=slog
 finalcov=torch.tensor(log[-1][0]._C)
 finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
-finaltheta=torch.cat([finaltheta[:6],finaltheta[-4:]])
+st=torch.cat([finaltheta[:6],finaltheta[-4:]])
 finalcov = finalcov[torch.arange(finalcov.size(0))!=6] 
-finalcov = finalcov[:,torch.arange(finalcov.size(1))!=6] 
-theta_bar(finaltheta,finalcov)
-thetaconfhist(finalcov)
+sc = finalcov[:,torch.arange(finalcov.size(1))!=6] 
+theta_bar(st,sc)
+# thetaconfhist(sc)
 
 log=blog
 finalcov=torch.tensor(log[-1][0]._C)
 finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
-finaltheta=torch.cat([finaltheta[:6],finaltheta[-4:]])
+bt=torch.cat([finaltheta[:6],finaltheta[-4:]])
 finalcov = finalcov[torch.arange(finalcov.size(0))!=6] 
-finalcov = finalcov[:,torch.arange(finalcov.size(1))!=6] 
-theta_bar(finaltheta,finalcov)
-thetaconfhist(finalcov)
+bc = finalcov[:,torch.arange(finalcov.size(1))!=6] 
+theta_bar(bt,bc)
+# thetaconfhist(bc)
 
 # totegher hist
-x = np.random.normal(1, 2, 99)
-y = np.random.normal(-1, 3, 99)
-bins = np.linspace(-10, 10, 11)
-
-plt.hist([t1.flatten(), t2.flatten()], label=['x', 'y'])
-
-plt.bar([i for i in range(len(finaltheta))], finaltheta,yerr=torch.diag(finalcov)**0.5,color = 'tab:blue')
-
+yerr=torch.diag(finalcov)**0.5 # using std
+plt.hist([st.flatten(), bt.flatten()], label=['x', 'y'])
+# plt.bar([i for i in range(len(finaltheta))], finaltheta,yerr=yerr,color = 'tab:blue')
 plt.legend(loc='upper right')
 plt.show()
 
+# err using std
+# bt=torch.tensor(blog[-1][0]._mean)
+# st=torch.tensor(slog[-1][0]._mean)
+# bc=torch.tensor(np.sqrt(np.diag(blog[-1][0]._C))).float()
+# sc=torch.tensor(np.sqrt(np.diag(slog[-1][0]._C))).float()
 
+# err using confidence interval of the range
+sci=get_ci(slog) # check here to use the range of stablized logll
+sci=np.delete(sci,(6),axis=1)
 
+bci=get_ci(blog)
+bci=np.delete(bci,(6),axis=1)
 
-a=theta_bar(t1,c1, label='schro',width=0.5,shift=-0.2)
-theta_bar(t2,c2,ax=a, label='bruno',width=0.5,shift=0.2)
+a=theta_bar(st,sc, label='schro',width=0.5,shift=-0.2, err=sci)
+theta_bar(bt,bc,ax=a, label='bruno',width=0.5,shift=0.2, err=bci)
 a.get_figure()
 
 
-
-
-
-
+# density vs observation noise ---------------------------------------------------------------
 # density
 densities=[0.0001, 0.0005, 0.001, 0.005]
 filenamecommom=Path('Z:\\schro_normal')
@@ -277,15 +378,9 @@ for i, density in enumerate(densities):
     except:
         continue
 
-xs,ys,errs=d_process(logs)
-d_noise()
-d_obs_degree()
-
-
-gauss_div(ys[0,2],errs[0,2],ys[0,4],errs[0,4])
-gauss_div(ys[1,2],errs[1,2],ys[1,4],errs[1,4])
-
-gauss_div(0,1,1,2)
+xs,ys,errs=d_process(logs,densities)
+d_noise(xs,ys,errs)
+d_kalman_gain(xs,ys,errs)
 
 
 
@@ -296,12 +391,6 @@ st=torch.tensor(log[-1][0]._mean).view(-1,1)
 sv=st[2]**2*st[4]**2/(st[2]**2+st[4]**2)
 sw=st[3]**2*st[5]**2/(st[3]**2+st[5]**2)
 
-
-def isum(a,b):
-    return a*b/a+b
-
-isum(sc[2]**2,sc[4]**2)
-
 log=blog
 bc=torch.tensor(log[-1][0]._C)
 bt=torch.tensor(log[-1][0]._mean).view(-1,1)
@@ -309,11 +398,6 @@ bv=bt[2]**2*bt[4]**2/(bt[2]**2+bt[4]**2)
 bw=bt[3]**2*bt[5]**2/(bt[3]**2+bt[5]**2)
 
 
-
-trialtypes=['pert','non pert']
-a=barpertacc([63.36783413567739,55.58846184159118],trialtypes,label='schro',shift=-0.2)
-barpertacc([57.37014305912993,43.945449613900934],trialtypes,label='bruno',shift=0.2,ax=a)
-a.get_figure()
 
 
 slog[-1][0]._C

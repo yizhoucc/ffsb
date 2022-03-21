@@ -17,23 +17,23 @@ arg.dev_action_cost_range= [0.1,1.]
 arg.dev_v_cost_range= [0.1,1.]
 arg.dev_w_cost_range= [0.1,1.]
 arg.gains_range =[0.1,1.,pi/2-0.6,pi/2+0.6]
-arg.goal_radius_range=[0.01,0.2]
-arg.std_range = [0.1,1,0.1,1]
+arg.goal_radius_range=[0.129,0.131]
+arg.std_range = [0.01,1,0.01,1]
 arg.reward_amount=100
-arg.terminal_vel = 0.1
+arg.terminal_vel = 0.05
 arg.dt=0.1
 arg.episode_len=40
 arg.training=True
 arg.presist_phi=False
 arg.agent_knows_phi=True
 arg.cost_scale=1
-env=ffacc_real.FireFlyPaperv2(arg)
+env=ffacc_real.FireFlyPaper(arg)
 env.no_skip=True
 n_actions = env.action_space.shape[-1]
-action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.2 * np.ones(n_actions))        
+action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(n_actions), sigma=0.2 * np.ones(n_actions))        
 modelname=None
-modelname='paper'
-note='re' 
+modelname='re1re1repaper_3_199_199'
+note='re1' 
 from stable_baselines3 import TD3
 
 if modelname is None:
@@ -58,18 +58,17 @@ if modelname is None:
         policy_kwargs = {'net_arch':[64,64],'activation_fn':torch.nn.ReLU},
         verbose = 0,
         seed = 42,
-        device = "cpu",
+        # device = "cuda",
         )
     train_time=100000
     for i in range(1,11):  
-        env.cost_scale=0.5
         env.noise_scale=1
-        env.cost_scale=0.02*i
+        env.cost_scale=min(0.03*i,0.03)
         if i==1:
             for j in range(1,11): 
                 # arg.std_range = [0.01,0.1*j,0.01,0.1*j]
                 env.noise_scale=0.1*j
-                env.cost_scale=0.
+                env.cost_scale=0.002
                 namestr= ("trained_agent/{}_{}_{}_{}_{}_{}".format(note,train_time,j,
                 str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
                 ))
@@ -83,7 +82,6 @@ if modelname is None:
 else:
     for i in range(1,200): 
         n_actions = env.action_space.shape[-1]
-        action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))        
         model = TD3.load('./trained_agent/'+modelname,
             env,
             train_freq = 4,
@@ -94,9 +92,9 @@ else:
             seed = 1,
             )
         env.noise_scale=1
-        train_time=50000
-        env.cost_scale=min(0.05*i,0.1)
-        # env.cost_scale=0.5
+        train_time=10000
+        env.cost_scale=min(0.002*i+0.3,0.5)
+        # env.cost_scale=0.3
         # env.cost_scale=0.1
         env.reward_ratio=1
         namestr= ("trained_agent/{}{}_{}".format(note,modelname,i))

@@ -1,8 +1,10 @@
 
-from torch import float32
 from plot_ult import *
 import numpy as np
-from matplotlib.pyplot import axes, bar, plot
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+plt.rcParams['svg.fonttype'] = 'none'
+
 
 
 
@@ -302,5 +304,5 @@ diagnose_plot_theta(agent, env, phi, theta_init, theta_final,5,etask=tasks[ind],
 
 
 
-
+rcParams['pdf.fonttype'] = 42
 

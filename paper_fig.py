@@ -40,7 +40,7 @@ plt.rcParams['svg.fonttype'] = 'none'
 
     # 4.1 overhead path of agent vs monkey in a perturbation trial, path similar
     # check agent proformance
-    agent_=TD3.load('trained_agent/rpaper_4.zip')
+    agent_=TD3.load('trained_agent/paper.zip')
     agent=agent_.actor.mu.cpu()
 
     indls=np.random.randint(low=0, high=len(tasks),size=(30,))
@@ -86,6 +86,9 @@ plt.rcParams['svg.fonttype'] = 'none'
     }
     single_trial_overhead()
 
+
+
+
     #---------------------------------------------------------------------
     #  one monkey trial overhead, not for paper
     ind=torch.randint(low=100,high=300,size=(1,))
@@ -97,7 +100,6 @@ plt.rcParams['svg.fonttype'] = 'none'
         ax.add_patch(goalcircle)
         ax.set_xlim(0,1)
         ax.set_ylim(-0.6,0.6)
-
 
 
     # IRC on its own---------------------------------------------------
@@ -142,7 +144,8 @@ plt.rcParams['svg.fonttype'] = 'none'
     plotv_fill(indls,resirc,actions=actions)
     plotw_fill(indls,resirc,actions=actions)
 
-    # given mk states
+
+    #  IRC iven mk states--------------------------------------------------
     ind=torch.randint(low=0,high=len(tasks),size=(1,))
     indls=similar_trials(ind, tasks, actions)
     with torch.no_grad():
@@ -162,7 +165,7 @@ plt.rcParams['svg.fonttype'] = 'none'
             'use_mk_data':False}
         with suppress():
             resirc=trial_data(inputirc)
-        # plotoverhead(resirc)
+        plotoverhead(resirc)
         inputmk={
             'agent':agent,
             'theta':theta,
@@ -179,7 +182,7 @@ plt.rcParams['svg.fonttype'] = 'none'
         }
         with suppress():
             resmk=trial_data(inputmk)
-        # plotoverhead(resmk)
+        plotoverhead(resmk)
         # ax=plotctrl(resmk, color=['blue','orangered'],prefix='monkey')
 
     # plotv(indls,resmk,actions=actions)
@@ -188,7 +191,7 @@ plt.rcParams['svg.fonttype'] = 'none'
     plotw_fill(indls,resmk,actions=actions)
     
 
-    # IRC on its own in pert task
+    # IRC on its own in pert task--------------------------------------------------
     ind=np.random.randint(low=0,high=len(df))
     assert len(df)==len(tasks)
     pert=np.array([df.iloc[ind].perturb_v,df.iloc[ind].perturb_w])
@@ -200,9 +203,6 @@ plt.rcParams['svg.fonttype'] = 'none'
     print(df.iloc[ind].perturb_wpeak)
 
     irc_pert(agent, env, phi, theta,etask=tasks[ind],initv=actions[ind][0][0],initw=actions[ind][0][1],mkactions=actions[ind],pert=pert)
-
-
-
 
 
 

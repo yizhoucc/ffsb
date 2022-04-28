@@ -3385,7 +3385,7 @@ class FireFlyPaper(FireFlyReady):
         alpha = -0.5 * mu @ P.inverse() @ mu.t()
         reward_prob = torch.exp(alpha).view(-1)
 
-        relative_distance=torch.norm(mu).view(-1)
+        relative_distance=torch.norm(mu).view(-1).clamp(0.,1.)
         decision_info = torch.cat([
             relative_distance, 
             relative_angle, 

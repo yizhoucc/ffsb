@@ -3,7 +3,6 @@ from plot_ult import *
 import warnings
 warnings.filterwarnings('ignore')
 from copy import copy
-import time
 import random
 from stable_baselines3 import SAC,PPO
 seed=0
@@ -22,60 +21,16 @@ from monkey_functions import *
 from Config import Config
 arg = Config()
 
-arg.presist_phi=True
-arg.agent_knows_phi=False
-arg.goal_distance_range=[0.1,1]
-arg.gains_range =[0.05,1.5,pi/4,pi/1]
-arg.goal_radius_range=[0.001,0.3]
-arg.std_range = [0.08,1,0.08,1]
-arg.mag_action_cost_range= [0.0001,0.001]
-arg.dev_action_cost_range= [0.0001,0.005]
-arg.dev_v_cost_range= [0.1,0.5]
-arg.dev_w_cost_range= [0.1,0.5]
-arg.TERMINAL_VEL = 0.1
-arg.DELTA_T=0.1
-arg.EPISODE_LEN=100
-arg.agent_knows_phi=False
-DISCOUNT_FACTOR = 0.99
-arg.sample=100
-arg.batch = 70
-# arg.NUM_SAMPLES=1
-# arg.NUM_EP=1
-arg.NUM_IT = 1 
-arg.NUM_thetas = 1
-arg.ADAM_LR = 0.0002
-arg.LR_STEP = 20
-arg.LR_STOP = 0.5
-arg.lr_gamma = 0.95
-arg.PI_STD=1
-arg.presist_phi=False
-arg.cost_scale=1
-
-phi=torch.tensor([[0.5],
-        [pi/2],
-        [0.001],
-        [0.001],
-        [0.001],
-        [0.001],
-        [0.13],
-        [0.5],
-        [0.5],
-        [0.001],
-        [0.001],
-])
 
 
-
-if __name__=='__main__':
+    # old version
+'''
     env=ffacc_real.FireFlyPaper(arg)
     env.debug=True
-
 
     agent_=TD3_torch.TD3.load('trained_agent/re1re1repaper_3_199_198.zip')
     agent=agent_.actor.mu.cpu()
     diagnose_plot_theta(agent, env, phi, theta_init, theta_final,5)
-
-
 
     # load monkey data
     print('loading data')
@@ -101,8 +56,6 @@ if __name__=='__main__':
             actions=sample_actions,
             tasks=sample_tasks,)
 
-
-
     # load inverse data
     inverse_data=load_inverse_data("testdcont2_16_45")
     theta_trajectory=inverse_data['theta_estimations']
@@ -113,7 +66,6 @@ if __name__=='__main__':
     print(H)
     plot_inverse_trend(inverse_data)
     colorgrad_inverse_traj(inverse_data)
-
 
     # vis the inverses of differnt density
     inverse_data=load_inverse_data("testdefstart2_12_43")
@@ -136,7 +88,6 @@ if __name__=='__main__':
         if H!=[]:
             noiseparam[eachdensity]['std']=stderr(torch.inverse(H))[2:6]
     obsvsdensity(noiseparam)
-
 
     with open("Z:\\bruno_normal/3dens_packed_bruno_normal",'rb') as f:
         df = pickle.load(f)
@@ -168,18 +119,7 @@ if __name__=='__main__':
         H=inverse_data['Hessian']
         print(stderr(torch.inverse(H)))
 
-
-    # count reward % by density
-    for eachdensity in [0.0001, 0.0005, 0.001, 0.005]:  
-        print('density {}, reward% '.format(eachdensity),len(df[df.floor_density==eachdensity][df.rewarded])/len(df[df.floor_density==eachdensity]))
-    # count reward by pert
-    print('all trial {}, reward% '.format(len(df[df.rewarded])/len(df)))
-    print('pert trial {}, reward% '.format(len(df[~df.perturb_start_time.isnull() & df.rewarded])/len(df[~df.perturb_start_time.isnull()])))
-    print('non pert trial {}, reward% '.format(len(df[df.perturb_start_time.isnull() & df.rewarded])/len(df[df.perturb_start_time.isnull()])))
-
-
     # calculate H
-
     H=torch.autograd.functional.hessian(loss_function,theta,strict=True)
     H=H[:,0,:,0]
     stderr(torch.inverse(H))          
@@ -220,14 +160,12 @@ if __name__=='__main__':
             logll1d.append(loss_function(onetheta))
     plt.plot(logll1d)
 
-    # inverse_data['grad']
-
     # load agent
     agent_=TD3_torch.TD3.load('trained_agent/paper.zip')
     agent=agent_.actor.mu.cpu()
-    policygiventheta()
-    policygiventhetav2(env.decision_info.shape[-1])
-    agentvsmk_skip(55)
+    policygiventheta(env, agent, theta) # smoother is better
+    policygiventhetav2(env.decision_info.shape[-1], env=env)
+    agentvsmk_skip(env,agent, theta,states, actions, tasks, num_trials=55)
     plot_critic_polar()
     ind=torch.randint(low=100,high=5000,size=(1,))
     input={
@@ -289,423 +227,10 @@ if __name__=='__main__':
                         num_episodes=13)
     inverse_data['background_data']={number_pixels:background_data}
     save_inverse_data(inverse_data)
-
-
     c=plt.imshow(background_data)
     plt.colorbar(c)
 
-    # 1. warpped up of agents with diff theta in a row
-    phi=torch.tensor([[0.5000],
-            [1.57],
-            [0.01],
-            [0.01],
-            [0.01],
-            [0.01],
-            [0.13],
-            [0.1],
-            [0.1],
-            [0.1],
-            [0.1],
-    ])
-    theta_init=torch.tensor([[0.5000],
-            [1.57],
-            [0.1],
-            [0.1],
-            [0.1],
-            [0.1],
-            [0.13],
-            [0.1],
-            [0.1],
-            [0.1],
-            [0.1],
-    ])
-    theta_final=torch.tensor([[0.5000],
-            [1.57],
-            [0.9],
-            [0.9],
-            [0.1],
-            [0.1],
-            [0.13],
-            [0.1],
-            [0.1],
-            [0.1],
-            [0.1],
-    ])
-    env.debug=True
-    diagnose_plot_theta(agent, env, phi, theta_init, theta_final,5,etask=tasks[ind],initv=actions[ind][0][0],initw=actions[ind][0][1],mkactions=actions[ind])
-
-
-
-
-
-
-    # 1. showing converge
-    # 1.1 theta uncertainty from heissian shows convergence
-    # 1.2 log likelihood surface in pc space, with our path and final uncertainty
-
-    #---------------------------------------------------------------------
-    # inversed theta with error bar
-    # inversed_theta_bar(inverse_data)
-
-    #---------------------------------------------------------------------
-    # inversed theta uncertainty by std/mean
-    # inversed_uncertainty_bar(inverse_data)
-    #---------------------------------------------------------------------
-
-
-    # 1.4 differnt inverse rans and final thetas in pc space, each with uncertainty
-
-    # 2. reconstruction belief from inferred params
-
-
-
-    # 2.1 overhead view, monkey's belief and state in one trial
-    ind=torch.randint(low=100,high=5000,size=(1,))
-    input={
-        'agent':agent,
-        'theta':theta,
-        'phi':phi,
-        'env': env,
-        'num_trials':1,
-        # 'task':tasks[:20],
-        'mkdata':{
-                        # 'trial_index': list(range(1)),               
-                        'trial_index': ind,               
-                        'task': [tasks[ind]],                  
-                        'actions': [actions[ind]],                 
-                        'states':[states[ind]],
-                        },                      
-        'use_mk_data':True
-    }
-    single_trial_overhead()
-
-
-    #---------------------------------------------------------------------
-    # plot one monkey trial using index
-    ind=torch.randint(low=100,high=300,size=(1,))
-    with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        ax = fig.add_subplot(111)
-        ax.plot(states[ind][:,0],states[ind][:,1], color='r',alpha=0.5)
-        goalcircle = plt.Circle([tasks[ind][0],tasks[ind][1]], 0.13, color='y', alpha=0.5)
-        ax.add_patch(goalcircle)
-        ax.set_xlim(0,1)
-        ax.set_ylim(-0.6,0.6)
-
-
-
-    #---------------------------------------------------------------------
-    # 3. monkey and inferred agent act similar on similar trials
-
-    # IRC on its own
-    ind=torch.randint(low=0,high=len(tasks),size=(1,))
-    indls=similar_trials(ind, tasks, actions)
-    indls=indls[:10]
-    with torch.no_grad():
-        inputirc={
-            'agent':agent,
-            'theta':theta,
-            'phi':phi,
-            'env': env,
-            'num_trials':10,
-            'task':[tasks[i] for i in indls],
-            'mkdata':{
-                            'trial_index': indls,               
-                            'task': tasks,                 
-                            'actions': actions,                 
-                            'states':states,},
-            'use_mk_data':False
-        }
-        with suppress():
-            resirc=trial_data(inputirc)
-
-        inputmk={
-            'agent':agent,
-            'theta':theta,
-            'phi':phi,
-            'env': env,
-            'num_trials':10,
-            'mkdata':{
-                            'trial_index': indls,               
-                            'task': tasks,                 
-                            'actions': actions,                 
-                            'states':states,
-                            },                      
-            'use_mk_data':True
-        }
-        with suppress():
-            resmk=trial_data(inputmk)
-    # ax=plotoverhead(resirc, color='orange')
-    # ax=plotoverhead(resmk, color='tab:blue')
-    # plotoverhead_mk(indls,ax=ax)
-    # ax.get_figure()
-    # ax=plotctrl(resmk, prefix='monkey')
-    ax=plotctrl_mk(indls,prefix='monkey')
-    plotctrl(resirc,ax=ax, color=['blue','orangered'],prefix='IRC')
-    # plotctrl(resmk,ax=ax, color=['blue','orangered'],prefix='IRCmk')
-    ax.get_figure()
-
-    plotoverhead(resirc, color='orange')
-    plotoverhead(resmk, color='tab:blue')
-    plotctrl(resirc, prefix='IRC')
-    plotctrl(resmk, color=['blue','orangered'],prefix='monkey')
-
-
-    # given mk states
-    ind=torch.randint(low=0,high=len(tasks),size=(1,))
-    indls=similar_trials(ind, tasks, actions)
-    with torch.no_grad():
-        inputirc={
-            'agent':agent,
-            'theta':theta,
-            'phi':phi,
-            'env': env,
-            'num_trials':10,
-            'task':[tasks[i] for i in indls],
-            'mkdata':{
-                            'trial_index': indls,               
-                            'task': tasks,                 
-                            'actions': actions,                 
-                            'states':states,
-                            },                      
-            'use_mk_data':False}
-        with suppress():
-            resirc=trial_data(inputirc)
-        # plotoverhead(resirc)
-        inputmk={
-            'agent':agent,
-            'theta':theta,
-            'phi':phi,
-            'env': env,
-            'num_trials':10,
-            'mkdata':{
-                            'trial_index': indls,               
-                            'task': tasks,                 
-                            'actions': actions,                 
-                            'states':states,
-                            },                      
-            'use_mk_data':True
-        }
-        with suppress():
-            resmk=trial_data(inputmk)
-        # plotoverhead(resmk)
-        # ax=plotctrl(resmk, color=['blue','orangered'],prefix='monkey')
-    ax=plotctrl_mk(indls,prefix='monkey')
-    plotctrl(resirc,ax=ax, color=['blue','orangered'],prefix='IRC')
-    ax.get_figure()
-
-
-    # IRC on its own in pert task
-    ind=np.random.randint(low=0,high=len(df))
-    print(ind)
-    pert=np.array([df.iloc[ind].perturb_v/400,df.iloc[ind].perturb_w/400])
-    pert=np.array(down_sampling_(pert.T))
-    pert=pert.astype('float32')
-    with torch.no_grad():
-        inputirc={
-            'agent':agent,
-            'theta':theta,
-            'phi':phi,
-            'env': env,
-            'num_trials':1,
-            'task':[tasks[ind]],
-            'mkdata':{
-                            'trial_index': [ind],               
-                            'task': tasks,                 
-                            'actions': actions,                 
-                            'states':states,
-                            'pert':pert
-                            },
-            'use_mk_data':False
-        }
-        with suppress():
-            resirc=trial_data(inputirc)
-
-        inputmk={
-            'agent':agent,
-            'theta':theta,
-            'phi':phi,
-            'env': env,
-            'num_trials':1,
-            'task':[tasks[ind]],
-            'mkdata':{
-                            'trial_index': [ind],               
-                            'task': tasks,                 
-                            'actions': actions,                 
-                            'states':states,
-                            'pert':pert
-                            },
-            'use_mk_data':True
-        }
-        with suppress():
-            resmk=trial_data(inputmk)
-    
-    plt.plot(pert)
-
-    ax=plotctrl_mk([ind],prefix='monkey')
-    plotctrl(resirc,ax=ax, color=['blue','orangered'],prefix='IRC')
-    # plotctrl(resmk,ax=ax, color=['blue','orangered'],prefix='IRCmk')
-    ax.get_figure()
-
-
-pert
-np.array(actions[ind])
-
-
-
-
-
-
-    #---------------------------------------------------------------------
-    alllogll=[]
-    for true, est in zip(resmk['mk_actions'],resmk['agent_actions']):
-        eplogll=[0.]
-        for t,e in zip(true,est):
-            eplogll.append(torch.sum(logll(t,e,std=0.01)))
-        alllogll.append(sum(eplogll))
-    print(np.mean(alllogll))
-
-    for a in resmk['mk_actions']:
-        plt.plot(a[:,0],c='tab:blue',alpha=0.5)
-    for a in resmk['agent_actions']:
-        plt.plot(a[:,0],c='tab:orange',alpha=0.5)
-
-    for a in resmk['mk_actions']:
-        plt.plot(a[:,1],c='royalblue',alpha=0.5)
-    for a in resmk['agent_actions']:
-        plt.plot(a[:,1],c='orangered',alpha=0.5)
-    plt.xlabel('time [dt]')
-    plt.ylabel('control v and w')
-
-
-    plt.plot(actions[indls[-1]])
-    plt.plot(resmk['agent_actions'][-1])
-
-    true=actions[indls[-1]]
-    est=resmk['agent_actions'][-1]
-
-    sumlogll=0.
-    for t,e in zip(true,est):
-        sumlogll+=logll(t,e,std=0.001)
-
-
-    # use irc action
-    ind=torch.randint(low=100,high=1111,size=(1,))
-    indls=similar_trials(ind, tasks, actions)
-    indls=indls[:20]
-    maxlen=max([len(actions[i]) for i in indls])
-    for ind in indls:
-        env.reset(goal_position=tasks[ind],theta=theta,phi=phi)
-        vw=[]
-        done=False
-        with torch.no_grad():
-            while not done and env.trial_timer<=maxlen:
-                action=agent(env.decision_info)
-                vw.append(action)
-                _,_,done,_=env.step(action)
-        vw=torch.stack(vw)[:,0,:]
-
-        plt.plot(vw,c='orange',alpha=0.5)
-        plt.plot(actions[ind],c='tab:blue',alpha=0.5)
-    plt.plot(vw,c='orange',alpha=1,label='agent')
-    plt.plot(actions[ind],c='tab:blue',alpha=1,label='monkey')
-    plt.xlabel('time [dt]')
-    plt.ylabel('control v and w')
-    plt.legend()
-
-
-    # use mkaction, same as in inverse
-    ind=torch.randint(low=100,high=1111,size=(1,))
-    indls=similar_trials(ind, tasks, actions)
-    indls=indls[:20]
-    for ind in indls:
-        env.reset(goal_position=tasks[ind],theta=theta,phi=phi)
-        vw=[]
-        done=False
-        mkactionep=actions[ind][1:]
-        with torch.no_grad():
-            while not done and env.trial_timer<len(mkactionep):
-                action=agent(env.decision_info)
-                vw.append(action)
-                _,_,done,_=env.step(mkactionep[int(env.trial_timer)])
-        vw=torch.stack(vw)[:,0,:]
-
-        plt.plot(vw,c='orange',alpha=0.5)
-        plt.plot(actions[ind],c='tab:blue',alpha=0.5)
-    plt.plot(vw,c='orange',alpha=1,label='agent')
-    plt.plot(actions[ind],c='tab:blue',alpha=1,label='monkey')
-    plt.xlabel('time [dt]')
-    plt.ylabel('control v and w')
-    plt.legend()
-
-
-
-
-
-
-
-    # 3.2 overhead view, similar trials, stopping positions distribution similar
-
-    # 3.3 overhead view, skipped trials boundary similar
-
-    # 3.4 control curves, similar trials, similar randomness
-
-    # 3.5 group similar trials, uncertainty grow along path, vs another theta
-
-    # 4. validation in other (perturbation) trials
-    # 4.1 overhead path of agent vs monkey in a perturbation trial, path similar
-
-
-    #---------------------------------------------------------------
-    # value analysis, bar plot, avg trial, skip trial
-
-    critic=agent_.critic.qf0.cpu()
-    skipped_task=[0.2,0.9]
-    avg_task=[0.,0.7]
-    atgoal_task=[0,0]
-    with torch.no_grad():
-        base=env.decision_info.flatten().clone().detach()
-        skipedge=base.clone().detach();skipedge[0:2]=torch.tensor(xy2pol(skipped_task))
-        avg=base.clone().detach();avg[0:2]=torch.tensor(xy2pol(avg_task))
-        atgoal=base.clone().detach();atgoal[0:2]=torch.tensor(xy2pol(atgoal_task))
-        avgvalue=critic(torch.cat([avg,agent(avg).flatten()]))
-        skipedgevalues=critic(torch.cat([skipedge,agent(skipedge).flatten()]))
-        goalv=critic(torch.cat([atgoal,agent(atgoal).flatten()]))
-
-    with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        ax = fig.add_subplot(111)
-        X=['skipped','avg','goal']
-        Y=[skipedgevalues,avgvalue,goalv]
-        ax.bar(X,Y)
-
-
-    #  value analysis, critic heatmap
-    plot_critic_polar()
-
-
-    #---------------------------------------------------------------
-    # intial uncertainty x y
-    with initiate_plot(2, 2, 300) as fig, warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        ax = fig.add_subplot()
-        cov=theta_cov(inverse_data['Hessian'])
-        theta_stds=stderr(cov)[-2:]
-        x_pos = [0,1]
-        data=inverse_data['theta_estimations'][-1][-2:]
-        data=[d[0] for d in data]
-        ax.bar(x_pos, data, yerr=theta_stds, width=0.5, color = 'tab:blue')
-        ax.set_xticks(x_pos)
-        ax.set_ylabel('inferred parameter')
-        ax.set_xticklabels(theta_names[-2:],rotation=45,ha='right')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-
-
-
-
-
-    # Heissian polots-----------------------------------------------------------
+        # Heissian polots-----------------------------------------------------------
     H=compute_H_monkey(env, 
                         agent, 
                         theta, 
@@ -848,6 +373,129 @@ np.array(actions[ind])
         background_data=None)
     plt.imshow(bk)
 
+'''
+
+
+
+'''
+
+    #-- mis and validation-------------------------------------------------------------------
+    alllogll=[]
+    for true, est in zip(resmk['mk_actions'],resmk['agent_actions']):
+        eplogll=[0.]
+        for t,e in zip(true,est):
+            eplogll.append(torch.sum(logll(t,e,std=0.01)))
+        alllogll.append(sum(eplogll))
+    print(np.mean(alllogll))
+
+    for a in resmk['mk_actions']:
+        plt.plot(a[:,0],c='tab:blue',alpha=0.5)
+    for a in resmk['agent_actions']:
+        plt.plot(a[:,0],c='tab:orange',alpha=0.5)
+
+    for a in resmk['mk_actions']:
+        plt.plot(a[:,1],c='royalblue',alpha=0.5)
+    for a in resmk['agent_actions']:
+        plt.plot(a[:,1],c='orangered',alpha=0.5)
+    plt.xlabel('time [dt]')
+    plt.ylabel('control v and w')
+
+
+    plt.plot(actions[indls[-1]])
+    plt.plot(resmk['agent_actions'][-1])
+
+    true=actions[indls[-1]]
+    est=resmk['agent_actions'][-1]
+
+    sumlogll=0.
+    for t,e in zip(true,est):
+        sumlogll+=logll(t,e,std=0.001)
+
+
+    # use irc action
+    ind=torch.randint(low=100,high=1111,size=(1,))
+    indls=similar_trials(ind, tasks, actions)
+    indls=indls[:20]
+    maxlen=max([len(actions[i]) for i in indls])
+    for ind in indls:
+        env.reset(goal_position=tasks[ind],theta=theta,phi=phi)
+        vw=[]
+        done=False
+        with torch.no_grad():
+            while not done and env.trial_timer<=maxlen:
+                action=agent(env.decision_info)
+                vw.append(action)
+                _,_,done,_=env.step(action)
+        vw=torch.stack(vw)[:,0,:]
+
+        plt.plot(vw,c='orange',alpha=0.5)
+        plt.plot(actions[ind],c='tab:blue',alpha=0.5)
+    plt.plot(vw,c='orange',alpha=1,label='agent')
+    plt.plot(actions[ind],c='tab:blue',alpha=1,label='monkey')
+    plt.xlabel('time [dt]')
+    plt.ylabel('control v and w')
+    plt.legend()
+
+
+    # use mkaction, same as in inverse
+    ind=torch.randint(low=100,high=1111,size=(1,))
+    indls=similar_trials(ind, tasks, actions)
+    indls=indls[:20]
+    for ind in indls:
+        env.reset(goal_position=tasks[ind],theta=theta,phi=phi)
+        vw=[]
+        done=False
+        mkactionep=actions[ind][1:]
+        with torch.no_grad():
+            while not done and env.trial_timer<len(mkactionep):
+                action=agent(env.decision_info)
+                vw.append(action)
+                _,_,done,_=env.step(mkactionep[int(env.trial_timer)])
+        vw=torch.stack(vw)[:,0,:]
+
+        plt.plot(vw,c='orange',alpha=0.5)
+        plt.plot(actions[ind],c='tab:blue',alpha=0.5)
+    plt.plot(vw,c='orange',alpha=1,label='agent')
+    plt.plot(actions[ind],c='tab:blue',alpha=1,label='monkey')
+    plt.xlabel('time [dt]')
+    plt.ylabel('control v and w')
+    plt.legend()
+
+'''
+
+
+
+
+'''
+    #---------------------------------------------------------------
+    # value analysis, bar plot, avg trial, skip trial
+
+    critic=agent_.critic.qf0.cpu()
+    skipped_task=[0.2,0.9]
+    avg_task=[0.,0.7]
+    atgoal_task=[0,0]
+    with torch.no_grad():
+        base=env.decision_info.flatten().clone().detach()
+        skipedge=base.clone().detach();skipedge[0:2]=torch.tensor(xy2pol(skipped_task))
+        avg=base.clone().detach();avg[0:2]=torch.tensor(xy2pol(avg_task))
+        atgoal=base.clone().detach();atgoal[0:2]=torch.tensor(xy2pol(atgoal_task))
+        avgvalue=critic(torch.cat([avg,agent(avg).flatten()]))
+        skipedgevalues=critic(torch.cat([skipedge,agent(skipedge).flatten()]))
+        goalv=critic(torch.cat([atgoal,agent(atgoal).flatten()]))
+
+    with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+        X=['skipped','avg','goal']
+        Y=[skipedgevalues,avgvalue,goalv]
+        ax.bar(X,Y)
+
+    #  value analysis, critic heatmap
+    plot_critic_polar()
+
+
+
+
 
     #----------------------------------------------------------------
     # function to get value of a given belief
@@ -913,6 +561,8 @@ np.array(actions[ind])
         ax.grid(False)
         ax.set_thetamin(-43)
         ax.set_thetamax(43)
+
+
 
 
 
@@ -1158,7 +808,4 @@ np.array(actions[ind])
         ax.set_xlabel('angle')
 
 
-
-# perturbation example
-
-
+'''

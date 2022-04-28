@@ -20,10 +20,10 @@ class Config:
         self.episode_len = 100
         self.reward_amount = 100  
         self.terminal_vel = 0.05  
-        self.goal_distance_range=   [0.3,1]
-        self.gains_range =          [0.25,1.,pi/4,pi/1]
-        self.std_range =            [0.05,0.05*5,pi/80,pi/80*5]
-        self.goal_radius_range =    [0.07, 0.2] 
+        self.goal_distance_range=   [0.1,1]
+        self.gains_range =          [0.1,1.,pi/2-0.6,pi/2+0.6]
+        self.std_range =            [0.01,1,0.01,1]
+        self.goal_radius_range =    [0.129,0.131]
         # action cost
         self.mag_action_cost_range= [1e-3,1]
         self.dev_action_cost_range= [1e-3,1]

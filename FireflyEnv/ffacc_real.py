@@ -2658,6 +2658,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.previous_v_range =             [0,1]
         self.trial_counter=                 0
         self.recent_rewarded_trials=        0
+        self.recent_timeup_trials=          0
         self.recent_skipped_trials=         0
         self.recent_trials=                 0
         self.debug=                         0
@@ -2697,6 +2698,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.trial_timer = torch.zeros(1)
         self.trial_sum_cost=0.
         self.trial_sum_reward=0.
+        self.rewardgiven=False
         vctrl=vctrl if vctrl else abs(torch.zeros(1).normal_(0., 0.3))
         wctrl=wctrl if wctrl else torch.zeros(1).normal_(0., 0.3)
         # vctrl=torch.zeros(1)
@@ -2709,6 +2711,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             self.obs_traj=obs_traj
             self.pro_traj=pro_traj
             self.trial_costs=[]
+            self.trial_rewards=[]
             self.trial_actions=[]
             self.ss=[self.s.clone()]
             self.bs=[self.b.clone()]
@@ -2826,14 +2829,17 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         _, self.prev_d=self.get_distance(state=self.b)
         self.trial_timer+=1
         self.sys_vel=torch.norm(action)
-        if not self.if_agent_stop(sys_vel=self.sys_vel) and not self.agent_start:
+        if not self.if_agent_stop() and not self.agent_start:
+            # print('start')
             self.agent_start=True
-        if self.agent_start:
-            self.stop=True if self.if_agent_stop(sys_vel=self.sys_vel) else False 
-        if not self.debug:
-            end_current_ep= self.rewarded() or self.trial_timer>=self.episode_len
-        else:
-            end_current_ep=self.stop or self.trial_timer>=self.episode_len
+        if self.agent_start and self.if_agent_stop():
+            # print('stop')
+            self.stop=True 
+        # if self.debug:
+        end_current_ep= self.if_agent_stop() or self.trial_timer>=self.episode_len
+        # else:
+        #     end_current_ep= (self.if_agent_stop() and self.prev_d<3*self.goal_r) or self.trial_timer>=self.episode_len or self.prev_d>self.max_distance
+        # end_current_ep=self.stop or self.trial_timer>=self.episode_len
         # dynamic
         if next_state is None:
             self.s=self.state_step(action,self.s)
@@ -2852,9 +2858,11 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 + self.reward_ratio*(reward-cost))
         else:
             signal=self.reward_ratio*(reward-cost)
+            assert self.rewardgiven == False # when not stop, reward should not be given
         if self.debug:
             self.trial_actions.append(action)
             self.trial_costs.append(cost)
+            self.trial_rewards.append(reward)
             self.ss.append(self.s.clone())
             self.bs.append(self.b.clone())
             self.covs.append(self.P.clone())
@@ -2862,20 +2870,23 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         if end_current_ep:
             if self.rewarded(): # eval based on belief.
                 self.recent_rewarded_trials+=1
-            if self.skipped():
+            elif self.skipped():
                 self.recent_skipped_trials+=1
+            elif self.trial_timer>=self.episode_len:
+                self.recent_timeup_trials+=1
             self.recent_trials+=1
             self.trial_counter+=1
             # print(self.trial_counter)
             if self.trial_counter!=0 and self.trial_counter%10==0:
-                print('rewarded: ',self.recent_rewarded_trials, 'skipped: ', self.recent_skipped_trials, ' out of total: ', self.recent_trials)
+                print('rewarded: ',self.recent_rewarded_trials, 'skipped: ', self.recent_skipped_trials, 'time up: ', self.recent_timeup_trials,'out of: ', self.recent_trials)
                 self.recent_rewarded_trials=0
                 self.recent_skipped_trials=0
+                self.recent_timeup_trials=0
                 self.recent_trials=0
             # print(
             # 'distance, ', "{:.1f}".format((self.get_distance()[1]-self.goal_r).item()),
             # 'stop',self.stop,
-            print('reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost))
+            print('reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost),'dist',self.prev_d)
             # 'rate {:.1f}'.format((self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5).item()) 
             # )
             # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}
@@ -2941,7 +2952,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         reward=torch.tensor([0.])
         cost=self.action_cost(self.a, self.previous_action)
         
-        if self.if_agent_stop(): 
+        if (self.if_agent_stop() and self.prev_d<2*self.goal_r): 
+            self.rewardgiven=True
             rew_std = self.goal_r/2 
             mu = torch.Tensor([self.goalx,self.goaly])-self.b[:2,0]
             R = torch.eye(2)*rew_std**2 
@@ -2961,7 +2973,10 @@ class FireFlyReady(gym.Env, torch.nn.Module):
                 print('mu', mu)
                 print('P', P)
                 print('R', R)
-            reward = self.reward * reward  
+            reward = self.reward * reward  * (self.episode_len-self.trial_timer)/self.episode_len
+        else:
+            _,d= self.get_distance(state=self.b)
+            reward+=(self.prev_d-d)*self.dt*0.1 # approaching reward
             # reward+=(1-self.cost_scale)*self.dt # stop reward, no matter what
         # _,d= self.get_distance(state=self.b)
         # reward+=(self.prev_d-d)*(1-self.cost_scale)*self.dt # approaching reward
@@ -2996,7 +3011,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         mincost=2
         scalar=self.reward/mincost
         cost=cost*scalar
-        return cost*self.cost_scale+1
+        return cost*self.cost_scale
 
     def unpack_theta(self):
         self.pro_gainv=self.phi[0]
@@ -3122,7 +3137,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         position = torch.stack([px,py])
         if distance2goal:
             relative_distance = torch.sqrt((self.goalx-px)**2+(self.goaly-py)**2).view(-1)
-        else:
+        else: # from oringin
             relative_distance = torch.sqrt((px)**2+(py)**2).view(-1)
         return position, relative_distance
     
@@ -3130,7 +3145,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         return self.if_agent_stop() and (self.get_distance(state=self.b)[1]<=self.goal_r)
 
     def skipped(self): # miss the target very far, not necesssary skip
-        return (self.get_distance(state=self.b,distance2goal=False)[1]<=self.goal_r)
+        return (self.get_distance(state=self.b,distance2goal=False)[1]<=self.goal_r) and self.trial_timer<5
 
     def forward(self, action,task_param,state=None, giving_reward=None):
         action=torch.tensor(action).reshape(1,-1)
@@ -3429,5 +3444,6 @@ class FireFlyPaperv2(FireFlyReady):
             task_param[4:7].view(-1)])
             
         return decision_info.view(1, -1)
+
 
 

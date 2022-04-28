@@ -19,6 +19,74 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 
+# check stop distribution given a task
+
+densities=sorted(pd.unique(df.floor_density))
+for dens in densities:
+    print('process data')
+    states, actions, tasks=monkey_data_downsampled(df[df.floor_density==dens],factor=0.0025)
+    print('done process data')
+
+    ind=torch.randint(low=0,high=len(tasks),size=(1,))
+    indls=similar_trials(ind, tasks, actions)
+    indls=indls[:10]
+
+
+
+# check error rate and radiual err with density for 4 monkey
+monkeys=['bruno', 'schro','victor','q']
+
+mk2beh={}
+for m in monkeys:
+    datapath=Path("Z:\\{}_normal\\packed".format(m))
+    with open(datapath,'rb') as f:
+        df = pickle.load(f)
+    df=datawash(df)
+    df=df[df.category=='normal']
+    densities=sorted(df.floor_density.unique())
+    percentrewarded = [len(df[(df.floor_density==i) & (df.rewarded)])/(len(df[df.floor_density==i])+1e-8) for i in densities]
+    radiualerr=[np.mean(df[(df.floor_density==i)].relative_radius_end) for i in densities]
+    mk2beh[m]=[densities,percentrewarded,radiualerr]
+
+for k,v in mk2beh.items():
+    with initiate_plot(4,3) as fig:
+        ax=fig.add_subplot(111)
+        ax.bar(list(range(len((v[0])))), [1-vv for vv in v[1]], label=k,color='k')
+        ax.legend()
+        ax.set_xlabel('density')
+        ax.set_ylabel('miss rate')
+        ax.set_xticks(list(range(len((v[0])))))
+        ax.set_xticklabels(v[0])
+        ax.set_yticks([0,np.round(1-min(v[1]),decimals=1)+0.1])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+for k,v in mk2beh.items():
+    with initiate_plot(4,3) as fig:
+        ax=fig.add_subplot(111)
+        ax.bar(list(range(len((v[0])))), v[2], label=k,color='k')
+        ax.legend()
+        ax.set_xlabel('density')
+        ax.set_ylabel('radial error [cm]')
+        ax.set_xticks(list(range(len((v[0])))))
+        ax.set_xticklabels(v[0])
+        datamax=max(v[2])
+        roundmax=np.round(max(v[2]),decimals=-1)
+        plotmax=roundmax if roundmax>datamax else roundmax+10
+        ax.set_yticks([0,plotmax])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+
+
+
+# multi monkey multi density bar, not working 
+monkeynames=['bruno', 'schro']
+performance=[mk2beh[i][2] for i in monkeynames]
+performance[1].append(0)
+ax=multimonkeyerr(densities,performance,monkeynames) # performance: n monkey x m density
+ax.get_figure()
+
 
 # check what victor do in pert
 print('loading data')
@@ -728,7 +796,7 @@ pert=np.array([trajectory.iloc[ind].perturb_v,trajectory.iloc[ind].perturb_w])
 
 
 pert=np.array([df.iloc[ind].perturb_v,df.iloc[ind].perturb_w])
-pert=np.array(down_sampling_(pert.T))
+pert=np.array(down_sampling_(pert.T))/400
 
 
 plotoverhead_mk([1])
@@ -742,3 +810,13 @@ trialtypes=['pert','non pert']
 a=barpertacc([63.36783413567739,55.58846184159118],trialtypes,label='schro',shift=-0.2)
 barpertacc([57.37014305912993,43.945449613900934],trialtypes,label='bruno',shift=0.2,ax=a)
 a.get_figure()
+
+
+
+    # count reward % by density
+    for eachdensity in [0.0001, 0.0005, 0.001, 0.005]:  
+        print('density {}, reward% '.format(eachdensity),len(df[df.floor_density==eachdensity][df.rewarded])/len(df[df.floor_density==eachdensity]))
+    # count reward by pert
+    print('all trial {}, reward% '.format(len(df[df.rewarded])/len(df)))
+    print('pert trial {}, reward% '.format(len(df[~df.perturb_start_time.isnull() & df.rewarded])/len(df[~df.perturb_start_time.isnull()])))
+    print('non pert trial {}, reward% '.format(len(df[df.perturb_start_time.isnull() & df.rewarded])/len(df[df.perturb_start_time.isnull()])))

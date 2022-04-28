@@ -11,18 +11,18 @@ from FireflyEnv import ffacc_real
 import torch
 
 arg.init_action_noise=0.5
-arg.goal_distance_range=[0.1,1] 
-arg.mag_action_cost_range= [0.1,1.]
-arg.dev_action_cost_range= [0.1,1.]
-arg.dev_v_cost_range= [0.1,1.]
-arg.dev_w_cost_range= [0.1,1.]
-arg.gains_range =[0.1,1.,pi/2-0.6,pi/2+0.6]
+arg.goal_distance_range=[0.15,1] 
+arg.mag_action_cost_range= [0.01,1.]
+arg.dev_action_cost_range= [0.01,1.]
+arg.dev_v_cost_range= [0.01,1.]
+arg.dev_w_cost_range= [0.01,1.]
+arg.gains_range =[0.1,1.5,pi/2-0.6,pi/2+0.6]
 arg.goal_radius_range=[0.129,0.131]
-arg.std_range = [0.01,1,0.01,1]
+arg.std_range = [0.01,2,0.01,2]
 arg.reward_amount=100
 arg.terminal_vel = 0.05
 arg.dt=0.1
-arg.episode_len=40
+arg.episode_len=50
 arg.training=True
 arg.presist_phi=False
 arg.agent_knows_phi=True
@@ -30,10 +30,10 @@ arg.cost_scale=1
 env=ffacc_real.FireFlyPaper(arg)
 env.no_skip=True
 n_actions = env.action_space.shape[-1]
-action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(n_actions), sigma=0.2 * np.ones(n_actions))        
+action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.5 * np.ones(n_actions))        
 modelname=None
-modelname='re1re1repaper_3_199_199'
-note='re1' 
+modelname='paper'
+note='r' 
 from stable_baselines3 import TD3
 
 if modelname is None:
@@ -60,15 +60,15 @@ if modelname is None:
         seed = 42,
         # device = "cuda",
         )
-    train_time=100000
+    train_time=10000
     for i in range(1,11):  
         env.noise_scale=1
         env.cost_scale=min(0.03*i,0.03)
         if i==1:
-            for j in range(1,11): 
+            for j in range(0,11): 
                 # arg.std_range = [0.01,0.1*j,0.01,0.1*j]
                 env.noise_scale=0.1*j
-                env.cost_scale=0.002
+                env.cost_scale=0.0
                 namestr= ("trained_agent/{}_{}_{}_{}_{}_{}".format(note,train_time,j,
                 str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
                 ))
@@ -80,23 +80,35 @@ if modelname is None:
         model.learn(train_time)
         model.save(namestr)
 else:
-    for i in range(1,200): 
-        n_actions = env.action_space.shape[-1]
-        model = TD3.load('./trained_agent/'+modelname,
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.2 * np.ones(n_actions))  
+    model = TD3.load('./trained_agent/'+modelname,
             env,
             train_freq = 4,
-            learning_starts= 0,
+            learning_starts= 1000,
             action_noise= action_noise,
             policy_delay = 6,
-            learning_rate=1e-4,
-            seed = 1,
+            buffer_size=int(1e6),
+            batch_size=512,
+            learning_rate=7e-4,
+            tau= 0.005,
+            gamma= 0.96,
+            # gradient_steps = -1,
+            # n_episodes_rollout = 1,
+            # optimize_memory_usage = False,
+            # target_policy_noise = 0.2,
+            # target_noise_clip = 0.5,
+            tensorboard_log = None,
+            # create_eval_env = False,
+            verbose = 0,
+            seed = 42,
+            # device = "cuda",
             )
+    for i in range(1,200): 
         env.noise_scale=1
         train_time=10000
-        env.cost_scale=min(0.002*i+0.3,0.5)
+        # env.cost_scale=min(0.002*i+0.3,0.3)
         # env.cost_scale=0.3
-        # env.cost_scale=0.1
-        env.reward_ratio=1
+        env.cost_scale=0.
         namestr= ("trained_agent/{}{}_{}".format(note,modelname,i))
         model.learn(train_time)
         model.save(namestr)

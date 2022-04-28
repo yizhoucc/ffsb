@@ -1,5 +1,6 @@
+import imp
 import numpy as np
-
+from matplotlib import pyplot as plt
 
 # linear quadratic estimator (Kalman filter)
 def lqe(A, C, V, W, X0):
@@ -245,7 +246,7 @@ class LQG:
 
 
 if __name__ == "__main__":
-    totaltime=1000
+    totaltime=30
     system = LQG(totaltime)  # initialize LQG system with time horizon T = 5
     # system.define('ABCQRVWX', np.matrix(np.eye(2)))  # define matrices
 
@@ -255,20 +256,25 @@ if __name__ == "__main__":
         np.matrix([[0,1]]),                     #c obs gain
         np.matrix([[10,0],[0,1]]),          #q state cost weight
         np.matrix([1e-8]),                      #r control cost weight
-        np.matrix([[0],[1]])*0.1,                #v control noise (system noise)
-        np.ones(1)*0.1,                       #w obs noise
+        np.matrix([[0],[1]])*1,                #v control noise (system noise)
+        np.ones(1)*1,                       #w obs noise
         np.matrix([[0],[0]]),                  # init state uncertainty
         np.matrix([[1],[0]]),                # Final state
     ])
     data, kf, noise=system.sample(1, x_p=np.array([[0],[0]]),x=np.array([[0],[0]]) )  # simulate 10 system runs
     # print(data)
 
-import matplotlib.pyplot as plt
 
-b=[]
-for i in range (totaltime):
-    b.append(data['x'][i][0,0])
-plt.plot(b,'b')
+
+    b=[]
+    for i in range (totaltime):
+        b.append(data['x'][i][0,0])
+    plt.plot(b,'b')
+    b=[]
+    for i in range (totaltime):
+        b.append(kf['x_e'][i][0,0])
+    plt.plot(b,'y')
+
 
 # b=[]
 # for i in range (50,100):

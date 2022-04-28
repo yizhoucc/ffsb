@@ -1,8 +1,14 @@
 
+
+import imp
+from pathlib import Path
+from tkinter import PhotoImage
 import numpy as np
+from matplotlib.ticker import MaxNLocator
 import scipy.stats
 from numpy import pi
 from torch import nn
+import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits import axes_grid1
@@ -84,10 +90,14 @@ global color_settings
 color_settings={
     'v':'tab:blue',
     'w':'orange',
-    'cov':'blue',
-    'b':'purple',
-    's':'blue',
-    'goal':'yellow',
+    'cov':'#8200FF', # purple, save as belief, just use low alpha
+    'b':'#8200FF', # purple
+    's':'#0000FF', # blue
+    'o':'#FF0000', # red
+    'a':'#008100', # green, slightly dark
+    'goal':'#4D4D4D', # dark grey
+    'hidden':'#636363',
+    'model':'#FFBC00', # orange shifting to green, earth
     '':'',
 }
 
@@ -162,7 +172,37 @@ parameter_range=[
     [1e-3,1],
 ]
 
-# from InverseFuncs import *
+global phi 
+phi=torch.tensor([[0.5],
+        [pi/2],
+        [0.001],
+        [0.001],
+        [0.001],
+        [0.001],
+        [0.13],
+        [0.5],
+        [0.5],
+        [0.001],
+        [0.001],
+])
+
+
+def hex2rgb(hexstr):
+    if hexstr[0] =='#':
+        hexstr=hexstr.lstrip('#')
+    return [int(hexstr[i:i+2], 16)/255 for i in (0, 2, 4)]
+
+
+def colorshift(mu, direction, amount, n):
+    mu=np.array(mu)
+    direction=np.array(direction)
+    deltas=np.linspace(np.clip(mu-direction*amount, 0,1), np.clip(mu+direction*amount,0,1), n)
+    res=[ d.tolist() for d in deltas ]
+    # for d in deltas:
+    #     res.append((mu+d).tolist())
+    return res
+    
+
 
 def mean_confidence_interval(data, confidence=0.95):
     # ci of the mean
@@ -296,7 +336,7 @@ def plot_point_cov(points, nstd=2, ax=None, **kwargs):
     return plot_cov_ellipse(cov, pos, nstd, ax, **kwargs)
 
 
-def plot_cov_ellipse(cov, pos=[0,0], nstd=2, color=None, ax=None,alpha_factor=1, **kwargs):
+def plot_cov_ellipse(cov, pos=[0,0], nstd=2, color=None, ax=None,alpha=1,edgecolor=None, **kwargs):
     """
     Plots an `nstd` sigma error ellipse based on the specified covariance
     matrix (`cov`). Additional keyword arguments are passed on to the 
@@ -334,15 +374,18 @@ def plot_cov_ellipse(cov, pos=[0,0], nstd=2, color=None, ax=None,alpha_factor=1,
 
     # Width and height are "full" widths, not radius
     width, height = 2 * nstd * np.sqrt(vals)
-    ellip = Ellipse(xy=pos, width=width, height=height, angle=theta, **kwargs)
+    ellip = Ellipse(xy=pos, width=width, edgecolor='none',height=height, angle=theta, **kwargs)
     if color is not None:
         ellip.set_color(color)
-    ellip.set_alpha(0.5*alpha_factor)
+    if edgecolor:
+        ellip.set_color('none')
+        ellip.set_edgecolor(edgecolor)
+    ellip.set_alpha(alpha)
     ax.add_artist(ellip)
     return ellip
 
 
-def plot_circle(cov, pos, color=None, ax=None,alpha_factor=1, **kwargs):
+def plot_circle(cov, pos, color=None, ax=None,alpha=1, **kwargs):
     'plot a circle'
     if ax is None:
         figure=plt.figure(figsize=(10,10))
@@ -354,7 +397,7 @@ def plot_circle(cov, pos, color=None, ax=None,alpha_factor=1, **kwargs):
     c = Circle(pos,r)
     if color is not None:
         c.set_color(color)
-    c.set_alpha(0.5*alpha_factor)
+    c.set_alpha(alpha)
     ax.add_artist(c)
     return c
 
@@ -2055,58 +2098,525 @@ def diagnose_plot_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[[
     ax2.spines['right'].set_visible(False)
     if n==2 and mkactions is not None:
           ax2.plot(np.arange(len(mkactions))/10,mkactions,alpha=0.7)
-#   # dev and mag costs
-#     ax2 = fig.add_subplot(6,nplots,n+nplots*2+1)
-#     ax2.set_xlabel('t')
-#     ax2.set_ylabel('costs')
-#     ax2.set_title('costs')
-#     for i in range(len(data['devcosts'])):
-#       ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
-#       # ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
+    ''' 
+        # dev and mag costs
+            ax2 = fig.add_subplot(6,nplots,n+nplots*2+1)
+            ax2.set_xlabel('t')
+            ax2.set_ylabel('costs')
+            ax2.set_title('costs')
+            for i in range(len(data['devcosts'])):
+            ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
+            # ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
 
-#   straight trails
-#   etask=[[0.7,0.0]]
-#   for n in range(nplots):
-#     ax1 = fig.add_subplot(6,nplots,n+nplots*3+1)
-#     theta=(n-1)*delta+theta_init
-#     ax1.set_xlabel('world x, cm')
-#     ax1.set_ylabel('world y, cm')
-#     ax1.set_title('state plot')
-#     data=sample_trials(agent, env, theta, phi, etask, num_trials=1)
-#     estate=data['estate']
-#     ax1.plot(estate[0,:],estate[1,:], color='r',alpha=0.5)
-#     goalcircle = plt.Circle((etask[0][0],etask[0][1]), theta[6], color='y', alpha=0.5)
-#     ax1.add_patch(goalcircle)
-#     ax1.set_xlim([-0.1,1.1])
-#     ax1.set_ylim([-0.6,0.6])
-#     agent_beliefs=data['agent_beliefs']
-#     for t in range(len(agent_beliefs[0][:,:,0])):
-#       cov=data['agent_covs'][0][t][:2,:2]
-#       pos=  [agent_beliefs[0][:,:,0][t,0],
-#               agent_beliefs[0][:,:,0][t,1]]
-#       plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
+        straight trails
+        etask=[[0.7,0.0]]
+        for n in range(nplots):
+            ax1 = fig.add_subplot(6,nplots,n+nplots*3+1)
+            theta=(n-1)*delta+theta_init
+            ax1.set_xlabel('world x, cm')
+            ax1.set_ylabel('world y, cm')
+            ax1.set_title('state plot')
+            data=sample_trials(agent, env, theta, phi, etask, num_trials=1)
+            estate=data['estate']
+            ax1.plot(estate[0,:],estate[1,:], color='r',alpha=0.5)
+            goalcircle = plt.Circle((etask[0][0],etask[0][1]), theta[6], color='y', alpha=0.5)
+            ax1.add_patch(goalcircle)
+            ax1.set_xlim([-0.1,1.1])
+            ax1.set_ylim([-0.6,0.6])
+            agent_beliefs=data['agent_beliefs']
+            for t in range(len(agent_beliefs[0][:,:,0])):
+            cov=data['agent_covs'][0][t][:2,:2]
+            pos=  [agent_beliefs[0][:,:,0][t,0],
+                    agent_beliefs[0][:,:,0][t,1]]
+            plot_cov_ellipse(cov, pos, nstd=2, color=None, ax=ax1,alpha=0.2)
 
-#   # v and w
-#     ax2 = fig.add_subplot(6,nplots,n+nplots*4+1)
-#     ax2.set_xlabel('t')
-#     ax2.set_ylabel('w')
-#     ax2.set_title('w control')
-#     data.keys()
-#     agent_actions=data['agent_actions']
-#     for i in range(len(agent_actions)):
-#       ax2.plot(agent_actions[i],alpha=0.7)
-#     ax2.set_ylim([-1.1,1.1])
+        # v and w
+            ax2 = fig.add_subplot(6,nplots,n+nplots*4+1)
+            ax2.set_xlabel('t')
+            ax2.set_ylabel('w')
+            ax2.set_title('w control')
+            data.keys()
+            agent_actions=data['agent_actions']
+            for i in range(len(agent_actions)):
+            ax2.plot(agent_actions[i],alpha=0.7)
+            ax2.set_ylim([-1.1,1.1])
 
-    # # dev and mag costs
-    # ax2 = fig.add_subplot(6,nplots,n+nplots*5+1)
-    # ax2.set_xlabel('t')
-    # ax2.set_ylabel('costs')
-    # ax2.set_title('costs')
-    # for i in range(len(data['devcosts'])):
-    #   ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
-    #   # ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
+            # dev and mag costs
+            ax2 = fig.add_subplot(6,nplots,n+nplots*5+1)
+            ax2.set_xlabel('t')
+            ax2.set_ylabel('costs')
+            ax2.set_title('costs')
+            for i in range(len(data['devcosts'])):
+            ax2.plot(data['devcosts'][0], color='green',alpha=0.7)
+        # ax2.plot(data['magcosts'][0], color='violet',alpha=0.7)
+    '''
 
-def policygiventheta():
+
+def vary_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[[0.7,-0.3]],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10):
+
+  def _sample_trials(agent, env, theta, phi, etask, initv=0.,initw=0., action_noise=0.1,pert=None):
+    agent_actions=[]
+    agent_beliefs=[]
+    agent_covs=[]
+    agent_states=[]
+    with torch.no_grad():
+        env.reset(phi=phi,theta=theta,goal_position=etask,vctrl=initv, wctrl=initw)
+        epbliefs=[]
+        epbcov=[]
+        epactions=[]
+        epstates=[]
+        done=False
+        while not done:
+            action = agent(env.decision_info)[0]
+            noise=torch.normal(torch.zeros(2),action_noise)
+            _action=(action+noise).clamp(-1,1)
+            if pert is not None and int(env.trial_timer)<len(pert):
+                _action+=pert[int(env.trial_timer)]
+            _,_,done,_=env.step(_action) 
+            epactions.append(action)
+            epbliefs.append(env.b)
+            epbcov.append(env.P)
+            epstates.append(env.s)
+        agent_actions.append(torch.stack(epactions))
+        agent_beliefs.append(torch.stack(epbliefs))
+        agent_covs.append(epbcov)
+        agent_states.append(torch.stack(epstates))
+        estate=torch.stack(agent_states)[0,:,:,0].t()
+        return_dict={
+        'agent_actions':agent_actions,
+        'agent_beliefs':agent_beliefs,
+        'agent_covs':agent_covs,
+        'estate':estate,
+        # 'eaction':eaction,
+        'etask':etask,
+        'theta':theta,
+      }
+    return return_dict
+  
+
+  def sample_trials(agent, env, theta, phi, thistask, initv=0.,initw=0., action_noise=0.1,pert=None,):
+    agent_actions=[]
+    agent_beliefs=[]
+    agent_covs=[]
+    agent_states=[]
+    with torch.no_grad():
+        env.reset(phi=phi,theta=theta,goal_position=thistask,vctrl=initv, wctrl=initw)
+
+        env.obs_traj= np.vstack([np.array([0,0]),np.random.normal(0,1,size=pert.shape)*np.asfarray(theta[4:6]).T + pert,np.zeros(shape=(20,2))])
+
+        epbliefs=[]
+        epbcov=[]
+        epactions=[]
+        epstates=[]
+        done=False
+        while not done:
+            action = agent(env.decision_info)[0]
+            noise=torch.normal(torch.zeros(2),action_noise)
+            _action=(action+noise).clamp(-1,1)
+            # if pert is not None and int(env.trial_timer)<len(pert):
+            #     _action+=pert[int(env.trial_timer)]
+            _,_,done,_=env.step(_action) 
+            epactions.append(action)
+            epbliefs.append(env.b)
+            epbcov.append(env.P)
+            epstates.append(env.s)
+        agent_actions.append(torch.stack(epactions))
+        agent_beliefs.append(torch.stack(epbliefs))
+        agent_covs.append(epbcov)
+        agent_states.append(torch.stack(epstates))
+        estate=torch.stack(agent_states)[0,:,:,0].t()
+        return_dict={
+        'agent_actions':agent_actions,
+        'agent_beliefs':agent_beliefs,
+        'agent_covs':agent_covs,
+        'estate':estate,
+        # 'eaction':eaction,
+        'etask':thistask,
+        'theta':theta,
+      }
+    return return_dict
+
+    
+  delta=(theta_final-theta_init)/(nplots-1)
+  fig = plt.figure(figsize=[9, 6])
+
+  for n in range(nplots):
+    theta=n*delta+theta_init
+    theta=torch.clamp(theta, 1e-3)
+    for i in range(ntrials):
+        with suppress():
+            data=sample_trials(agent, env, theta, phi, etask,initv=initv,initw=initw,pert=pert)
+        estate=data['estate']
+        agent_beliefs=data['agent_beliefs']
+        agent_actions=data['agent_actions']
+
+        # overhead
+        ax = fig.add_subplot(3,nplots,n+1)
+        ax.plot(estate[0,:]*200,estate[1,:]*200, color=color_settings['s'],alpha=0.5)
+        ax.scatter(estate[0,-1]*200,estate[1,-1]*200, color=color_settings['a'],alpha=0.5)
+        if i==0:
+            goalcircle = plt.Circle((etask[0]*200,etask[1]*200), 65, color=color_settings['goal'], edgecolor='none', alpha=0.3, linewidth=0.8)
+            ax.add_patch(goalcircle)
+            ax.set_aspect('equal')
+            ax.set_xlabel('world x [cm]')
+            ax.set_ylabel('world y [cm]')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+
+        for t in range(len(agent_beliefs[0][:,:,0])):
+            cov=data['agent_covs'][0][t][:2,:2]*200*200
+            pos=  [agent_beliefs[0][:,:,0][t,0]*200,
+                    agent_beliefs[0][:,:,0][t,1]*200]
+            plot_cov_ellipse(cov, pos, nstd=3, color=color_settings['b'], ax=ax,alpha=0.05)
+        if n!=0:
+            ax.set_yticklabels([])
+            # ax.set_xticklabels([])
+            # ax.set_xlabel('')
+            ax.set_ylabel('')
+
+        # forward control
+        ax = fig.add_subplot(3,nplots,n+nplots+1)
+        if pert is not None and i==0:
+            pertv=np.abs(pert.T[0])
+            pertcolor=matplotlib.colors.ListedColormap(np.linspace([1,0,0,0],[1,0,0,np.max(pertv)],200))
+            pertvbox=np.broadcast_to(pertv,(20,len(pertv)))
+            im = ax.imshow(pertvbox, interpolation='bilinear', cmap=pertcolor, aspect='auto',origin='lower',extent=[0, len(pertv)/10,-0.2, 1])
+
+        ax.set_ylabel('forward control')
+        for j in range(len(agent_actions)):
+            ax.plot(np.arange(len(agent_actions[j]))/10,agent_actions[j][:,0],alpha=0.7, color=color_settings['model'], linewidth=1)
+        ax.set_ylim([-0.2,1.1])
+        ax.set_yticks([0,1.])
+        # ax.set_xticks([])
+        ax.set_xlim(left=0.)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xticklabels([])    
+        if n!=0:
+            ax.set_yticklabels([])
+            ax.set_ylabel('')
+        if n==nplots//2 and mkactions is not None:
+            ax.plot(np.arange(len(mkactions))/10,mkactions[:,0],alpha=0.7, color=color_settings['a'])
+        
+        # angular control
+        ax = fig.add_subplot(3,nplots,n+2*nplots+1)
+        if pert is not None and i==0:
+            pertw=np.abs(pert.T[1])
+            pertcolor=matplotlib.colors.ListedColormap(np.linspace([1,0,0,0],[1,0,0,np.max(pertw)],100))
+            pertwbox=np.broadcast_to(pertw,(20,len(pertw)))
+            im = ax.imshow(pertwbox, interpolation='bilinear', cmap=pertcolor, aspect='auto',origin='lower',extent=[0, len(pertw)/10,-1, 1])
+
+        ax.set_xlabel('t [s]')
+        ax.set_ylabel('angular control')
+        for j in range(len(agent_actions)):
+            ax.plot(np.arange(len(agent_actions[j]))/10,agent_actions[j][:,1],alpha=0.7, color=color_settings['model'])
+        ax.set_ylim([-1.1,1.1])
+        ax.set_yticks([-1.,0,1.])
+        ax.set_xlim(left=0.)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_position('zero')
+        if n!=0:
+            ax.set_yticklabels([])
+            ax.set_ylabel('')
+        if n==nplots//2 and mkactions is not None:
+            ax.plot(np.arange(len(mkactions))/10,mkactions[:,1],alpha=0.7, color=color_settings['a'])
+
+    plt.tight_layout()
+
+
+def ll2array(v):
+    lens = np.array([len(item) for item in v])
+    mask = lens[:,None] > np.arange(lens.max())
+    out = np.zeros(mask.shape)
+    out[mask] = np.concatenate(v)
+    return out
+
+
+def vary_theta_ctrl(agent, env, phi, theta_init, theta_final,nplots=5,etask=[[0.7,-0.3]],initv=0.,initw=0.,mkactions=None,ntrials=10,pert=None):
+
+    def sample_trials(agent, env, theta, phi, etask, initv=0.,initw=0., action_noise=0.1,pert=None):
+        agent_actions=[]
+        agent_beliefs=[]
+        agent_covs=[]
+        agent_states=[]
+        with torch.no_grad():
+            env.reset(phi=phi,theta=theta,goal_position=etask,vctrl=initv, wctrl=initw)
+            epbliefs=[]
+            epbcov=[]
+            epactions=[]
+            epstates=[]
+            done=False
+            while not done:
+                action = agent(env.decision_info)[0]
+                noise=torch.normal(torch.zeros(2),action_noise)
+                _action=(action+noise).clamp(-1,1)
+                if pert is not None and int(env.trial_timer)<len(pert):
+                    _action+=pert[int(env.trial_timer)]
+                _,_,done,_=env.step(_action) 
+                epactions.append(action)
+                epbliefs.append(env.b)
+                epbcov.append(env.P)
+                epstates.append(env.s)
+            agent_actions.append(torch.stack(epactions))
+            agent_beliefs.append(torch.stack(epbliefs))
+            agent_covs.append(epbcov)
+            agent_states.append(torch.stack(epstates))
+            estate=torch.stack(agent_states)[0,:,:,0].t()
+            return_dict={
+            'agent_actions':agent_actions,
+            'agent_beliefs':agent_beliefs,
+            'agent_covs':agent_covs,
+            'estate':estate,
+            # 'eaction':eaction,
+            'etask':etask,
+            'theta':theta,
+        }
+        return return_dict
+  
+    delta=(theta_final-theta_init)/(nplots-1)
+    fig = plt.figure(figsize=[10, 5])
+    percentile=5
+    basecolor=hex2rgb(color_settings['model'])
+    colors=colorshift(basecolor,basecolor,0.5,nplots)
+    labels=['- eigen vector','mean','+ eigen vector'  ]
+    ax = fig.add_subplot(2,1,1)
+    for n in range(nplots): # this is actually number of theta
+        theta=(n-1)*delta+theta_init
+        theta=torch.clamp(theta, 1e-3)
+        agent_v=[]
+        for i in range(ntrials):
+            with suppress():
+                data=sample_trials(agent, env, theta, phi, etask,initv=initv,initw=initw,pert=pert)
+            agent_v.append(data['agent_actions'][0][:,0].tolist())
+        agent_v=ll2array(agent_v) # ntrial, ts
+        low=np.percentile(agent_v,percentile, axis=0)
+        high=np.percentile(agent_v,100-percentile, axis=0)
+        ts=np.arange(len(agent_v.T))*0.1
+        if n==2:
+            ax.fill_between(ts, y1=low, y2=high, color=color_settings['a'],alpha=0.2, edgecolor='none', label=labels[n])
+        else:
+            ax.fill_between(ts, y1=low, y2=high, color=colors[n],alpha=0.2, edgecolor='none', label=labels[n])
+    ax.set_ylim([-0.2,1.1])
+    ax.set_yticks([0,1.])
+    ax.set_xlim(left=0.)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylabel('forward control')
+    # ax.set_xticklabels([])    
+    # ax.set_xlabel('t [s]')
+    ax.plot(np.arange(len(mkactions))/10,mkactions[:,0],alpha=0.7, color=color_settings['a'])
+    leg=ax.legend()
+    for lh in leg.legendHandles: 
+        lh.set_alpha(1)
+
+    ax = fig.add_subplot(2,1,2,sharex=ax)
+    for n in range(nplots): # this is actually number of theta
+        theta=(n-1)*delta+theta_init
+        agent_w=[]
+        for i in range(ntrials):
+            with suppress():
+                data=sample_trials(agent, env, theta, phi, etask,initv=initv,initw=initw)
+            agent_w.append(data['agent_actions'][0][:,1].tolist())
+        agent_w=ll2array(agent_w) # ntrial, ts
+        low=np.percentile(agent_w,percentile, axis=0)
+        high=np.percentile(agent_w,100-percentile, axis=0)
+        ts=np.arange(len(agent_w.T))*0.1
+        if n==2:
+            ax.fill_between(ts, y1=low, y2=high, color=color_settings['a'],alpha=0.2, edgecolor='none', label=labels[n])
+        else:
+            ax.fill_between(ts, y1=low, y2=high, color=colors[n],alpha=0.2, edgecolor='none', label=labels[n])
+
+    ax.set_xlabel('t [s]')
+    ax.set_ylabel('angular control')
+    ax.set_ylim([-1.1,1.1])
+    ax.set_yticks([-1.,0,1.])
+    ax.set_xlim(left=0.)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_position('zero')
+    ax.plot(np.arange(len(mkactions))/10,mkactions[:,1],alpha=0.7, color=color_settings['a'])
+    plt.tight_layout()
+
+
+def pert_disk(pert):
+    # simple clock version (ego centric)
+    with initiate_plot(3,3) as fig:
+        ax = fig.subplots(subplot_kw={'projection': 'polar'})
+        ax.set_yticklabels([])
+        ax.set_yticks([])
+        ax.set_xticks([])
+        ax.set_ylim([0,1])
+        ax.plot([pi/2,pi/2],[0,1],'k')
+        direction=np.nan_to_num(pert[:,0]/pert[:,1],0)
+        sign=-1 if np.any(direction<0) else 1
+        theta=np.min(direction) if sign==-1 else np.max(direction)
+        ax.plot([theta]*2,[0,1],'k')
+
+
+def likelihoodvstime(agent=None, 
+            actions=None, 
+            tasks=None, 
+            phi=None, 
+            theta=None, 
+            env=None,
+            states=None, 
+            samples=50,
+            action_var=0.1,
+            ep=None,
+            pert=None):
+
+    task=tasks[ep]
+    with torch.no_grad():
+            logllt=[] # log ll at time t
+            totalll=0.
+            # get mk actions
+            mkactionep = actions[ep][1:]
+            # make env list
+            envls=[]
+            for _ in range(samples):
+                env.debug=True
+                envls.append(copy.deepcopy(env))
+            # reset task
+            for env in envls:
+                    env.reset(theta=theta, phi=phi, goal_position=task, vctrl=mkactionep[0][0],wctrl=mkactionep[0][1])
+            # run task
+            for t,mk_action in enumerate(mkactionep[1:]):
+                action = [agent(env.decision_info) for env in envls]
+                nextstate=states[ep][1:][t].view(-1,1)
+                for env in envls:
+                    env.b, env.P=env.belief_step(env.b,env.P, env.observations(nextstate), torch.tensor(mk_action).view(1,-1))
+                    previous_action=mk_action # current action is prev action for next time
+                    env.trial_timer+=1
+                    env.decision_info=env.wrap_decision_info(previous_action=previous_action, time=env.trial_timer)
+
+                action_ll = [logll(torch.tensor(mk_action),a,std=np.sqrt(action_var)).view(-1).tolist() for a in action]
+                obs_ll = [logll(error=env.obs_err(), std=theta[4:6].view(1,-1)).view(-1).tolist() for env in envls]
+                totalll = totalll + np.sum(action_ll)+ np.sum(obs_ll)
+                logllt.append(totalll/samples) # this is log liklihood
+
+    return  np.exp(logllt) # this is likelihood
+
+
+def irc_pert(agent, env, phi, theta,etask=[[0.7,-0.3]],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10):
+
+    def sample_trials(agent, env, theta, phi, etask, initv=0.,initw=0., action_noise=0.1,pert=None):
+        agent_actions=[]
+        agent_beliefs=[]
+        agent_covs=[]
+        agent_states=[]
+        with torch.no_grad():
+            env.reset(phi=phi,theta=theta,goal_position=etask,vctrl=initv, wctrl=initw)
+            epbliefs=[]
+            epbcov=[]
+            epactions=[]
+            epstates=[]
+            done=False
+            while not done:
+                action = agent(env.decision_info)[0]
+                noise=torch.normal(torch.zeros(2),action_noise)
+                _action=(action+noise).clamp(-1,1)
+                if pert is not None and int(env.trial_timer)<len(pert):
+                    _action+=pert[int(env.trial_timer)]
+                _,_,done,_=env.step(_action) 
+                epactions.append(action)
+                epbliefs.append(env.b)
+                epbcov.append(env.P)
+                epstates.append(env.s)
+            agent_actions.append(torch.stack(epactions))
+            agent_beliefs.append(torch.stack(epbliefs))
+            agent_covs.append(epbcov)
+            agent_states.append(torch.stack(epstates))
+            estate=torch.stack(agent_states)[0,:,:,0].t()
+            return_dict={
+            'agent_actions':agent_actions,
+            'agent_beliefs':agent_beliefs,
+            'agent_covs':agent_covs,
+            'estate':estate,
+            # 'eaction':eaction,
+            'etask':etask,
+            'theta':theta,
+        }
+        return return_dict
+  
+    fig = plt.figure(figsize=[5, 3])
+    percentile=5
+    # basecolor=hex2rgb(color_settings['model'])
+
+    # forward
+    ax = fig.add_subplot(2,1,1)
+    agent_v=[]
+    for i in range(ntrials):
+        with suppress():
+            data=sample_trials(agent, env, theta, phi, etask,initv=initv,initw=initw,pert=pert)
+        agent_v.append(data['agent_actions'][0][:,0].tolist())
+    
+        pertv=pert.T[0]
+
+    pertv=np.abs(pert.T[0])
+    pertcolor=matplotlib.colors.ListedColormap(np.linspace([1,0,0,0],[1,0,0,np.max(pertv)],200))
+    pertvbox=np.broadcast_to(pertv,(20,len(pertv)))
+    im = ax.imshow(pertvbox, interpolation='bilinear', cmap=pertcolor, aspect='auto',
+                    origin='lower',extent=[0, len(pertv)/10,-0.2, 1])
+
+    agent_v=ll2array(agent_v) # ntrial, ts
+    low=np.percentile(agent_v,percentile, axis=0)
+    high=np.percentile(agent_v,100-percentile, axis=0)
+    ts=np.arange(len(agent_v.T))*0.1
+    ax.fill_between(ts, y1=low, y2=high, color=color_settings['model'],alpha=0.2, edgecolor='none', label='IRC')
+    ax.set_ylim([-0.2,1.1])
+    ax.set_yticks([0,1.])
+    ax.set_xlim(left=0.)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylabel('forward control')
+    # ax.set_xticklabels([])    
+    # ax.set_xlabel('t [s]')
+    ax.plot(np.arange(len(mkactions))/10,mkactions[:,0],alpha=0.7, color=color_settings['a'], label='monkey')
+    leg=ax.legend()
+    for lh in leg.legendHandles: 
+        lh.set_alpha(1)
+
+    # angular
+    ax = fig.add_subplot(2,1,2,sharex=ax)
+    agent_w=[]
+    for i in range(ntrials):
+        with suppress():
+            data=sample_trials(agent, env, theta, phi, etask,initv=initv,initw=initw)
+        agent_w.append(data['agent_actions'][0][:,1].tolist())
+    agent_w=ll2array(agent_w) # ntrial, ts
+    low=np.percentile(agent_w,percentile, axis=0)
+    high=np.percentile(agent_w,100-percentile, axis=0)
+    ts=np.arange(len(agent_w.T))*0.1
+
+    ax.fill_between(ts, y1=low, y2=high, color=color_settings['model'],alpha=0.2, edgecolor='none', label='IRC')
+
+    ax.set_xlabel('t [s]')
+    ax.set_ylabel('angular control')
+    ax.set_ylim([-1.1,1.1])
+    ax.set_yticks([-1.,0,1.])
+    ax.set_xlim(left=0.)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_position('zero')
+    ax.plot(np.arange(len(mkactions))/10,mkactions[:,1],alpha=0.7, color=color_settings['a'])
+
+    pertw=np.abs(pert.T[1])
+    pertcolor=matplotlib.colors.ListedColormap(np.linspace([1,0,0,0],[1,0,0,np.max(pertw)],200))
+    pertwbox=np.broadcast_to(pertw,(20,len(pertw)))
+    im = ax.imshow(pertwbox, interpolation='bilinear', cmap=pertcolor, aspect='auto',
+                    origin='lower',extent=[0, len(pertv)/10,-1, 1])
+
+
+
+    plt.tight_layout()
+
+
+def policygiventheta(env=None,agent=None, theta=None):
 
     env.reset(phi=phi,theta=theta)
     bl=torch.zeros(5)
@@ -2487,7 +2997,7 @@ def policygiventheta():
         ax.legend(handles=[teal_patch,orange_patch],loc='upper right',fontsize=6)
 
 
-def policygiventhetav2(n):
+def policygiventhetav2(n,env=None):
     env.reset(phi=phi,theta=theta)
     bl=torch.zeros(5)
     # br=torch.tensor([0.0,0.0,0.0,0,0])
@@ -2580,21 +3090,25 @@ def single_trial_overhead():
     etask=input['mkdata']['task'][0]
     initv=input['mkdata']['actions'][0][0][0]  
     initw=input['mkdata']['actions'][0][0][1]    
-    num_trials=input['num_trials']
     # agent_dev_costs=[]
     # agent_mag_costs=[]
     # create plot
     with initiate_plot(3, 3, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
         ax1 = fig.add_subplot(111)
-        ax1.set_xlabel('world x, cm')
-        ax1.set_ylabel('world y, cm')
-        goalcircle = plt.Circle((etask[0],etask[1]), 0.13, color='y', alpha=0.5)
+        ax1.set_xlabel('world x, [m]')
+        ax1.set_ylabel('world y, [m]')
+        # goalcircle = matplotlib.patches.Circle((etask[0],etask[1]), 0.13,), edgecolor="none",color=color_settings['goal'],alpha=0.5)
+        # ax.add_patch(circle)
+        goalcircle = plt.Circle((etask[0],etask[1]), 0.13, color=color_settings['goal'], edgecolor='none',linewidth=0., alpha=0.5)
         ax1.add_patch(goalcircle)
         ax1.set_xlim([-0.1,1.1])
         ax1.set_ylim([-0.6,0.6])
+        ax1.spines['top'].set_visible(False)
+        ax1.spines['right'].set_visible(False)
+        ax1.set_xticks([0,0.5,1])
+        ax1.set_yticks([-0.5,0.,0.5])
         with torch.no_grad():
-            for trial_i in range(num_trials):
                 agent_actions=[]
                 agent_beliefs=[]
                 agent_covs=[]
@@ -2626,19 +3140,19 @@ def single_trial_overhead():
                 estate[:,1]=estate[:,1]-estate[0,1]
                 # agent path, red
                 print('ploting')
-                ax1.plot(estate[:,0],estate[:,1], color=color_settings['s'],alpha=0.5)
+                # ax1.plot(estate[:,0],estate[:,1], color=color_settings['s'],alpha=0.5)
                 # agent belief path
                 for t in range(len(agent_beliefs[0][:,:,0])-1):
                     cov=agent_covs[0][t][:2,:2]
                     pos=  [agent_beliefs[0][:,:,0][t,0],
                             agent_beliefs[0][:,:,0][t,1]]
-                    plot_cov_ellipse(cov, pos, nstd=2, color=color_settings['b'], ax=ax1,alpha_factor=0.7/num_trials)
+                    plot_cov_ellipse(cov, pos, nstd=2, color=color_settings['b'], ax=ax1,alpha=0.5)
         # mk state, blue
-        ax1.plot(input['mkdata']['states'][0][:,0],input['mkdata']['states'][0][:,1],alpha=0.5)
+        ax1.plot(input['mkdata']['states'][0][:,0],input['mkdata']['states'][0][:,1],alpha=0.9)
 
 
 # 3.3 overhead view, skipped trials boundary similar
-def agentvsmk_skip(num_trials=10):
+def agentvsmk_skip(env,agent, theta,states, actions, tasks, num_trials=10):
     ind=torch.randint(low=100,high=222,size=(num_trials,))
     input={
         'agent':agent,
@@ -2831,9 +3345,12 @@ def similar_trials(ind, tasks, actions=None, ntrial=10):
     for i in range(len(tasks)):
         dx=abs(tasks[i][0]-tasks[ind][0])
         dy=abs(tasks[i][1]-tasks[ind][1])
-        dv=abs(actions[i][0][0]-actions[ind][0][0])
-        dw=abs(actions[i][0][1]-actions[ind][0][1])
-        d=-1*(dx+dy+0.5*dv+0.5*dw).item()
+        if actions is not None:
+            dv=abs(actions[i][0][0]-actions[ind][0][0])
+            dw=abs(actions[i][0][1]-actions[ind][0][1])
+            d=-1*(dx**2+dy**2+0.5*dv**2+0.5*dw**2).item()
+        else:
+            d=-1*(dx**2+dy**2).item()
         if len(indls)>=ntrial:
             heapq.heappushpop(indls,(d,i)) # push and pop
         else:
@@ -2842,19 +3359,22 @@ def similar_trials(ind, tasks, actions=None, ntrial=10):
     return result
 
 
-def similar_trials2this(tasks,actions, thistask, thisaction, ntrial=10):
+def similar_trials2this(tasks, thistask, thisaction=None, actions=None, ntrial=10):
     indls=[] # max heap of dist and ind
     for i in range(len(tasks)):
         dx=abs(tasks[i][0]-thistask[0])
         dy=abs(tasks[i][1]-thistask[1])
-        dv=abs(actions[i][0][0]-thisaction[0])
-        dw=abs(actions[i][0][1]-thisaction[1])
-        d=-1*(dx+dy+0.5*dv+0.5*dw)
+        if actions is not None:
+            dv=abs(actions[i][0][0]-thisaction[0])
+            dw=abs(actions[i][0][1]-thisaction[1])
+            d=-1*(dx**2+dy**2+0.5*dv**2+0.5*dw**2).item()
+        else:
+            d=-1*(dx**2+dy**2).item()
         if len(indls)>=ntrial:
             heapq.heappushpop(indls,(d,i)) # push and pop
         else:
             heapq.heappush(indls,(d,i)) # only push
-    result=([i[1] for i in heapq.nlargest(10,indls)])
+    result=([i[1] for i in heapq.nlargest(ntrial,indls)])
     return result
 
 
@@ -3110,6 +3630,7 @@ def trial_data(input):
     'mk_states':[],
     }
     # check
+    env=input['env']
     action_std=0.1 if 'action_std' not in input else input['action_std']
     if input['use_mk_data'] and not input['mkdata']: #TODO more careful check
         warnings.warn('need to input monkey data when using monkey data')
@@ -3486,7 +4007,7 @@ def plotctrl(input,**kwargs):
         return  ax
 
 
-def plotctrl_mk(indls,**kwargs):
+def plotctrl_mk(indls,actions=None,**kwargs):
     labels=[' v', ' w']
     with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
@@ -3995,7 +4516,29 @@ def plotpertfillwrapper():
     plotpert_fill(v,pertv, w, pertw, ax=None,alpha=0.8)
 
 
-def run_trial(agent=None,env=None,given_action=None, given_state=None):
+def get_stops(states, tasks, thistask, env, theta, agent,pert=None):
+    indls=similar_trials2this(tasks,thistask)
+    # get the stops from monkey data
+    mkstops=[]
+    for i in indls:
+        mkstops.append(states[i][-1][:2].view(-1).tolist())
+    mkstops=np.array(mkstops)
+
+    # sample stop distribution from agent doing these tasks
+    ircstops=[]
+    for i in indls:
+        env.reset(theta=theta, phi=phi, goal_position=tasks[i])
+        if pert is not None:
+            env.obs_traj= np.vstack([np.array([0,0]),np.random.normal(0,1,size=pert.shape)*np.asfarray(theta[4:6]).T + pert,np.zeros(shape=(20,2))])
+        _,_,_,epstates=run_trial(agent,env,given_action=None, given_state=None, action_noise=0.1,pert=pert)
+        stop=epstates[-1][:2].view(-1).tolist()
+        ircstops.append(stop)
+    ircstops=np.array(ircstops)
+    
+    return mkstops,ircstops
+
+
+def run_trial(agent=None,env=None,given_action=None, given_state=None, action_noise=0.1,pert=None):
     # 10 a 10 s. 
     # when both
     # use a1 and s2
@@ -4039,7 +4582,11 @@ def run_trial(agent=None,env=None,given_action=None, given_state=None):
             while not done:
                 action = agent(env.decision_info)[0]
                 _collect()
-                _,_,done,_=env.step(torch.tensor(action).reshape(1,-1)) 
+                noise=torch.normal(torch.zeros(2),action_noise)
+                _action=(action+noise).clamp(-1,1)
+                if pert is not None and int(env.trial_timer)<len(pert):
+                    _action+=pert[int(env.trial_timer)]
+                _,_,done,_=env.step(torch.tensor(_action).reshape(1,-1)) 
                 t+=1
     return epactions,epbliefs,epbcov,epstates
 
@@ -4093,14 +4640,15 @@ def quickoverhead(statelike,ax=None,alpha=0.5):
     ax.legend(by_label.values(), by_label.keys(),loc=2, prop={'size': 6})
 
 
-def theta_bar(finaltheta,finalcov=None,xlabels=theta_names,err=None, ax=None, label=None,shift=0,width=0.5):
-    err=torch.diag(finalcov)**0.5 if err is None else err
-    with initiate_plot(6, 4, 300) as fig, warnings.catch_warnings():
+def theta_bar(finaltheta,finalcov=None,xlabels=theta_names,err=None, ax=None, label=None,shift=0,width=0.5, color=None):
+    if finalcov is None: err=None
+    else: err=torch.diag(finalcov)**0.5 if err is None else err
+    with initiate_plot(12, 4, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
         if ax is None:
             ax = fig.add_subplot(111)
         # Create bars and choose color
-        ax.bar([i+shift for i in range(len(xlabels))], finaltheta,width,yerr=err,label=label)
+        ax.bar([i+shift for i in range(len(xlabels))], finaltheta,width,yerr=err,label=label, color=color)
         # title and axis names
         ax.set_ylabel('inferred parameter value')
         ax.set_xticks([i for i in range(len(xlabels))])
@@ -4153,7 +4701,7 @@ def d_process(logs,densities):
     means=[log[-1][0]._mean if log else None for log in logs]
     stds=[np.diag(log[-1][0]._C)**0.5 if log else None for log in logs]
     xs,ys,errs=[],[],[]
-    for i in range(4):
+    for i in range(len(logs)):
         if means[i] is not None and stds[i] is not None and densities[i] is not None:
             x,y,err=densities[i],means[i],stds[i]
             xs.append(x);ys.append(y);errs.append(err)
@@ -4363,7 +4911,7 @@ def ovbystate():
 
 
 def get_ci(log, low=5, high=95, threshold=2):
-    res=[l[2] for l in log]
+    res=[l[2] for l in log[:len(log)//2]]
     mean=log[-1][0]._mean
     allsamples=[]
     for r in res:
@@ -4526,3 +5074,250 @@ def correlation_from_covariance(covariance):
     correlation = covariance / outer_v
     correlation[covariance == 0] = 0
     return correlation
+
+
+def process_inv(res, removegr=True, ci=5):
+    # get final theta and cov 
+    if type(res) == str:
+        res=Path(res)
+    print(res)
+    with open(res, 'rb') as f:
+        log = pickle.load(f)
+    finalcov=torch.tensor(log[-1][0]._C)
+    finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
+    theta=torch.cat([finaltheta[:6],finaltheta[-4:]])
+    cov = finalcov[torch.arange(finalcov.size(0))!=6] 
+    cov = cov[:,torch.arange(cov.size(1))!=6] 
+    cirange=get_ci(log, low=ci, high=100-ci)
+    if removegr:
+        return theta, cov, np.delete(cirange,(6),axis=1)
+    return finaltheta, finalcov, cirange
+
+
+def multimonkeytheta(monkeynames, mus, covs, errs, ):
+    nmonkey=len(monkeynames)
+    basecolor=color_settings['a']
+    colorrgb=hex2rgb(basecolor)
+    colorlist=colorshift(colorrgb, [0,-1,1],0.3, nmonkey)
+    shifts=np.linspace(-1/nmonkey,1/nmonkey,nmonkey)
+    for i in range(nmonkey):
+        if i==0:
+            ax=theta_bar(mus[i],covs[i], label=monkeynames[i],width=1/nmonkey,shift=shifts[i], err=errs[i], color=colorlist[i])
+        else:
+            theta_bar(mus[i],covs[i],ax=ax, label=monkeynames[i],width=1/nmonkey,shift=shifts[i], err=errs[i],color=colorlist[i])
+    return ax
+
+
+def multimonkeyobs(monkeynames, mus, covs, errs, ):
+    def _bar(finaltheta,xlabels=theta_names[4:6],err=None, ax=None, label=None,shift=0,width=0.5, color=None):
+        with initiate_plot(4, 3, 300) as fig, warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            if ax is None:
+                ax = fig.add_subplot(111)
+            # Create bars and choose color
+            ax.bar([i+shift for i in range(len(xlabels))], finaltheta,width,yerr=err,label=label, color=color)
+            # title and axis names
+            ax.set_ylabel('inferred observation noise')
+            ax.set_xticks([i for i in range(len(xlabels))])
+            ax.set_xticklabels(xlabels, rotation=45, ha='right')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.legend()
+        return ax
+
+    nmonkey=len(monkeynames)
+    basecolor=color_settings['o']
+    colorrgb=hex2rgb(basecolor)
+    colorlist=colorshift(colorrgb, colorrgb,0.8, nmonkey)
+    shifts=np.linspace(-1/nmonkey,1/nmonkey,nmonkey)
+    for i in range(nmonkey):
+        if i==0:
+            ax=_bar(mus[i][4:6], label=monkeynames[i],width=1/nmonkey,shift=shifts[i], err=errs[i][:,4:6], color=colorlist[i])
+        else:
+            _bar(mus[i][4:6],ax=ax, label=monkeynames[i],width=1/nmonkey,shift=shifts[i], err=errs[i][:,4:6],color=colorlist[i])
+    return ax
+
+
+def multimonkeyeig(monkeynames, evectors):
+    nmonkey=len(monkeynames)
+    basecolor=color_settings['a']
+    colorrgb=hex2rgb(basecolor)
+    colorlist=colorshift(colorrgb, [0,-1,1],0.3, nmonkey)
+    shifts=np.linspace(-1/nmonkey,1/nmonkey,nmonkey)
+    for i in range(nmonkey):
+        if i==0:
+            ax=theta_bar(evectors[i], label=monkeynames[i],width=1/nmonkey,shift=shifts[i],  color=colorlist[i])
+        else:
+            theta_bar(evectors[i],ax=ax, label=monkeynames[i],width=1/nmonkey,shift=shifts[i], color=colorlist[i])
+    return ax
+
+
+def plotv(indls,resirc,actions=None,**kwargs):
+    with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+
+        # plot data
+        for trial_i in indls:
+            ax.plot(actions[trial_i][1:,0],color=hex2rgb(color_settings['a']),alpha=1/len(indls)**.3, label='monkey')
+
+        for trial_i in range(resirc['num_trials']):
+            ax.plot(resirc['agent_actions'][trial_i][:,0],color=hex2rgb(color_settings['model']),alpha=1/resirc['num_trials']**.3, label='IRC')
+        # legend and label
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xlabel('time, dt')
+        ax.set_ylabel('control magnitude')
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+        ax.set_xlim(left=0.)
+        ax.set_ylim(-0.1,1)
+        ax.set_yticks([0,1])
+        return  ax
+
+
+def plotw(indls,resirc,actions=None,**kwargs):
+    with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+
+        # plot data
+        for trial_i in indls:
+            ax.plot(actions[trial_i][1:,1],color=hex2rgb(color_settings['a']),alpha=1/len(indls)**.3, label='monkey')
+
+        for trial_i in range(resirc['num_trials']):
+            ax.plot(resirc['agent_actions'][trial_i][:,1],color=hex2rgb(color_settings['model']),alpha=1/resirc['num_trials']**.3, label='IRC')
+        # legend and label
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xlabel('time, dt')
+        ax.set_ylabel('control magnitude')
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+        ax.set_xlim(left=0.)
+        ax.set_ylim(-1.,1)
+        ax.set_yticks([-1,0,1])
+        ax.spines['bottom'].set_position('zero')
+        return  ax
+
+
+def multimonkeyerr(densities, mus, monkeynames):
+    def _bar(data,xlabels=densities,err=None, ax=None, label=None,shift=0,width=0.5, color=None, ylabel='radial error [cm]', xlabel='densities'):
+        with initiate_plot(4, 4, 300) as fig, warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            if ax is None:
+                ax = fig.add_subplot(111)
+            # Create bars and choose color
+            ax.bar([i+shift for i in range(len(densities))], data,width,yerr=err,label=label, color=color)
+            # title and axis names
+            ax.set_ylabel(ylabel)
+            ax.set_xlabel(xlabel)
+            ax.set_xticks([i for i in range(len(densities))])
+            ax.set_xticklabels(xlabels)
+            # ax.set_xticklabels(xlabels, rotation=45, ha='right')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.legend()
+        return ax
+
+    nmonkey=len(mus)
+    basecolor=color_settings['a']
+    colorrgb=hex2rgb(basecolor)
+    colorlist=colorshift(colorrgb, [0,-1,1],0.3, nmonkey)
+    shifts=np.linspace(-1/nmonkey,1/nmonkey,nmonkey)
+    for i in range(nmonkey):
+        if i==0:
+            ax=_bar(mus[i], label=monkeynames[i],width=1/(nmonkey+0.2),shift=shifts[i], color=colorlist[i])
+        else:
+            _bar(mus[i],ax=ax, label=monkeynames[i],width=1/(nmonkey+0.2),shift=shifts[i],color=colorlist[i])
+    return ax
+
+
+def plotv_fill(indls,resirc,actions=None,percentile=5,**kwargs):
+
+    with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+        
+        # plot data
+        mk=[]
+        for trial_i in indls:
+            mk.append(actions[trial_i][1:,0].tolist())
+        mk=ll2array(mk) # trial, ts
+        low=np.percentile(mk,percentile, axis=0)
+        high=np.percentile(mk,100-percentile, axis=0)
+        ts=np.arange(len(mk.T))*0.1
+        ax.fill_between(ts, y1=low, y2=high, color=color_settings['a'],alpha=0.5, edgecolor='none', label='monkey')
+
+        mk=[]
+        for trial_i in range(resirc['num_trials']):
+            mk.append(resirc['agent_actions'][trial_i][:,0].tolist())
+        mk=ll2array(mk) # trial, ts
+        low=np.percentile(mk,percentile, axis=0)
+        high=np.percentile(mk,100-percentile, axis=0)
+        ts=np.arange(len(mk.T))*0.1
+        ax.fill_between(ts, y1=low, y2=high, color=color_settings['model'],alpha=0.5, edgecolor='none', label='IRC')
+
+        # legend and label
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xlabel('time, dt')
+        ax.set_ylabel('control magnitude')
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+        ax.set_xlim(left=0.)
+        ax.set_ylim(-0.1,1)
+        ax.set_yticks([0,1])
+        ax.set_xticks([0,1,2])
+        return  ax
+
+
+def plotw_fill(indls,resirc,actions=None,percentile=5,**kwargs):
+
+    with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+        
+        # plot data
+        mk=[]
+        for trial_i in indls:
+            mk.append(actions[trial_i][1:,1].tolist())
+        mk=ll2array(mk) # trial, ts
+        low=np.percentile(mk,percentile, axis=0)
+        high=np.percentile(mk,100-percentile, axis=0)
+        ts=np.arange(len(mk.T))*0.1
+        ax.fill_between(ts, y1=low, y2=high, color=color_settings['a'],alpha=0.5, edgecolor='none', label='monkey')
+
+        mk=[]
+        for trial_i in range(resirc['num_trials']):
+            mk.append(resirc['agent_actions'][trial_i][:,1].tolist())
+        mk=ll2array(mk) # trial, ts
+        low=np.percentile(mk,percentile, axis=0)
+        high=np.percentile(mk,100-percentile, axis=0)
+        ts=np.arange(len(mk.T))*0.1
+        ax.fill_between(ts, y1=low, y2=high, color=color_settings['model'],alpha=0.5, edgecolor='none', label='IRC')
+
+        # legend and label
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xlabel('time, dt')
+        ax.set_ylabel('control magnitude')
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+        ax.set_xlim(left=0.)
+        ax.set_ylim(-1.,1)
+        ax.set_yticks([-1,0,1])
+        ax.spines['bottom'].set_position('zero')
+        ax.set_xticks([0,1,2])
+
+        return  ax
+
+
+
+
+
+

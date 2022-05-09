@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import random
 import matplotlib.pyplot as plt
 from contextlib import contextmanager
-from numba import njit
+# from numba import njit
 from astropy.convolution import convolve
 import warnings
 import pandas as pd
@@ -183,7 +183,7 @@ def config_colors():
 
 
 def convert_2d_response(x, y, z, xmin, xmax, ymin, ymax, num_bins=20, kernel_size=3, isconvolve=True):
-    @njit
+    # @njit
     def compute(*args):
         x_bins = np.linspace(xmin - 1, xmax + 1, num_bins + 1)
         y_bins = np.linspace(ymin - 1, ymax + 1, num_bins + 1)

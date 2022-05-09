@@ -2855,10 +2855,11 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         if end_current_ep:
             signal=(
                 (1-self.reward_ratio)*(self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5) 
-                + self.reward_ratio*(reward-cost))
+                + self.reward_ratio*(reward-cost))+(1-self.prev_d.item())
         else:
             signal=self.reward_ratio*(reward-cost)
-            assert self.rewardgiven == False # when not stop, reward should not be given
+            if not self.debug:
+                assert self.rewardgiven == False # when not stop, reward should not be given
         if self.debug:
             self.trial_actions.append(action)
             self.trial_costs.append(cost)
@@ -2886,12 +2887,12 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             # print(
             # 'distance, ', "{:.1f}".format((self.get_distance()[1]-self.goal_r).item()),
             # 'stop',self.stop,
-            print('reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost),'dist',self.prev_d)
+            print('reward: {:.1f}, cost: {:.1f}'.format(self.trial_sum_reward, self.trial_sum_cost),'dist {:.2f}'.format(self.prev_d.item()))
             # 'rate {:.1f}'.format((self.trial_sum_reward-self.trial_sum_cost)/(self.trial_timer+5).item()) 
             # )
             # return self.decision_info, self.episode_reward-self.trial_sum_cost, end_current_ep, {}
         self.previous_action=action
-        return self.decision_info, signal, end_current_ep, {}
+        return self.decision_info, float(signal), end_current_ep, {}
 
     def state_step(self,a, s): # update xy, then apply new action as new v and w
         next_s = self.update_state(s)
@@ -2952,7 +2953,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         reward=torch.tensor([0.])
         cost=self.action_cost(self.a, self.previous_action)
         
-        if (self.if_agent_stop() and self.prev_d<2*self.goal_r): 
+        if (self.if_agent_stop() and self.prev_d<4*self.goal_r): 
             self.rewardgiven=True
             rew_std = self.goal_r/2 
             mu = torch.Tensor([self.goalx,self.goaly])-self.b[:2,0]
@@ -2976,7 +2977,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             reward = self.reward * reward  * (self.episode_len-self.trial_timer)/self.episode_len
         else:
             _,d= self.get_distance(state=self.b)
-            reward+=(self.prev_d-d)*self.dt*0.1 # approaching reward
+            reward+=(self.prev_d-d)*self.dt # approaching reward
             # reward+=(1-self.cost_scale)*self.dt # stop reward, no matter what
         # _,d= self.get_distance(state=self.b)
         # reward+=(self.prev_d-d)*(1-self.cost_scale)*self.dt # approaching reward

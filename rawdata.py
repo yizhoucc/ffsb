@@ -1,7 +1,8 @@
 # ploting related to just raw data, no irc or agent involved
 
+from dummy_threading import ThreadError
 import pickle
-from plot_ult import plotpert, quickoverhead, smooth
+from plot_ult import plotpert, quickoverhead, similar_trials, similar_trials2this, smooth
 from FireflyEnv import ffacc_real
 from matplotlib.pyplot import xlabel
 import pandas as pd
@@ -10,13 +11,13 @@ from scipy.ndimage.measurements import label
 import torch
 from scipy.signal import medfilt
 from scipy.stats import norm
-import neo
 from pathlib import Path
 from rult import *
 from monkey_functions import *
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import stats
+from plot_ult import *
 
 
 # check stop distribution given a task
@@ -813,10 +814,479 @@ a.get_figure()
 
 
 
-    # count reward % by density
-    for eachdensity in [0.0001, 0.0005, 0.001, 0.005]:  
-        print('density {}, reward% '.format(eachdensity),len(df[df.floor_density==eachdensity][df.rewarded])/len(df[df.floor_density==eachdensity]))
-    # count reward by pert
-    print('all trial {}, reward% '.format(len(df[df.rewarded])/len(df)))
-    print('pert trial {}, reward% '.format(len(df[~df.perturb_start_time.isnull() & df.rewarded])/len(df[~df.perturb_start_time.isnull()])))
-    print('non pert trial {}, reward% '.format(len(df[df.perturb_start_time.isnull() & df.rewarded])/len(df[df.perturb_start_time.isnull()])))
+# count reward % by density
+for eachdensity in [0.0001, 0.0005, 0.001, 0.005]:  
+    print('density {}, reward% '.format(eachdensity),len(df[df.floor_density==eachdensity][df.rewarded])/len(df[df.floor_density==eachdensity]))
+# count reward by pert
+print('all trial {}, reward% '.format(len(df[df.rewarded])/len(df)))
+print('pert trial {}, reward% '.format(len(df[~df.perturb_start_time.isnull() & df.rewarded])/len(df[~df.perturb_start_time.isnull()])))
+print('non pert trial {}, reward% '.format(len(df[df.perturb_start_time.isnull() & df.rewarded])/len(df[df.perturb_start_time.isnull()])))
+
+
+
+
+
+# human data----------------------------------------------------
+
+
+
+# error vs target distance in data, in wofb and fb -----------------------------
+from scipy import stats
+
+with initiate_plot(8, 8, 300) as fig, warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    # healthy with feedback
+    ax = fig.add_subplot(221)
+    ax.set_title('healthy with feedback')
+    data_path=Path("Z:/human")
+    theta,_,_=process_inv(data_path/'fixrhgroup', removegr=False)
+    datapath=Path("Z:/human/hgroup")
+    with open(datapath, 'rb') as f:
+        states, actions, tasks = pickle.load(f)
+    target_dist=np.linalg.norm(tasks,axis=1)
+    radialerr=[np.linalg.norm(t-np.asarray(s[-1][:2])) for s,t in zip(states,tasks)]
+    ax.scatter(target_dist,radialerr, alpha=0.02,edgecolors='none',label='human response')
+    ax.plot([min(target_dist),max(target_dist)],(1-theta[0])*np.asarray([min(target_dist),max(target_dist)]),label='irc prediction',color='orange')
+    slope, intercept, r, p, se=stats.linregress(target_dist,radialerr)
+    ax.plot([min(target_dist),max(target_dist)],intercept+slope*np.asarray([min(target_dist),max(target_dist)]),label='linear prediction',color='blue')
+    ax.legend()
+    ax.set_xlabel('target distance [2 m]')
+    ax.set_ylabel('radial error [2 m]')
+    
+
+    # autism with feedback
+    ax = fig.add_subplot(222, sharey=ax)
+    ax.set_title('autism with feedback')
+    data_path=Path("Z:/human")
+    theta,_,_=process_inv(data_path/'fixragroup', removegr=False)
+    datapath=Path("Z:/human/agroup")
+    with open(datapath, 'rb') as f:
+        states, actions, tasks = pickle.load(f)
+    target_dist=np.linalg.norm(tasks,axis=1)
+    radialerr=[np.linalg.norm(t-np.asarray(s[-1][:2])) for s,t in zip(states,tasks)]
+    ax.scatter(target_dist,radialerr, alpha=0.02,edgecolors='none',label='human response')
+    ax.plot([min(target_dist),max(target_dist)],(1-theta[0])*np.asarray([min(target_dist),max(target_dist)]),label='irc prediction',color='orange')
+    slope, intercept, r, p, se=stats.linregress(target_dist,radialerr)
+    ax.plot([min(target_dist),max(target_dist)],slope*np.asarray([min(target_dist),max(target_dist)]),label='linear prediction',color='blue')
+    ax.legend()
+    ax.set_xlabel('target distance [2 m]')
+    ax.set_ylabel('radial error [2 m]')
+
+    # healthy without feedback
+    ax = fig.add_subplot(223)
+    ax.set_title('healthy without feedback')
+    data_path=Path("Z:/human")
+    theta,_,_=process_inv(data_path/'wofixrwohgroup', removegr=False)
+    datapath=Path("Z:/human/wohgroup")
+    with open(datapath, 'rb') as f:
+        states, actions, tasks = pickle.load(f)
+    target_dist=np.linalg.norm(tasks,axis=1)
+    radialerr=[np.linalg.norm(t-np.asarray(s[-1][:2])) for s,t in zip(states,tasks)]
+    ax.scatter(target_dist,radialerr, alpha=0.02,edgecolors='none',label='human response')
+    ax.plot([min(target_dist),max(target_dist)],(1-theta[0])*np.asarray([min(target_dist),max(target_dist)]),label='irc prediction',color='orange')
+    slope, intercept, r, p, se=stats.linregress(target_dist,radialerr)
+    ax.plot([min(target_dist),max(target_dist)],slope*np.asarray([min(target_dist),max(target_dist)]),label='linear prediction',color='blue')
+    ax.legend()
+    ax.set_xlabel('target distance [2 m]')
+    ax.set_ylabel('radial error [2 m]')
+    ax.set_ylim(0,5)
+
+
+    # autism without feedback
+    ax = fig.add_subplot(224,sharey=ax)
+    ax.set_title('autism without feedback')
+    data_path=Path("Z:/human")
+    theta,_,_=process_inv(data_path/'fixrwoagroup', removegr=False)
+    datapath=Path("Z:/human/woagroup")
+    with open(datapath, 'rb') as f:
+        states, actions, tasks = pickle.load(f)
+    target_dist=np.linalg.norm(tasks,axis=1)
+    radialerr=[np.linalg.norm(t-np.asarray(s[-1][:2])) for s,t in zip(states,tasks)]
+
+    ax.scatter(target_dist,radialerr, alpha=0.02,edgecolors='none',label='human response')
+    ax.plot([min(target_dist),max(target_dist)],(1-theta[0])*np.asarray([min(target_dist),max(target_dist)]),label='irc prediction',color='orange')
+    slope, intercept, r, p, se=stats.linregress(target_dist,radialerr)
+    ax.plot([min(target_dist),max(target_dist)],slope*np.asarray([min(target_dist),max(target_dist)]),label='linear prediction',color='blue')
+    ax.legend()
+    ax.set_xlabel('target distance [2 m]')
+    ax.set_ylabel('radial error [2 m]')
+
+
+stats.describe(radialerr)
+
+
+
+
+
+plt.scatter(tasks[:,0], tasks[:,1],alpha=0.2)
+plt.scatter([s[-1][0] for s in states], [s[-1][1] for s in states],alpha=0.2)
+
+
+ind=np.random.randint(0,2000)
+np.linalg.norm(tasks[ind])*200
+np.linalg.norm(states[ind][-1][:2]*200)
+targetrs[ind]
+respondrs[ind]
+
+res=[]
+for ind,r in enumerate(respondrs):
+    res.append(r-np.linalg.norm(states[ind][-1][:2]*200))
+
+
+from scipy import stats
+stats.binned_statistic(target_dist,radialerr)
+np.histogram(target_dist, 9)
+
+
+sortind=np.argsort(target_dist)
+
+
+nbin=10
+binind=np.linspace()
+target_dist[sortind]
+
+plt.plot(sorted(np.asarray(radialerr)*200)[:20])
+
+
+targetrs=[]
+for a in adata:
+    targetrs+=a['targ']['r']
+plt.plot(sorted(targetrs))
+respondrs=[]
+for a in adata:
+    respondrs+=a['resp']['r']
+plt.plot(sorted(respondrs))
+
+
+
+plt.scatter(targetrs,respondrs,alpha=0.02)
+plt.gca().set_aspect('equal', adjustable='box')
+slope, intercept, r, p, se=stats.linregress(targetrs,respondrs)
+plt.plot([0,1000],np.asarray([0,1000])*slope+intercept)
+plt.plot([0,1000],[0,1000])
+plt.plot([0,1000],[0,800])
+
+
+
+
+
+# error vs target distance in model -------------------------------------------
+data_path=Path("Z:/human")
+theta,_,_=process_inv(data_path/'fixrhgroup', removegr=False)
+
+
+
+stops=[]
+for task in tasks:
+    env.reset(goal_position=task,phi=phi,theta=theta)
+    _,_,_,epstates=run_trial(agent=agent,env=env,given_action=None, given_state=None, action_noise=0.01,pert=None)
+    stops.append(epstates[-1][:2])
+
+repsrs_model=[np.linalg.norm(s) for s in stops]
+
+
+plt.scatter(targetrs[:197],repsrs_model)
+plt.scatter(targetrs[:197],respondrs[:197])
+
+
+
+
+# healthy fb vs wofb, overhead of similar trials
+datapath=Path("Z:/human/hgroup")
+with open(datapath, 'rb') as f:
+    states, actions, tasks = pickle.load(f)
+ind=np.random.randint(0,len(tasks))
+task=tasks[ind]
+indls=similar_trials(ind, tasks,ntrial=5)
+# for i in indls:
+#     plt.plot(actions[i],'b')
+ax=plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=None,color='b',label='healthy fb')
+
+datapath=Path("Z:/human/wohgroup")
+with open(datapath, 'rb') as f:
+    states, actions, tasks = pickle.load(f)
+indls=similar_trials2this(tasks,task,ntrial=5)
+ax=plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=ax,color='orange',label='healthy wofb')
+# for i in indls:
+#     plt.plot(actions[i],'orange')
+# ax.legend()
+ax.get_figure()
+
+# autism fb vs wofb, overhead of similar trials
+datapath=Path("Z:/human/agroup")
+with open(datapath, 'rb') as f:
+    states, actions, tasks = pickle.load(f)
+ind=np.random.randint(0,len(tasks))
+task=tasks[ind]
+indls=similar_trials(ind, tasks,ntrial=5)
+# for i in indls:
+#     plt.plot(actions[i],'b')
+ax=plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=None,color='b',label='healthy fb')
+
+datapath=Path("Z:/human/woagroup")
+with open(datapath, 'rb') as f:
+    states, actions, tasks = pickle.load(f)
+indls=similar_trials2this(tasks,task,ntrial=5)
+ax=plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=ax,color='orange',label='healthy wofb')
+# for i in indls:
+#     plt.plot(actions[i],'orange')
+# ax.legend()
+ax.get_figure()
+
+
+# fb healthy vs autism, overhead of similar trials
+datapath=Path("Z:/human/hgroup")
+with open(datapath, 'rb') as f:
+    states, actions, tasks = pickle.load(f)
+ind=np.random.randint(0,len(tasks))
+task=tasks[ind]
+indls=similar_trials(ind, tasks,ntrial=5)
+ax=plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=None,color='b',label='healthy fb')
+
+datapath=Path("Z:/human/agroup")
+with open(datapath, 'rb') as f:
+    states, actions, tasks = pickle.load(f)
+indls=similar_trials2this(tasks,task,ntrial=5)
+ax=plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=ax,color='orange',label='healthy wofb')
+ax.get_figure()
+
+# wofb healthy vs autism, overhead of similar trials
+datapath=Path("Z:/human/wohgroup")
+with open(datapath, 'rb') as f:
+    states, actions, tasks = pickle.load(f)
+ind=np.random.randint(0,len(tasks))
+task=tasks[ind]
+indls=similar_trials(ind, tasks,ntrial=5)
+ax=plotoverheadhuman(indls,states,tasks,alpha=0.5,fontsize=5,ax=None,color='b',label='healthy wofb')
+
+datapath=Path("Z:/human/woagroup")
+with open(datapath, 'rb') as f:
+    states, actions, tasks = pickle.load(f)
+indls=similar_trials2this(tasks,task,ntrial=5)
+ax=plotoverheadhuman(indls,states,tasks,alpha=0.5,fontsize=5,ax=ax,color='orange',label='autism wofb')
+handles, labels = ax.get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+leg=ax.legend(by_label.values(), by_label.keys(),loc='lower right')
+for lh in leg.legendHandles: 
+    lh.set_alpha(1)
+ax.get_figure()
+
+
+# autism likes to combine vw and normal likes to w then v -------------------------------------
+# check ctrl trajectory
+datapath1=Path("Z:/human/hgroup")
+datapath2=Path("Z:/human/agroup")
+with open(datapath1, 'rb') as f:
+    states1, actions1, tasks1 = pickle.load(f)
+with open(datapath2, 'rb') as f:
+    states2, actions2, tasks2 = pickle.load(f)
+
+ind=np.random.randint(0,len(tasks))
+task=tasks1[ind]
+indls1=similar_trials(ind, tasks1,ntrial=5)
+indls2=similar_trials2this(tasks2,task,ntrial=5)
+with initiate_plot(4, 2, 300) as fig, warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    ax=fig.add_subplot(111)
+    for i1,i2 in zip(indls1,indls2):
+        ax.plot(-actions2[i2][:len(actions2[i2])//5,1],actions2[i2][:len(actions2[i2])//5,0],'r',alpha=0.5,label=str(datapath2.name))
+        ax.plot(-actions1[i1][:len(actions1[i1])//5,1],actions1[i1][:len(actions1[i1])//5,0],'b',alpha=0.5,label=str(datapath1.name))
+    ax.set_xlim(-1,1); ax.set_ylim(-1,1)
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xticks([]);ax.set_yticks([])
+    ax.set_xlabel('angular ctrl');ax.set_ylabel('forward ctrl')
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    leg=ax.legend(by_label.values(), by_label.keys(),loc='lower right')
+    for lh in leg.legendHandles: 
+        lh.set_alpha(1)
+    ax.get_figure()
+
+ax=plotoverheadhuman(indls1,states1,tasks1,alpha=0.5,fontsize=5,ax=None,color='b',label=str(datapath1.name))
+ax=plotoverheadhuman(indls2,states2,tasks2,alpha=0.5,fontsize=5,ax=ax,color='orange',label=str(datapath2.name))
+handles, labels = ax.get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+leg=ax.legend(by_label.values(), by_label.keys(),loc='lower right')
+for lh in leg.legendHandles: 
+    lh.set_alpha(1)
+ax.get_figure()
+
+
+with initiate_plot(4, 2, 300) as fig, warnings.catch_warnings():
+    ax=fig.add_subplot(111)
+    for i in indls1:
+        ax.plot(actions1[i][:,0],'b',alpha=0.5, label=str(datapath1.name)+' v')
+        ax.plot(actions1[i][:,1],'g',alpha=0.5,label=str(datapath1.name)+' w')
+    for i in indls2:
+        ax.plot(actions2[i][:,0],'orange',alpha=0.5,label=str(datapath2.name)+' v')
+        ax.plot(actions2[i][:,1],'red',alpha=0.5,label=str(datapath2.name)+' w')
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    leg=ax.legend(by_label.values(), by_label.keys(),loc='lower right')
+    for lh in leg.legendHandles: 
+        lh.set_alpha(1)
+    ax.set_xlabel('t [0.1 s]')
+    ax.set_ylabel('ctrl')
+    ax.set_yticks([-1,0,1])
+    ax.set_xticks([0,20,40])
+
+
+# autism starts faster. do their trials shorter? yes------------
+datapath1=Path("Z:/human/hgroup")
+datapath2=Path("Z:/human/agroup")
+with open(datapath1, 'rb') as f:
+    states1, actions1, tasks1 = pickle.load(f)
+with open(datapath2, 'rb') as f:
+    states2, actions2, tasks2 = pickle.load(f)
+
+ntrial=10
+ind=np.random.randint(0,len(tasks))
+task=tasks1[ind]
+indls1=similar_trials(ind, tasks1,ntrial=ntrial)
+indls2=similar_trials2this(tasks2,task,ntrial=ntrial)
+
+trial_len1, trial_len2=[],[]
+for i1,i2 in zip(indls1,indls2):
+    trial_len1.append(len(actions1[i1]))
+    trial_len2.append(len(actions2[i2]))
+
+sampled_lens=[]
+for i in range(50):
+    ind=np.random.randint(0,len(tasks))
+    task=tasks1[ind]
+    indls1=similar_trials(ind, tasks1,ntrial=ntrial)
+    indls2=similar_trials2this(tasks2,task,ntrial=ntrial)
+
+    trial_len1, trial_len2=[],[]
+    for i1,i2 in zip(indls1,indls2):
+        trial_len1.append(len(actions1[i1])/np.linalg.norm(task))
+        trial_len2.append(len(actions2[i2])/np.linalg.norm(task))
+
+    sampled_lens.append((sum(trial_len1)-sum(trial_len2))/ntrial)
+plt.hist(sampled_lens,bins=30)
+plt.xlabel('healthy - autism trial length / target distance [0.2 s / 2 m]')
+plt.ylabel('occurance')
+
+
+
+
+# healthy vs autism ctrl cloud -----------------------------------
+datapath1=Path("Z:/human/hgroup")
+datapath2=Path("Z:/human/agroup")
+with open(datapath1, 'rb') as f:
+    states1, actions1, tasks1 = pickle.load(f)
+with open(datapath2, 'rb') as f:
+    states2, actions2, tasks2 = pickle.load(f)
+
+ctrlxy1,ctrlxy2=[],[]
+for epaction in actions1:
+    for taction in epaction[min(len(epaction)//5,2):len(epaction)//1]:
+        ctrlxy1.append(taction.tolist())
+for epaction in actions2:
+    for taction in epaction[min(len(epaction)//5,2):len(epaction)//1]:
+        ctrlxy2.append(taction.tolist())
+ctrlxy1,ctrlxy2=np.array(ctrlxy1),np.array(ctrlxy2)
+
+with initiate_plot(4, 2, 300) as fig, warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    ax=fig.add_subplot(121)
+    ax.set_xlim(-1,1); ax.set_ylim(-1,1)
+    ax.scatter(-ctrlxy1[:,1],ctrlxy1[:,0],label='healthy',alpha=0.02,edgecolor='none',s=1)
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xticks([]);ax.set_yticks([])
+    ax.set_xlabel('angular ctrl');ax.set_ylabel('forward ctrl')
+
+    ax=fig.add_subplot(122)
+    ax.scatter(-ctrlxy2[:,1],ctrlxy2[:,0],label='autism',alpha=0.1,edgecolor='none',s=1)
+    ax.set_xlim(-1,1); ax.set_ylim(-1,1)
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xticks([]);ax.set_yticks([])
+    ax.set_xlabel('angular ctrl');ax.set_ylabel('forward ctrl')
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    leg=ax.legend(by_label.values(), by_label.keys(),loc='lower right')
+    for lh in leg.legendHandles: 
+        lh.set_alpha(1)
+ax.get_figure()
+
+
+
+
+
+
+# uncertainty growth rate --------------------------------------------------------------------------
+data_path=Path("Z:/human")
+atheta,_,_=process_inv(data_path/'fixrhgroup', removegr=False)
+htheta,_,_=process_inv(data_path/'fixragroup', removegr=False)
+with initiate_plot(4, 4, 300) as fig, warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    ax=fig.add_subplot(111)
+    theta=htheta
+    uncertaintygrowhv=1/((theta[2]**2+theta[4]**2)**0.5)
+    uncertaintygrowhw=1/((theta[3]**2+theta[5]**2)**0.5)
+    theta=atheta
+    uncertaintygrowav=1/((theta[2]**2+theta[4]**2)**0.5)
+    uncertaintygrowaw=1/((theta[3]**2+theta[5]**2)**0.5)
+    ax.bar([0,1],[uncertaintygrowhv,uncertaintygrowav])
+    ax.bar([3,4],[uncertaintygrowhw,uncertaintygrowaw])
+    ax.set_ylabel('uncertainty growth rate')
+    ax.set_yticks([0,1])
+    ax.set_xticks([0,0.5,1, 3, 3.5, 4])
+    ax.set_xticklabels(('healthy','\n\nforward v', 'ASD', 'healthy','\n\nangular w', 'ASD'),ha='center')
+    ax.tick_params(axis='x', which='both',length=0)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    # ax.set_xticklabels([], rotation=45, ha='right')
+
+
+# process noise (intergration leak)
+with initiate_plot(4, 4, 300) as fig, warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    ax=fig.add_subplot(111)
+    ax.bar([0,1],[htheta[2],atheta[2]])
+    ax.bar([3,4],[htheta[4],atheta[4]])
+    ax.set_ylabel('intergration leak')
+    ax.set_yticks([0,1])
+    ax.set_xticks([0,0.5,1, 3, 3.5, 4])
+    ax.set_xticklabels(('healthy','\n\nforward v', 'ASD', 'healthy','\n\nangular w', 'ASD'),ha='center')
+    ax.tick_params(axis='x', which='both',length=0)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    # ax.set_xticklabels([], rotation=45, ha='right')
+
+theta,_,_=process_inv(data_path/'wofixrwohgroup')
+theta,_,_=process_inv(data_path/'fixrwoagroup', removegr=False)
+
+
+# theta bar, fb
+theta,_,_=process_inv(data_path/'fixrhgroup')
+ax=theta_bar(theta,label='healthy')
+theta,_,_=process_inv(data_path/'fixragroup')
+ax=theta_bar(theta,ax=ax,shift=0.3,label='ASD')
+ax.legend()
+ax.set_yticks([0,1])
+ax.get_figure()
+
+
+# theta bar, wo
+theta,_,_=process_inv(data_path/'wofixrwohgroup')
+ax=theta_bar(theta,label='healthy')
+theta,_,_=process_inv(data_path/'fixrwoagroup')
+ax=theta_bar(theta,ax=ax,shift=0.3,label='ASD')
+ax.legend()
+ax.set_yticks([0,1])
+ax.get_figure()
+
+
+
+
+# trials can be compared with monkey
+ds=[np.linalg.norm(d) for d in tasks1]
+ds=sorted(ds)
+
+ds=[d if d<2 else None  for d in ds]
+plt.plot(ds)
+
+
+
+

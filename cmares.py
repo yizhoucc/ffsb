@@ -911,3 +911,9 @@ densities=sorted(pd.unique(df.floor_density))
 d=df[df.d]
 
 len(df[df.rewarded])/len(df)
+
+
+# human data, a vs h
+data_path=Path("Z:/human")
+theta,_,_=process_inv(data_path/'fixrhgroup', removegr=False)
+print('finished')

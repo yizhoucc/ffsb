@@ -30,8 +30,8 @@ import os
 
 
 print('loading data')
-datapath=Path("Z:/human/hgroup")
-savename=datapath.parent/('preall'+datapath.name)
+datapath=Path("Z:/human/woagroup")
+savename=datapath.parent/('fixr'+datapath.name)
 
 with open(datapath, 'rb') as f:
     states, actions, tasks = pickle.load(f)

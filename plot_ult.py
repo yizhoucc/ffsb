@@ -4150,6 +4150,76 @@ def plotoverhead(input,alpha=0.8,**kwargs):
     return ax
 
 
+def plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=None,color=color_settings['s'], label=None):
+    if ax:
+        for trial_i in indls:
+            xs=states[trial_i][:,0]
+            ys=states[trial_i][:,1]
+            ax.plot(-ys*400,xs*400, c=color, lw=1, ls='-',label=label,alpha=alpha)
+        return ax
+    with initiate_plot(4, 4, 300) as fig:
+        ax = fig.add_subplot(111)
+        ax.set_aspect('equal')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.axes.xaxis.set_ticks([]); ax.axes.yaxis.set_ticks([])
+        # ax.set_xlim([-235, 235]); ax.set_ylim([-2, 430])
+        x_temp = np.linspace(-235*3, 235*3)
+        ax.plot(x_temp, np.sqrt(1200**2 - x_temp**2), c='k', ls=':')
+        ax.text(-10, 425, s=r'$70\degree$', fontsize=fontsize)
+        ax.text(130, 150, s=r'$6 m$', fontsize=fontsize)
+        ax.plot(np.linspace(-230, -130), np.linspace(0, 0), c='k')
+        ax.plot(np.linspace(-230, -230), np.linspace(0, 100), c='k')
+
+        ax.text(-200, 100, s=r'$1 m$', fontsize=fontsize)
+        ax.text(-100, 0, s=r'$1 m$', fontsize=fontsize)
+        # ax.plot(np.linspace(0, 1200 ),
+        #         np.tan(np.deg2rad(55)) * np.linspace(0, 600) - 10, c='k', ls=':')
+                
+        goal=plt.Circle(np.array(tasks[indls[0]])@np.array([[0,1],[-1,0]])*400,65,color=color_settings['goal'], edgecolor='none',alpha=alpha,label='target')
+        ax.add_patch(goal)
+        for trial_i in indls:
+            xs=states[trial_i][:,0]
+            ys=states[trial_i][:,1]
+            ax.plot(-ys*400,xs*400, c=color, lw=1, ls='-',label=label,alpha=alpha)
+    return ax
+            
+
+def plotoverheadhuman_compare(data1,data2,alpha=0.8,fontsize=5):
+    with initiate_plot(1.8, 1.8, 300) as fig:
+        ax = fig.add_subplot(111)
+        ax.set_aspect('equal')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.axes.xaxis.set_ticks([]); ax.axes.yaxis.set_ticks([])
+        # ax.set_xlim([-235, 235]); ax.set_ylim([-2, 430])
+        x_temp = np.linspace(-235*3, 235*3)
+        ax.plot(x_temp, np.sqrt(1200**2 - x_temp**2), c='k', ls=':')
+        ax.text(-10, 425, s=r'$70\degree$', fontsize=fontsize)
+        ax.text(130, 150, s=r'$6 m$', fontsize=fontsize)
+        ax.plot(np.linspace(-230, -130), np.linspace(0, 0), c='k')
+        ax.plot(np.linspace(-230, -230), np.linspace(0, 100), c='k')
+
+        ax.text(-200, 100, s=r'$1 m$', fontsize=fontsize)
+        ax.text(-100, 0, s=r'$1 m$', fontsize=fontsize)
+        # ax.plot(np.linspace(0, 1200 ),
+        #         np.tan(np.deg2rad(55)) * np.linspace(0, 600) - 10, c='k', ls=':')
+                
+        goal=plt.Circle(np.array(data1['task'][0])@np.array([[0,1],[-1,0]])*400,65,color=color_settings['goal'], facecolor='none',alpha=alpha,label='target')
+        ax.add_patch(goal)
+        for trial_i in range(data1['num_trials']):
+            data1['agent_states'][trial_i][:,0]=data1['agent_states'][trial_i][:,0]-data1['agent_states'][trial_i][0,0]
+            data1['agent_states'][trial_i][:,1]=data1['agent_states'][trial_i][:,1]-data1['agent_states'][trial_i][0,1]
+            ax.plot(-data1['agent_states'][trial_i][:,1]*400,data1['agent_states'][trial_i][:,0]*400, c=color_settings['s'], lw=0.1, ls='-')
+            data2['agent_states'][trial_i][:,0]=data2['agent_states'][trial_i][:,0]-data2['agent_states'][trial_i][0,0]
+            data2['agent_states'][trial_i][:,1]=data2['agent_states'][trial_i][:,1]-data2['agent_states'][trial_i][0,1]
+            ax.plot(-data2['agent_states'][trial_i][:min(data2['agent_states'][trial_i][:,1].shape[0],data1['agent_states'][trial_i][:,1].shape[0])-1,1]*400,data2['agent_states'][trial_i][:min(data2['agent_states'][trial_i][:,1].shape[0],data1['agent_states'][trial_i][:,1].shape[0])-1,0]*400, c=color_settings['model'], lw=0.1, ls='-')
+            
+
 def plotoverhead_mk(indls, alpha=0.3,**kwargs):
     pathcolor='gray' if 'color' not in kwargs else kwargs['color'] 
     fontsize = 9

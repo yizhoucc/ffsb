@@ -1134,3 +1134,21 @@ class MonkeyDataExtractor():
 #     monkey_action_distribution(df)
 
 
+
+
+'''
+
+
+some concern about using the data where human stop - move = stop - move. 
+when i try the task, i would do that to probe the gain of the task. so, when i move for a short time (it would be around 1 dt), i predict how far i would move and observe the optical flow. when i stop, im not expecting to reach the target, but to give myself some time to process the previous infomation (to estimate the gain, such that improve my next prediction).
+as a result, the stop period could confuse the model. luckly its usually very short, and got diluted by the move period. if this is important, we can clean the data and throw those trials out.
+
+some side thought about learning
+so when first doing this task, we are 'fully' rely on the obs.
+besides integrate obs when updating the belief, we also use obs to refine our prediction.
+lets assume no prediction. obs is certered around truth, so subjet would stop around truth, at least in forward direction.
+now assume gain is learned from belief. so it will be dblief/dt/action.
+if this is true, then we will still have the stops center aroudn the truth
+but this is not true. we do see stop distribution is biased.
+so why is that?
+'''

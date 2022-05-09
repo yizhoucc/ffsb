@@ -140,7 +140,8 @@ plt.rcParams['svg.fonttype'] = 'none'
         }
         with suppress():
             resmk=trial_data(inputmk)
-
+    
+    # plotoverheadhuman(resmk,resirc)
     plotv_fill(indls,resirc,actions=actions)
     plotw_fill(indls,resirc,actions=actions)
 
@@ -165,7 +166,7 @@ plt.rcParams['svg.fonttype'] = 'none'
             'use_mk_data':False}
         with suppress():
             resirc=trial_data(inputirc)
-        plotoverhead(resirc)
+        # plotoverhead(resirc)
         inputmk={
             'agent':agent,
             'theta':theta,
@@ -182,11 +183,12 @@ plt.rcParams['svg.fonttype'] = 'none'
         }
         with suppress():
             resmk=trial_data(inputmk)
-        plotoverhead(resmk)
+        # plotoverhead(resmk)
         # ax=plotctrl(resmk, color=['blue','orangered'],prefix='monkey')
 
     # plotv(indls,resmk,actions=actions)
     # plotw(indls,resmk,actions=actions)
+    plotoverheadhuman(resmk,resirc)
     plotv_fill(indls,resmk,actions=actions)
     plotw_fill(indls,resmk,actions=actions)
     

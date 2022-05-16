@@ -1,6 +1,5 @@
 # ploting related to just raw data, no irc or agent involved
 
-from dummy_threading import ThreadError
 import pickle
 from plot_ult import plotpert, quickoverhead, similar_trials, similar_trials2this, smooth
 from FireflyEnv import ffacc_real

@@ -39,10 +39,35 @@ plt.rcParams['svg.fonttype'] = 'none'
     # 4. validation in other (perturbation) trials
 
     # 4.1 overhead path of agent vs monkey in a perturbation trial, path similar
-    # check agent proformance
-    agent_=TD3.load('trained_agent/paper.zip')
+    # check agent performance
+    print('loading data')
+    datapath=Path("Z:\\human\\hgroup")
+    with open(datapath,'rb') as f:
+        states, actions, tasks = pickle.load(f)
+    print('done process data')
+
+
+    agent_=TD3.load('trained_agent/humancost.zip')
     agent=agent_.actor.mu.cpu()
 
+    ind=np.random.randint(low=0, high=len(tasks))
+    env.reset(phi=phi, theta=theta, goal_position=tasks[ind],vctrl=0., wctrl=0.)
+    epactions,epbliefs,epbcov,epstates=run_trial(agent,env,given_action=None, given_state=None, action_noise=0.1)
+    plt.plot((torch.stack(epactions)))
+    plt.ylim(-1,1.1)
+    plt.show()
+
+    plt.plot((torch.cat(epstates,1)).T[:,0],(torch.cat(epstates,1)).T[:,1])
+    plt.scatter(tasks[ind][0],tasks[ind][1])
+    plt.axis('equal')
+
+
+
+
+    agent_=TD3.load('trained_agent/paper.zip')
+    agent=agent_.actor.mu.cpu()
+    # with open('paper', 'wb+') as f:
+    #     pickle.dump(agent, f, protocol=pickle.HIGHEST_PROTOCOL)
     indls=np.random.randint(low=0, high=len(tasks),size=(30,))
     inputirc={
             'agent':agent,
@@ -104,6 +129,7 @@ plt.rcParams['svg.fonttype'] = 'none'
 
     # IRC on its own---------------------------------------------------
     ind=torch.randint(low=0,high=len(tasks),size=(1,))
+
     indls=similar_trials(ind, tasks, actions)
     indls=indls[:10]
     with torch.no_grad():
@@ -140,22 +166,23 @@ plt.rcParams['svg.fonttype'] = 'none'
         }
         with suppress():
             resmk=trial_data(inputmk)
-    
-    # plotoverheadhuman(resmk,resirc)
+
+    plotoverheadhuman(indls,states,tasks,)
+    plotoverheadhuman_compare(resirc,resmk)
     plotv_fill(indls,resirc,actions=actions)
     plotw_fill(indls,resirc,actions=actions)
 
 
-    #  IRC iven mk states--------------------------------------------------
+    #  IRC given mk states--------------------------------------------------
     ind=torch.randint(low=0,high=len(tasks),size=(1,))
-    indls=similar_trials(ind, tasks, actions)
+    indls=similar_trials(ind, tasks, actions,ntrial=5)
     with torch.no_grad():
         inputirc={
             'agent':agent,
             'theta':theta,
             'phi':phi,
             'env': env,
-            'num_trials':10,
+            'num_trials':5,
             'task':[tasks[i] for i in indls],
             'mkdata':{
                             'trial_index': indls,               
@@ -172,7 +199,7 @@ plt.rcParams['svg.fonttype'] = 'none'
             'theta':theta,
             'phi':phi,
             'env': env,
-            'num_trials':10,
+            'num_trials':5,
             'mkdata':{
                             'trial_index': indls,               
                             'task': tasks,                 
@@ -188,7 +215,8 @@ plt.rcParams['svg.fonttype'] = 'none'
 
     # plotv(indls,resmk,actions=actions)
     # plotw(indls,resmk,actions=actions)
-    plotoverheadhuman(resmk,resirc)
+    plotoverheadhuman(indls,states,tasks,)
+    plotoverheadhuman_compare(resirc,resmk)
     plotv_fill(indls,resmk,actions=actions)
     plotw_fill(indls,resmk,actions=actions)
     
@@ -285,7 +313,7 @@ overheaddf_path(df,list(range(1000)))
 
 
 # fig2, training vs time
-agentcommon='rpaper_'
+agentcommon='rerere_52000_6_6_18_30_2_'
 log=[]
 for i in range(1,3,1):
     # load the agent check points
@@ -412,7 +440,7 @@ with initiate_plot(3, 2, 300) as fig, warnings.catch_warnings():
 
 
 
-# slice pc -----------------------------------------------------
+# slice pc ----------------------------------------------------------------------------
 print('loading data')
 datapath=Path("Z:\\bruno_pert\\packed")
 with open(datapath,'rb') as f:
@@ -451,7 +479,7 @@ score, evectors, evals = pca(np.asfarray(alltheta))
 x=score[:,0] # pc1
 y=score[:,1] # pc2
 z=logllsall
-npixel=33
+npixel=9
 
 finalcov=log[-1][0]._C
 realfinalcov=np.cov(np.array([l[0] for l in log[-1][2]]).T)
@@ -520,11 +548,11 @@ norma-=np.min(norma)
 # plt.contourf(norma)
 
 
-with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
+with initiate_plot(3, 3, 300) as fig, warnings.catch_warnings():
     warnings.simplefilter('ignore')
     ax = fig.add_subplot(111)
     plot_cov_ellipse(pccov[:2,:2], pcfinaltheta[:2], alpha=1,nstd=1,ax=ax, edgecolor=[1,1,1])
-    im=ax.contourf(X,Y,-newa,cmap='jet')
+    im=ax.contourf(X[:,3:],Y[:,3:],-newa[:,3:],cmap='jet')
     # c = add_colorbar(im)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -537,11 +565,20 @@ with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
     c.set_label('normalized likelihood')
     # c.set_ticks([min((loglls)),max((loglls))])
     c.ax.locator_params(nbins=4)
-    ax.set_xlim(xlow,xhigh)
+    ax.set_xlim(-0.05,xhigh)
     ax.set_ylim(ylow,yhigh)
     ax.plot(allthetameanspc[:,0],allthetameanspc[:,1])
 
+    try:
+        groundtruthpc=(groundtruth-allthetamu)@np.array(v)@np.linalg.inv(np.diag(s))
+        ax.scatter(groundtruthpc[0],groundtruthpc[1],color='k')
+    except NameError:
+        pass
 
+
+
+plt.imshow(a)
+plt.imshow(a[:,3:])
 
 
 
@@ -715,3 +752,95 @@ def sample_trials(agent, env, theta, phi, thistask, initv=0.,initw=0., action_no
     return return_dict
 
 
+
+# likelihood of trial overhead. check fit quanlity and change in strategy--------------------------------
+ntargets=333
+ntrial=3
+indls=np.random.randint(low=0, high=len(tasks),size=(ntargets,))
+newindls=[similar_trials(i,tasks,ntrial=ntrial) for i in indls]
+# plt.scatter(tasks[indls,0],tasks[indls,1],s=2)
+plt.scatter(tasks[:,0],tasks[:,1],s=2)
+for l in newindls:
+    plt.scatter(tasks[l,0],tasks[l,1],s=2,color='orange')
+
+res=llmap(newindls, agent, actions, tasks, phi, theta, env, action_var=0.01, num_iteration=1, states=states)
+
+def llmap(indls, agent, actions, tasks, phi, theta, env, action_var=0.01, num_iteration=1, states=states, samples=5,gpu=False):
+    res=[]
+    for inds in indls:
+        subactions=[actions[i] for i in inds]
+        subtasks=[tasks[i] for i in inds]
+        substates=[states[i] for i in inds]
+        with torch.no_grad():
+            ll=monkeyloss_(agent, subactions, subtasks, phi, theta, env, action_var=action_var,num_iteration=num_iteration, states=substates, samples=samples,gpu=gpu).item()
+        res.append(ll)
+    return res
+
+with initiate_plot(3,3,300) as fig:
+    ax=fig.add_subplot(111)
+    c=ax.scatter(tasks[indls,0],tasks[indls,1],c=res,s=10)
+    plt.colorbar(c, label='- log likelihood')
+
+        
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    # ax.axes.xaxis.set_ticks([0,0.5,1])
+    ax.set_xlabel('world x [2m]')
+    ax.set_ylabel('world y [2m]' )
+    ax.set_aspect('equal')
+
+
+
+
+# check cluster inverse res -------------------------------------------------------------------------
+folder=Path('C:/Users/24455/Desktop')
+finaltheta,finalcov,err=process_inv(folder/'paperhgroup')
+
+# plot asd vs healthy theta in one same hist plot------------------------------------------------
+logls=[folder/'testk8hgroup', folder/'testk8agroup']
+monkeynames=[ 'paperh','papera',]
+
+mus,covs,errs=[],[],[]
+for inv in logls:
+    finaltheta,finalcov, err=process_inv(inv)
+    mus.append(finaltheta.view(-1))
+    covs.append(finalcov)
+    errs.append(err)
+
+
+ax=multimonkeytheta(monkeynames, mus, covs, errs, shifts=[-0.2,0.2])
+ax.set_yticks([0,1,2])
+ax.get_figure()
+
+
+
+folder=Path('Z:/human')
+logls = sorted(list(folder.glob("*")), key=os.path.getatime,reverse=True)
+logls=[l  for l in logls if os.path.isfile(l) and os.path.getsize(l)>>10<1024 ]
+
+
+invs=[logls[2],logls[5]]
+mus,covs,errs=[],[],[]
+for inv in invs:
+    finaltheta,finalcov, err=process_inv(inv)
+    mus.append(finaltheta.view(-1))
+    covs.append(finalcov)
+    errs.append(err)
+
+ax=multimonkeytheta([l.name for l in invs], mus, covs, errs)
+ax.set_yticks([0,1,2])
+ax.get_figure()
+
+
+
+
+
+
+print('loading data')
+datapath=Path("Z:\\human\\hgroup")
+with open(datapath,'rb') as f:
+    states, actions, tasks = pickle.load(f)
+print('done process data')
+
+
+#

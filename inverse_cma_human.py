@@ -27,25 +27,8 @@ import ray
 from pathlib import Path
 arg = Config()
 import os
-
-
-print('loading data')
-datapath=Path("Z:/human/woagroup")
-savename=datapath.parent/('fixr'+datapath.name)
-
-with open(datapath, 'rb') as f:
-    states, actions, tasks = pickle.load(f)
-
-print('done loading data')
-
-# decide if to continue
-optimizer=None
-log=[]
-if savename.is_file():
-    print('continue on previous inverse...')
-    with open(savename, 'rb') as f:
-        log = pickle.load(f)
-    optimizer=log[-1][0]
+from timeit import default_timer as timer
+from plot_ult import xy2pol
 
 env=ffacc_real.FireFlyPaper(arg)
 phi=torch.tensor([[1],
@@ -62,6 +45,39 @@ phi=torch.tensor([[1],
     ])
 agent_=TD3.load('trained_agent/paper.zip')
 agent=agent_.actor.mu.cpu()
+
+
+print('loading data')
+datapath=Path("Z:/human/hgroup")
+savename=datapath.parent/('subinvside'+datapath.name)
+
+with open(datapath, 'rb') as f:
+    states, actions, tasks = pickle.load(f)
+
+res=[]
+for task in tasks:
+    d,a=xy2pol(task, rotation=False)
+    # if  env.min_angle/2<=a<env.max_angle/2:
+    if a<=env.min_angle*0.7 or a>=env.max_angle*0.7:
+        res.append(task)
+tasks=np.array(res)
+
+
+# states, actions, tasks=states[:500], actions[:500], tasks[:500]
+
+print('done loading data')
+
+# decide if to continue
+optimizer=None
+log=[]
+if savename.is_file():
+    print('continue on previous inverse...')
+    with open(savename, 'rb') as f:
+        log = pickle.load(f)
+    optimizer=log[-1][0]
+else:
+    print('starting new inverse ...')
+
 
 
 # use localhost
@@ -97,12 +113,14 @@ if not optimizer:
 
 
 for generation in range(len(log),len(log)+99):
+    start=timer()
     solutions = []
     xs=[]
     for _ in range(optimizer.population_size):
         x = optimizer.ask().astype('float32')
         xs.append(x)
     solutions=ray.get([getlogll.remote(p) for p in xs])
+    
     solutions=[[x,s] for x,s in zip(xs,solutions)]
     optimizer.tell(solutions)
     log.append([copy.deepcopy(optimizer), xs, solutions])
@@ -111,6 +129,7 @@ for generation in range(len(log),len(log)+99):
     # plt.show()
     with open(savename, 'wb') as handle:
         pickle.dump(log, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    print('done, ',timer()-start)
     print("generation: ",generation)
     print(["{0:0.2f}".format(i) for i in optimizer._mean])
     print(["{0:0.2f}".format(i) for i in np.diag(optimizer._C)**0.5])

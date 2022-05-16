@@ -1,6 +1,5 @@
 # plotting of immedite inverse result, using cmaes.
 
-from turtle import color
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
@@ -43,6 +42,7 @@ for inv in invres:
     finaltheta,finalcov,err=process_inv(inv)
     print(inv, finaltheta)
     theta_bar(finaltheta,finalcov,err=err)
+    # theta_bar(finaltheta,finalcov)
 
 # bar plots of inferred theta -----------------------------------------------
 
@@ -119,8 +119,13 @@ plt.ylabel('parameter value')
 
 
 # converge and heatmaps plot ---------------------------------------------------
-
-# pca space of all samples
+with open('Z:/simulation/invbliefsimulationpert100','rb') as f:
+    log=pickle.load(f)
+path=Path('Z:/simulation')
+datafile=path/'simulation500'
+with open(datafile, 'rb') as f:
+    _, _, _, groundtruth = pickle.load(f)
+# pca space of all samples ---------------------------------------------------
 res=[l[2] for l in log]
 allsamples=[]
 alltheta=[]
@@ -138,6 +143,14 @@ projectedparam=torch.pca_lowrank(torch.tensor(alltheta),2)
 transition=projectedparam[2] # the V
 projectedparamall=projectedparam[0] # the U
 
+allthetamu=np.mean(0,alltheta)
+centeralltheta=alltheta-allthetamu
+u,s,v=torch.pca_lowrank(torch.tensor(centeralltheta),2)
+# u[0]@torch.diag(s)@v.T+allthetamu
+# alltheta[0]
+# (alltheta[1]-allthetamu)@np.array(v)@np.linalg.inv(np.diag(s))
+# u[1]
+
 mu=torch.mean(projectedparamall,axis=0)
 aroundsolution=allsamples[:len(allsamples)//2]
 aroundsolution.sort(key=lambda x: x[0])
@@ -148,23 +161,34 @@ pccov=transition.T@torch.tensor(np.cov(alltheta.T)).float()@transition
 with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
     warnings.simplefilter('ignore')
     ax = fig.add_subplot(111)
-    plot_cov_ellipse(pccov, mu, alpha_factor=1,nstd=1,ax=ax)
+    plot_cov_ellipse(pccov, mu, alpha=1,nstd=1,ax=ax)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    s = ax.scatter(projectedparamall[:,0], projectedparamall[:,1], c=(logllsall),alpha=0.5,edgecolors='None', cmap='jet')
+    scatters = ax.scatter(projectedparamall[:,0], projectedparamall[:,1], c=(logllsall),alpha=0.5,edgecolors='None', cmap='jet')
     ax.set_xlabel('projected parameters')
     ax.set_ylabel('projected parameters')
-    c = fig.colorbar(s, ax=ax)
+    c = fig.colorbar(scatters, ax=ax)
     ax.locator_params(nbins=3, axis='y')
     ax.locator_params(nbins=3, axis='x')
     # c.clim(min(np.log(loglls)), max(np.log(loglls))) 
     c.set_label('- log likelihood')
     # c.set_ticks([min((loglls)),max((loglls))])
     c.ax.locator_params(nbins=4)
+    # plot ground truth for simulation
+    try:
+        groundtruthpc=(groundtruth-allthetamu)@np.array(v)@np.linalg.inv(np.diag(s))
+        ax.scatter(groundtruthpc[0],groundtruthpc[1],color='k')
+    except NameError:
+        pass
 
 
 
-# conditional uncertainty
+
+pcaedxy=(groundtruth-torch.mean(torch.tensor(alltheta),0))@transition
+
+pcaedxy@torch.inverse(transition).T+torch.mean(torch.tensor(alltheta))
+
+# conditional uncertainty -------------------------------------------------------
 # case 0, use math
 # two monkey theta hist and confidence hist
 # compare 2 monkeys
@@ -211,7 +235,8 @@ theta_bar(st,sc )
 
 corr=correlation_from_covariance(cov)
 
-# covariance heatmap
+
+# covariance heatmap -----------------------------------------------------
 inds=[1, 3, 5, 7, 0, 2, 4,6, 8, 9]
 theta_names=theta_names[:6]+theta_names[-4:]
 theta_mean=theta_mean[:6]+theta_mean[-4:]
@@ -229,7 +254,7 @@ with initiate_plot(5,5,300) as fig:
     plt.xticks(x_pos, [theta_names[i] for i in inds],rotation=45,ha='right')
     
 
-# correlation heatmap
+# correlation heatmap -----------------------------------------------------
 b=torch.diag(torch.tensor(cov),0)
 S=torch.diag(torch.sqrt(b))
 Sinv=torch.inverse(S)
@@ -247,7 +272,7 @@ with initiate_plot(5,5,300) as fig:
     plt.xticks(x_pos, [theta_names[i] for i in inds],rotation=45,ha='right')
 
 
-# eig cov heatmap
+# eig cov heatmap -----------------------------------------------------
 ev, evector=torch.eig(torch.tensor(cov),eigenvectors=True)
 ev=ev[:,0]
 ev,esortinds=ev.sort(descending=False)
@@ -333,7 +358,7 @@ theta_bar(bt,bc,ax=ax, label='bruno',width=0.5,shift=0.2, err=bci)
 ax.get_figure()
 
 
-# plot multi monkey theta in one same hist plot
+# plot multi monkey theta in one same hist plot------------------------------------------------
 logls=[
     Path('Z:/bruno_pert/cmafull_b_pert'),
     Path('Z:/schro_pert/cmafull_packed_schro_pert'),
@@ -352,6 +377,7 @@ for inv in logls:
 ax=multimonkeytheta(monkeynames, mus, covs, errs, )
 ax.set_yticks([0,1,2])
 ax.get_figure()
+
 
 
 # multi monkey first eig vector
@@ -917,3 +943,9 @@ len(df[df.rewarded])/len(df)
 data_path=Path("Z:/human")
 theta,_,_=process_inv(data_path/'fixrhgroup', removegr=False)
 print('finished')
+
+# simulation data
+data_path=Path("Z:/simulation")
+theta,_,_=process_inv(data_path/'invbliefsimulationpert100', removegr=False)
+
+

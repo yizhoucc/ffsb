@@ -20,7 +20,7 @@ arg.dev_w_cost_range= [0.01,1.]
 arg.gains_range =[0.1,1.5,pi/2-0.6,pi/2+0.6]
 arg.goal_radius_range=[0.129,0.131]
 arg.std_range = [0.01,2,0.01,2]
-arg.reward_amount=100
+arg.reward_amount=10
 arg.terminal_vel = 0.05
 arg.dt=0.1
 arg.episode_len=50
@@ -33,8 +33,8 @@ env.no_skip=True
 n_actions = env.action_space.shape[-1]
 action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.5 * np.ones(n_actions))        
 modelname=None
-modelname='rerere_52000_6_6_18_30_2_20'
-note='8' 
+modelname='humancost'
+note='end' 
 from stable_baselines3 import TD3
 
 if modelname is None:
@@ -54,36 +54,37 @@ if modelname is None:
         policy_delay = 6,
         # target_policy_noise = 0.2,
         # target_noise_clip = 0.5,
-        tensorboard_log = None,
+        tensorboard_log = "./Tensorboard/{}{}".format(note,modelname),
         # create_eval_env = False,
         policy_kwargs = {'net_arch':[64,64],'activation_fn':torch.nn.ReLU},
         verbose = 0,
         seed = 42,
         # device = "cuda",
         )
-    train_time=52000
+    train_time=220000
     for i in range(1,200):  
-        env.reward_ratio=1
+        env.reward_ratio=0
         env.noise_scale=1
         env.cost_scale=min(0.003*i,0.03)
         if i==1:
-            for j in range(1,11): 
+            for j in range(4,11): 
                 # arg.std_range = [0.01,0.1*j,0.01,0.1*j]
                 env.terminal_vel=(11-j)*0.05
-                env.noise_scale=0.1*j
-                env.cost_scale=0.0
-                namestr= ("trained_agent/pre_{}_{}_{}_{}_{}_{}".format(note,train_time,j,
-                str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
-                ))
+                env.noise_scale=1
+                env.cost_scale=0.05
+                namestr= ("trained_agent/stop_{}_{}_{}_{}_{}_{}".format(note,train_time,j,
+                str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)))
+                model.tensorboard_log='./Tensorboard/'+'stop_{}_{}'.format(note,j)
                 model.learn(train_time)
                 model.save(namestr)
+
         namestr= ("trained_agent/{}_{}_{}_{}_{}_{}".format(note,train_time,i,
         str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)
         ))
         model.learn(train_time)
         model.save(namestr)
 else:
-    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.3 * np.ones(n_actions))  
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.4 * np.ones(n_actions))  
     model = TD3.load('./trained_agent/'+modelname,
             env,
             train_freq = 4,
@@ -106,16 +107,28 @@ else:
             seed = 42,
             # device = "cuda",
             )
-    for i in range(1,200): 
-        env.reward_ratio=1
+    for i in range(5,200): 
+        env.reward_ratio=0
         env.noise_scale=1
-        train_time=520000
-        env.cost_scale=min(0.002*i,0.1)
-        j=9
-        env.terminal_vel=(11-j)*0.05
-        env.noise_scale=0.1*j
+        train_time=220000
+        env.cost_scale=min(0.01*i,0.1)
+        env.noise_scale=1
+        env.terminal_vel=0.1
+        
+        if i==1:
+            for j in range(7,11): 
+                # arg.std_range = [0.01,0.1*j,0.01,0.1*j]
+                env.terminal_vel=(11-j)*0.05
+                env.noise_scale=1
+                env.cost_scale=0.05
+                namestr= ("trained_agent/stop_{}_{}_{}_{}_{}_{}".format(note,train_time,j,
+                str(time.localtime().tm_mday),str(time.localtime().tm_hour),str(time.localtime().tm_min)))
+                model.tensorboard_log='./Tensorboard/'+'stop_{}_{}'.format(note,j)
+                model.learn(train_time)
+                model.save(namestr)
 
         namestr= ("trained_agent/{}{}_{}".format(note,modelname,i))
+        model.tensorboard_log=namestr
         model.learn(train_time)
         model.save(namestr)
 

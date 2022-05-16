@@ -3331,10 +3331,7 @@ def cart2pol(*args):
 
 
 def xy2pol(*args, rotation=True): # rotated for the task
-    if type(args[0])==list or type(args[0])==np.array:
-        x=args[0][0]; y=args[0][1]
-    else:
-        x=args[0]; y=args[1]
+    x=args[0][0]; y=args[0][1]
     d = np.sqrt(x**2 + y**2)
     a = np.arctan2(y, x)+pi/2 if rotation else  np.arctan2(y, x)
     return d, a
@@ -4157,7 +4154,7 @@ def plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=None,color=colo
             ys=states[trial_i][:,1]
             ax.plot(-ys*400,xs*400, c=color, lw=1, ls='-',label=label,alpha=alpha)
         return ax
-    with initiate_plot(4, 4, 300) as fig:
+    with initiate_plot(3, 3, 300) as fig:
         ax = fig.add_subplot(111)
         ax.set_aspect('equal')
         ax.spines['top'].set_visible(False)
@@ -4188,7 +4185,7 @@ def plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=None,color=colo
             
 
 def plotoverheadhuman_compare(data1,data2,alpha=0.8,fontsize=5):
-    with initiate_plot(1.8, 1.8, 300) as fig:
+    with initiate_plot(3, 3, 300) as fig:
         ax = fig.add_subplot(111)
         ax.set_aspect('equal')
         ax.spines['top'].set_visible(False)
@@ -4214,10 +4211,10 @@ def plotoverheadhuman_compare(data1,data2,alpha=0.8,fontsize=5):
         for trial_i in range(data1['num_trials']):
             data1['agent_states'][trial_i][:,0]=data1['agent_states'][trial_i][:,0]-data1['agent_states'][trial_i][0,0]
             data1['agent_states'][trial_i][:,1]=data1['agent_states'][trial_i][:,1]-data1['agent_states'][trial_i][0,1]
-            ax.plot(-data1['agent_states'][trial_i][:,1]*400,data1['agent_states'][trial_i][:,0]*400, c=color_settings['s'], lw=0.1, ls='-')
+            ax.plot(-data1['agent_states'][trial_i][:,1]*400,data1['agent_states'][trial_i][:,0]*400, c=color_settings['s'], lw=1, ls='-')
             data2['agent_states'][trial_i][:,0]=data2['agent_states'][trial_i][:,0]-data2['agent_states'][trial_i][0,0]
             data2['agent_states'][trial_i][:,1]=data2['agent_states'][trial_i][:,1]-data2['agent_states'][trial_i][0,1]
-            ax.plot(-data2['agent_states'][trial_i][:min(data2['agent_states'][trial_i][:,1].shape[0],data1['agent_states'][trial_i][:,1].shape[0])-1,1]*400,data2['agent_states'][trial_i][:min(data2['agent_states'][trial_i][:,1].shape[0],data1['agent_states'][trial_i][:,1].shape[0])-1,0]*400, c=color_settings['model'], lw=0.1, ls='-')
+            ax.plot(-data2['agent_states'][trial_i][:min(data2['agent_states'][trial_i][:,1].shape[0],data1['agent_states'][trial_i][:,1].shape[0])-1,1]*400,data2['agent_states'][trial_i][:min(data2['agent_states'][trial_i][:,1].shape[0],data1['agent_states'][trial_i][:,1].shape[0])-1,0]*400, c=color_settings['model'], lw=1, ls='-')
             
 
 def plotoverhead_mk(indls, alpha=0.3,**kwargs):
@@ -4718,7 +4715,7 @@ def theta_bar(finaltheta,finalcov=None,xlabels=theta_names,err=None, ax=None, la
         if ax is None:
             ax = fig.add_subplot(111)
         # Create bars and choose color
-        ax.bar([i+shift for i in range(len(xlabels))], finaltheta,width,yerr=err,label=label, color=color)
+        ax.bar([i+shift for i in range(len(finaltheta))], finaltheta.view(-1),width,yerr=err,label=label, color=color)
         # title and axis names
         ax.set_ylabel('inferred parameter value')
         ax.set_xticks([i for i in range(len(xlabels))])
@@ -4996,6 +4993,7 @@ def get_ci(log, low=5, high=95, threshold=2):
     upper_ci=[np.percentile(alltheta[:,i],high) for i in range(alltheta.shape[1])]
     asymmetric_error = np.array(list(zip(lower_ci, upper_ci))).T
     res=np.array([ np.abs(mean.T-asymmetric_error[0,:] ), np.abs(asymmetric_error[1,:]-mean.T) ] )
+    # res=asymmetric_error
     return res
     
 
@@ -5153,28 +5151,31 @@ def process_inv(res, removegr=True, ci=5):
     print(res)
     with open(res, 'rb') as f:
         log = pickle.load(f)
-    finalcov=torch.tensor(log[-1][0]._C)
+    finalcov=torch.tensor(log[-1][0]._C).float()
     finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
     theta=torch.cat([finaltheta[:6],finaltheta[-4:]])
     cov = finalcov[torch.arange(finalcov.size(0))!=6] 
     cov = cov[:,torch.arange(cov.size(1))!=6] 
-    cirange=get_ci(log, low=ci, high=100-ci)
+    cirange=get_ci(log, low=ci, high=100-ci).astype('float32')
     if removegr:
         return theta, cov, np.delete(cirange,(6),axis=1)
     return finaltheta, finalcov, cirange
 
 
-def multimonkeytheta(monkeynames, mus, covs, errs, ):
+def multimonkeytheta(monkeynames, mus, covs, errs, shifts=None):
     nmonkey=len(monkeynames)
     basecolor=color_settings['a']
     colorrgb=hex2rgb(basecolor)
     colorlist=colorshift(colorrgb, [0,-1,1],0.3, nmonkey)
-    shifts=np.linspace(-1/nmonkey,1/nmonkey,nmonkey)
+    if shifts is None:
+        shifts=np.linspace(-1/(nmonkey),1/(nmonkey),nmonkey)
+    if nmonkey==2:
+        shifts=[-0.15,0.15]
     for i in range(nmonkey):
         if i==0:
-            ax=theta_bar(mus[i],covs[i], label=monkeynames[i],width=1/nmonkey,shift=shifts[i], err=errs[i], color=colorlist[i])
+            ax=theta_bar(mus[i],covs[i], label=monkeynames[i],width=1/(nmonkey+1),shift=shifts[i], err=errs[i], color=colorlist[i])
         else:
-            theta_bar(mus[i],covs[i],ax=ax, label=monkeynames[i],width=1/nmonkey,shift=shifts[i], err=errs[i],color=colorlist[i])
+            theta_bar(mus[i],covs[i],ax=ax, label=monkeynames[i],width=1/(nmonkey+1),shift=shifts[i], err=errs[i],color=colorlist[i])
     return ax
 
 

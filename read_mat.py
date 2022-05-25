@@ -130,3 +130,29 @@ def get_task_info(data,subject_index, trial_index,goal_radius):
     wgain=data[subject_index][trial_index]['prs']['wmax']
 
 
+
+
+
+s='x.xxxxx.x.'
+s='.x..x'
+s='xxxx'
+
+p=3
+cur=0
+res=0
+for c in s:
+    # print('pre',c,cur,res)
+    if cur!=0:
+        cur+=1
+        if cur>=p:
+            cur=0
+            
+    elif cur==0 and c=='x':
+        res+=1
+        cur+=1
+    print('post',c,cur,res)
+    
+print(res)
+
+
+

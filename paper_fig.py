@@ -21,8 +21,6 @@ from pathlib import Path
 from plot_ult import *
 from stable_baselines3 import TD3
 import matplotlib
-
-torch.manual_seed(42)
 matplotlib.rcParams['pdf.fonttype'] = 42
 plt.rcParams['svg.fonttype'] = 'none'
 
@@ -795,6 +793,7 @@ with initiate_plot(3,3,300) as fig:
 # check cluster inverse res -------------------------------------------------------------------------
 folder=Path('C:/Users/24455/Desktop')
 finaltheta,finalcov,err=process_inv(folder/'paperhgroup')
+
 
 # plot asd vs healthy theta in one same hist plot------------------------------------------------
 logls=[folder/'testk8hgroup', folder/'testk8agroup']

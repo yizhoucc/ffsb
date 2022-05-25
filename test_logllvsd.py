@@ -43,6 +43,7 @@ from plot_ult import run_trial, sample_all_tasks, initiate_plot
 env=ffacc_real.FireFlyPaper(arg)
 env.episode_len=50
 env.debug=1
+env.terminal_vel=0.1
 phi=torch.tensor([[1],
             [pi/2],
             [0.001],
@@ -83,12 +84,13 @@ tasks=np.array(tasks)
 # check tasks on map
 plt.scatter(gridmap[:,0],gridmap[:,1],s=2)
 plt.scatter(tasks[:,0],tasks[:,1],s=2)
-res=np.array(res)
-plt.scatter(res[:,0],res[:,1],s=2,color='orange')
+# res=np.array(res)
+# plt.scatter(res[:,0],res[:,1],s=2,color='orange')
 plt.axis('equal')
 len(tasks)
 
 groundtruth=env.reset_task_param()
+theta=env.reset_task_param()
 states, actions=[],[]
 perts=[]
 for task in tasks:
@@ -118,7 +120,7 @@ for task in tasks:
 
 def getlogll(states, actions, tasks):
     with torch.no_grad():
-        return  monkeyloss_(agent, actions, tasks, phi, groundtruth, env, action_var=0.001,num_iteration=1, states=states, samples=5,gpu=False,debug=True)
+        return  monkeyloss_(agent, actions, tasks, phi, theta, env, action_var=0.001,num_iteration=1, states=states, samples=9,gpu=False,debug=True)
 
 loglls=getlogll(states, actions, tasks)
 
@@ -128,7 +130,7 @@ loglls=getlogll(states, actions, tasks)
 
 with initiate_plot(9,3,300) as fig:
     ax=fig.add_subplot(131)
-    c=ax.scatter(tasks[:,0],tasks[:,1],c=loglls,s=10)
+    c=ax.scatter(tasks[:,0],tasks[:,1],c=loglls,s=10,cmap='bwr',norm=getcbarnorm(np.min(loglls), np.mean(loglls), np.max(loglls)))
     plt.colorbar(c, label='- log likelihood')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -139,7 +141,7 @@ with initiate_plot(9,3,300) as fig:
     ax.set_title('trial likelihoods')
 
     ax=fig.add_subplot(132)
-    c=ax.scatter(tasks[:,0],tasks[:,1],c=[len(a)/10 for a in actions],s=10)
+    c=ax.scatter(tasks[:,0],tasks[:,1],c=[len(a)/10 for a in actions],s=10,cmap='bwr',norm=getcbarnorm(np.min([len(a)/10 for a in actions]), np.mean([len(a)/10 for a in actions]), np.max([len(a)/10 for a in actions])))
     plt.colorbar(c, label='trial length [s]')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -150,7 +152,7 @@ with initiate_plot(9,3,300) as fig:
     ax.set_title('trial length')
 
     ax=fig.add_subplot(133)
-    c=ax.scatter(tasks[:,0],tasks[:,1],c=loglls/np.array([len(a)/10 for a in actions]),s=10)
+    c=ax.scatter(tasks[:,0],tasks[:,1],c=loglls/np.array([len(a)/10 for a in actions]),s=10,cmap='bwr',norm=getcbarnorm(np.min(loglls/np.array([len(a)/10 for a in actions])), np.mean(loglls/np.array([len(a)/10 for a in actions])), np.max(loglls/np.array([len(a)/10 for a in actions]))))
     plt.colorbar(c, label='1/trial length [s]')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -161,3 +163,18 @@ with initiate_plot(9,3,300) as fig:
     ax.set_title('trial d logll / dt')
     plt.tight_layout()
     plt.show()
+
+
+
+
+
+
+
+
+with open('sim_logll', 'wb+') as f:
+    pickle.dump(
+        [states, actions, tasks, loglls,],
+        f,  protocol=pickle.HIGHEST_PROTOCOL
+    )
+
+

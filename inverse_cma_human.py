@@ -30,6 +30,7 @@ import os
 from timeit import default_timer as timer
 from plot_ult import xy2pol
 
+
 env=ffacc_real.FireFlyPaper(arg)
 phi=torch.tensor([[1],
             [pi/2],
@@ -64,7 +65,6 @@ tasks=np.array(res)
 
 
 # states, actions, tasks=states[:500], actions[:500], tasks[:500]
-
 print('done loading data')
 
 # decide if to continue
@@ -135,5 +135,13 @@ for generation in range(len(log),len(log)+99):
     print(["{0:0.2f}".format(i) for i in np.diag(optimizer._C)**0.5])
     if optimizer.should_stop():
         print('stop at {}th generation'.format(str(generation)))
+
+
+
+
+
+
+
+
 
 

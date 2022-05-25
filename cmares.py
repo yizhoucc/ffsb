@@ -255,6 +255,7 @@ with initiate_plot(5,5,300) as fig:
     
 
 # correlation heatmap -----------------------------------------------------
+inds=[1, 3, 5, 7, 0, 2, 4,6, 8, 9]
 b=torch.diag(torch.tensor(cov),0)
 S=torch.diag(torch.sqrt(b))
 Sinv=torch.inverse(S)
@@ -359,6 +360,14 @@ ax.get_figure()
 
 
 # plot multi monkey theta in one same hist plot------------------------------------------------
+folder=Path("Z:/human/")
+invres = sorted(list(folder.glob("*")), key=os.path.getmtime,reverse=True)
+logls=['Z:/human/subinvsidehgroup','Z:/human/paperhgroup']
+monkeynames=['side', 'straight' ]
+
+logls=['Z:/human/fixragroup','Z:/human/clusterpaperhgroup']
+monkeynames=['ASD', 'Ctrl' ]
+
 logls=[
     Path('Z:/bruno_pert/cmafull_b_pert'),
     Path('Z:/schro_pert/cmafull_packed_schro_pert'),
@@ -369,14 +378,16 @@ monkeynames=['bruno', 'schro', 'victor', 'quigley']
 
 mus,covs,errs=[],[],[]
 for inv in logls:
-    finaltheta,finalcov, err=process_inv(inv)
+    finaltheta,finalcov, err=process_inv(inv,ind=60)
     mus.append(finaltheta)
     covs.append(finalcov)
     errs.append(err)
 
 ax=multimonkeytheta(monkeynames, mus, covs, errs, )
 ax.set_yticks([0,1,2])
+ax.plot(np.linspace(-1,9),[2]*50)
 ax.get_figure()
+
 
 
 
@@ -947,5 +958,14 @@ print('finished')
 # simulation data
 data_path=Path("Z:/simulation")
 theta,_,_=process_inv(data_path/'invbliefsimulationpert100', removegr=False)
+
+
+
+
+
+
+
+
+
 
 

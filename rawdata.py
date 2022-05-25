@@ -1,6 +1,7 @@
 # ploting related to just raw data, no irc or agent involved
 
 import pickle
+from re import A
 from plot_ult import plotpert, quickoverhead, similar_trials, similar_trials2this, smooth
 from FireflyEnv import ffacc_real
 from matplotlib.pyplot import xlabel
@@ -13,7 +14,6 @@ from scipy.stats import norm
 from pathlib import Path
 from rult import *
 from monkey_functions import *
-import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import stats
 from plot_ult import *
@@ -1049,6 +1049,8 @@ indls=similar_trials2this(tasks,task,ntrial=5)
 ax=plotoverheadhuman(indls,states,tasks,alpha=0.8,fontsize=5,ax=ax,color='orange',label='healthy wofb')
 ax.get_figure()
 
+
+
 # wofb healthy vs autism, overhead of similar trials
 datapath=Path("Z:/human/wohgroup")
 with open(datapath, 'rb') as f:
@@ -1278,7 +1280,6 @@ ax.get_figure()
 
 
 
-
 # trials can be compared with monkey
 ds=[np.linalg.norm(d) for d in tasks1]
 ds=sorted(ds)
@@ -1288,4 +1289,233 @@ plt.plot(ds)
 
 
 
+# fb healthy vs autism, cost of similar trials
+
+datapath=Path("Z:/human/hgroup")
+with open(datapath, 'rb') as f:
+    hstates, hactions, htasks = pickle.load(f)
+datapath=Path("Z:/human/agroup")
+with open(datapath, 'rb') as f:
+    astates, aactions, atasks = pickle.load(f)
+
+res=[];res2=[]
+for task in htasks:
+    d,a=xy2pol(task, rotation=False)
+    # if  env.min_angle/2<=a<env.max_angle/2:
+    if a<=-pi/5*0.7 or a>=pi/5*0.7:
+        res.append(task)
+    elif -pi/5*0.3<=a<=pi/5*0.3:
+        res2.append(task)
+hsidetasks=np.array(res)
+hcentertasks=np.array(res2)
+
+# check the target distributions
+plt.scatter(hsidetasks[:,0],hsidetasks[:,1])
+plt.scatter(hcentertasks[:,0],hcentertasks[:,1])
+
+    
+# the magnitude cost
+hcost,acost=[],[]
+d_s,a_s=[],[]
+for task in hsidetasks:
+    indls=similar_trials2this(htasks,task,ntrial=5)
+    for i in indls:
+        epaction=hactions[i]
+        epcost=np.linalg.norm(np.array(epaction),axis=0)
+        hcost.append(epcost)
+        d_s.append(d)
+        a_s.append(a)
+    indls=similar_trials2this(atasks,task,ntrial=5)
+    for i in indls:
+        epaction=aactions[i]
+        epcost=np.linalg.norm(np.array(epaction),axis=0)
+        acost.append(epcost)
+    d,a=xy2pol(task, rotation=False)
+hcost,acost=np.array(hcost), np.array(acost)
+print(np.sum(hcost,axis=0), np.sum(acost,axis=0))
+
+# the dev cost
+hcost,acost=[],[]
+for task in hsidetasks:
+    indls=similar_trials2this(htasks,task,ntrial=5)
+    for i in indls:
+        epaction=hactions[i]
+        epcost=sum(np.power(np.diff(np.array(epaction),axis=0),2))
+        hcost.append(epcost)
+    indls=similar_trials2this(atasks,task,ntrial=5)
+    for i in indls:
+        epaction=aactions[i]
+        epcost=sum(np.power(np.diff(np.array(epaction),axis=0),2))
+        acost.append(epcost)
+hcost,acost=np.array(hcost), np.array(acost)
+print(np.sum(hcost,axis=0), np.sum(acost,axis=0))
+
+
+# the dev of dev
+hcost,acost=[],[]
+for task in hcentertasks:
+    indls=similar_trials2this(htasks,task,ntrial=5)
+    for i in indls:
+        epaction=hactions[i]
+        epcost=sum(np.power(np.diff(np.diff(np.array(epaction),axis=0),axis=0),2))
+        hcost.append(epcost)
+    indls=similar_trials2this(atasks,task,ntrial=5)
+    for i in indls:
+        epaction=aactions[i]
+        epcost=sum(np.power(np.diff(np.diff(np.array(epaction),axis=0),axis=0),2))
+        acost.append(epcost)
+hcost,acost=np.array(hcost), np.array(acost)
+print(np.sum(hcost,axis=0), np.sum(acost,axis=0))
+
+
+# compare costs
+hcost,acost=[],[]
+for i,task in enumerate(htasks):
+    epaction=hactions[i]
+    epcost=sum(np.power(np.diff(np.array(epaction),axis=0),2))
+    hcost.append(epcost)
+for i,task in enumerate(atasks):
+    epaction=aactions[i]
+    epcost=sum(np.power(np.diff(np.diff(np.array(epaction),axis=0),axis=0),2))
+    acost.append(epcost)
+hcost,acost=np.array(hcost), np.array(acost)
+
+
+with initiate_plot(9,3,300) as fig:
+    ax=fig.add_subplot(131)
+    c=ax.scatter(htasks[:,0],htasks[:,1],c=hcost[:,0],s=5,cmap='bwr',norm=getcbarnorm(np.min(hcost[:,0]), np.mean(hcost[:,0]), np.max(hcost[:,0])))
+    plt.colorbar(c, label='- log likelihood')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    # ax.axes.xaxis.set_ticks([0,0.5,1])
+    ax.set_xlabel('world x [2m]')
+    ax.set_ylabel('world y [2m]' )
+    ax.set_aspect('equal')
+    ax.set_title('trial likelihoods')
+
+    ax=fig.add_subplot(132)
+    c=ax.scatter(htasks[:,0],htasks[:,1],c=hcost[:,1],s=5,cmap='bwr',norm=getcbarnorm(np.min(hcost[:,1]), np.mean(hcost[:,1]), np.max(hcost[:,1])))
+    plt.colorbar(c, label='- log likelihood')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    # ax.axes.xaxis.set_ticks([0,0.5,1])
+    ax.set_xlabel('world x [2m]')
+    ax.set_ylabel('world y [2m]' )
+    ax.set_aspect('equal')
+    ax.set_title('trial likelihoods')
+
+with initiate_plot(9,3,300) as fig:
+    ax=fig.add_subplot(131)
+    c=ax.scatter(atasks[:,0],atasks[:,1],c=acost[:,0],s=5,cmap='bwr',norm=getcbarnorm(np.min(acost[:,0]), np.mean(acost[:,0]), np.max(acost[:,0])))
+    plt.colorbar(c, label='- log likelihood')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    # ax.axes.xaxis.set_ticks([0,0.5,1])
+    ax.set_xlabel('world x [2m]')
+    ax.set_ylabel('world y [2m]' )
+    ax.set_aspect('equal')
+    ax.set_title('trial likelihoods')
+
+    ax=fig.add_subplot(132)
+    c=ax.scatter(atasks[:,0],atasks[:,1],c=acost[:,1],s=5,cmap='bwr',norm=getcbarnorm(np.min(acost[:,1]), np.mean(acost[:,1]), np.max(acost[:,1])))
+    plt.colorbar(c, label='- log likelihood')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    # ax.axes.xaxis.set_ticks([0,0.5,1])
+    ax.set_xlabel('world x [2m]')
+    ax.set_ylabel('world y [2m]' )
+    ax.set_aspect('equal')
+    ax.set_title('trial likelihoods')
+
+
+htasksda,atasksda=[],[]
+for task1,task2 in zip(htasks,atasks):
+    htasksda.append(xy2pol(task1, rotation=False))
+    atasksda.append(xy2pol(task2, rotation=False))
+htasksda,atasksda=np.abs(np.array(htasksda)), np.abs(np.array(atasksda))
+
+hbyd=np.argsort(htasksda[:,0])
+hbya=np.argsort(htasksda[:,1])
+plt.plot(htasksda[hbya,1],hcost[hbya,1])
+
+abyd=np.argsort(atasksda[:,0])
+abya=np.argsort(atasksda[:,1])
+plt.plot(atasksda[abyd,0],acost[abyd,0])
+plt.plot(atasksda[abya,1],acost[abya,1])
+
+plt.plot(atasksda[abyd,0],acost[abyd,0])
+plt.plot(htasksda[hbyd,0],hcost[hbyd,0])
+
+
+with initiate_plot(6,3,300) as fig:
+    ax=fig.add_subplot(121)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.plot(atasksda[abya,1],acost[abya,1], label='ASD',alpha=0.8,color='orange')
+    ax.plot(htasksda[hbya,1],hcost[hbya,1], label='Control',alpha=0.8)    
+    ax.set_xlabel('target angle')
+    ax.set_ylabel('normalized cost')
+    ax.set_title('angular cost')
+    ax.legend()
+
+    ax=fig.add_subplot(122)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.plot(atasksda[abyd,0],acost[abyd,0], label='ASD',alpha=0.8,color='orange')
+    ax.plot(htasksda[hbyd,0],hcost[hbyd,0], label='Control',alpha=0.8)    
+    ax.set_xlabel('target distance [2m]')
+    ax.set_ylabel('normalized cost')
+    ax.set_title('forward cost')
+    ax.legend()
+
+
+# ASD total distance travel/ angule turned compare to control for similar targets------------
+
+hcost,acost=[],[] # here the cost is total distance and total angle traveled
+for i,task in enumerate(htasks):
+    epaction=hactions[i]
+    epcost=np.sum(np.asarray(epaction),axis=0)
+    hcost.append(epcost)
+for i,task in enumerate(atasks):
+    epaction=aactions[i]
+    epcost=np.sum(np.asarray(epaction),axis=0)
+    acost.append(epcost)
+hcost,acost=np.abs(np.array(hcost)), np.abs(np.array(acost))
+
+hcost,acost=[],[] 
+for i,task in enumerate(htasks):
+    epaction=hactions[i]
+    epcost=np.sum(np.abs(np.diff(np.asarray(epaction),axis=0)),axis=0)
+    hcost.append(epcost)
+for i,task in enumerate(atasks):
+    epaction=aactions[i]
+    epcost=np.sum(np.abs(np.diff(np.asarray(epaction),axis=0)),axis=0)
+    acost.append(epcost)
+hcost,acost=np.abs(np.array(hcost)), np.abs(np.array(acost))
+
+
+hcost,acost=[],[] 
+hreward,areward=[],[]
+for i,task in enumerate(htasks):
+    epaction=hactions[i]
+    epcost=np.sum(np.power(np.diff(np.asarray(epaction),axis=0),2),axis=0)
+    hcost.append(epcost)
+for i,task in enumerate(atasks):
+    epaction=aactions[i]
+    epcost=np.sum(np.abs(np.diff(np.asarray(epaction),axis=0)),axis=0)
+    acost.append(epcost)
+hcost,acost=np.abs(np.array(hcost)), np.abs(np.array(acost))
+
+
+
+
+
+
+
+
+
+
+
+
+#
 

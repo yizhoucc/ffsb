@@ -116,6 +116,37 @@ def data_iter(batch_size,states,actions,tasks):
         yield itemgetter(*batchinds)(states),itemgetter(*batchinds)(actions),itemgetter(*batchinds)(tasks)
 
 
+def df_downsamplepert(df,factor=0.0025):
+    # perts,pertsmeta
+    def pertmeta(pert):
+        # the theta is the turning radius. - for backward left
+        direction=np.nan_to_num(pert[:,0]/pert[:,1],0)
+        sign=-1 if np.any(direction<0) else 1
+        theta=np.min(direction) if sign==-1 else np.max(direction)
+        strength=max(np.abs(pert[:,0]))*sign
+        center=np.argmax(np.abs(pert[:,0]))
+        return theta,strength,center
+
+    perts=[]
+    pertsmeta=[] # direction, strength, start time
+    index=0
+    while index<df.shape[0]:
+        trial=df.iloc[index]
+        try:
+            if len(trial.action_v)>2:
+                pert=np.array([trial.perturb_v,trial.perturb_w])
+                pert=np.array(down_sampling_(pert.T))/400
+                pert=pert.astype('float32')
+                perts.append(pert)
+                pertsmeta.append(pertmeta(pert))
+        except:
+            print('no',index)
+            index+=1
+            continue
+        index+=1
+    return perts,pertsmeta
+
+
 def monkey_data_downsampled_(df,factor=0.0025):
     states = []
     actions = []

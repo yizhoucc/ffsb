@@ -582,7 +582,7 @@ getlogll(finaltheta)
 # distribution of likelihood of each desnity-------------------------------------
 
 
-with open('brunoobsdensloglong','rb') as f:
+with open('brunoobsdenslog500','rb') as f:
     obsvls,p = pickle.load(f)
 
 

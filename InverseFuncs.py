@@ -483,6 +483,7 @@ def monkeyloss_(agent=None,
     return logPr/len(tasks)+0.01*regularization
 
 
+
 def monkeyloss_sim(agent=None, 
             actions=None, 
             tasks=None, 

@@ -2,9 +2,10 @@
 
 import pickle
 from re import A
+from turtle import width
 from plot_ult import plotpert, quickoverhead, similar_trials, similar_trials2this, smooth
 from FireflyEnv import ffacc_real
-from matplotlib.pyplot import xlabel
+from matplotlib.pyplot import axis, xlabel
 import pandas as pd
 import numpy as np
 from scipy.ndimage.measurements import label
@@ -17,6 +18,12 @@ from monkey_functions import *
 import matplotlib.pyplot as plt
 from scipy import stats
 from plot_ult import *
+
+
+
+
+
+
 
 
 # check stop distribution given a task
@@ -51,21 +58,8 @@ for m in monkeys:
 for k,v in mk2beh.items():
     with initiate_plot(4,3) as fig:
         ax=fig.add_subplot(111)
-        ax.bar(list(range(len((v[0])))), [1-vv for vv in v[1]], label=k,color='k')
-        ax.legend()
-        ax.set_xlabel('density')
-        ax.set_ylabel('miss rate')
-        ax.set_xticks(list(range(len((v[0])))))
-        ax.set_xticklabels(v[0])
-        ax.set_yticks([0,np.round(1-min(v[1]),decimals=1)+0.1])
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-
-for k,v in mk2beh.items():
-    with initiate_plot(4,3) as fig:
-        ax=fig.add_subplot(111)
-        ax.bar(list(range(len((v[0])))), v[2], label=k,color='k')
-        ax.legend()
+        ax2 = ax.twinx()
+        ax.bar([i-0.2 for i in range(len((v[0])))], v[2], label=k,color='k',width=0.4)
         ax.set_xlabel('density')
         ax.set_ylabel('radial error [cm]')
         ax.set_xticks(list(range(len((v[0])))))
@@ -75,7 +69,16 @@ for k,v in mk2beh.items():
         plotmax=roundmax if roundmax>datamax else roundmax+10
         ax.set_yticks([0,plotmax])
         ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+
+        ax2.bar([i+0.2 for i in range(len((v[0])))], [1-vv for vv in v[1]], label=k,color='r',width=0.4)
+        ax2.set_xlabel('density')
+        ax2.set_ylabel('miss rate')
+        ax2.set_xticks(list(range(len((v[0])))))
+        ax2.set_xticklabels(v[0])
+        ax2.set_yticks([0,np.round(1-min(v[1]),decimals=1)+0.1])
+        ax2.spines['top'].set_visible(False)
+
+        ax2.text(0,0.8,'monkey {}'.format(k))
 
 
 
@@ -90,9 +93,20 @@ ax.get_figure()
 
 # check what victor do in pert
 print('loading data')
-datapath=Path("Z:\\victor_pert\\victor_pert_ds")
+datapath=Path("Z:\\victor_pert\\packed")
 with open(datapath,'rb') as f:
     df = pd.read_pickle(f)
+    df=df[~df.perturb_start_time.isnull()] # pert only trial
+datapath=Path("Z:\\{}_pert\\packed".format('bruno'))
+with open(datapath,'rb') as f:
+    bdf = pickle.load(f)
+    bdf=bdf[~bdf.perturb_start_time.isnull()] # pert only trial
+
+datapath=Path("Z:\\{}_pert\\packed".format('schro'))
+with open(datapath,'rb') as f:
+    sdf = pickle.load(f)
+    sdf=sdf[~sdf.perturb_start_time.isnull()] # pert only trial
+
 
 plotmetatrend(df.iloc[:600])
 df.keys()
@@ -128,11 +142,11 @@ scatter_hist(bdf[:9999].perturb_start_time, bdf[:9999].relative_radius_end)
 scatter_hist(df.perturb_start_time, df.relative_radius_end)
 
 
-scatter_hist(df[~df.perturb_start_time.isnull()].perturb_vpeak+df[~df.perturb_start_time.isnull()].perturb_wpeak, df[~df.perturb_start_time.isnull()].relative_radius_end)
+scatter_hist(df.perturb_vpeak+df.perturb_wpeak, df.relative_radius_end)
 
 
 
-plt.plot(smooth(df[~df.perturb_start_time.isnull()].relative_radius_end/(abs(df[~df.perturb_start_time.isnull()].perturb_vpeak)+abs(df[~df.perturb_start_time.isnull()].perturb_wpeak)),100))
+plt.plot(smooth(df.relative_radius_end/(abs(df.perturb_vpeak)+abs(df.perturb_wpeak)),100))
 
 # if we assume pertpeak affect err, this trend is decreasing
 res = stats.linregress((abs(df[~df.perturb_start_time.isnull()].perturb_vpeak)+abs(df[~df.perturb_start_time.isnull()].perturb_wpeak)), df[~df.perturb_start_time.isnull()].relative_radius_end)
@@ -875,7 +889,7 @@ with initiate_plot(8, 8, 300) as fig, warnings.catch_warnings():
     ax = fig.add_subplot(223)
     ax.set_title('healthy without feedback')
     data_path=Path("Z:/human")
-    theta,_,_=process_inv(data_path/'wofixrwohgroup', removegr=False)
+    theta,_,_=process_inv(data_path/'1wohgroup2', removegr=False)
     datapath=Path("Z:/human/wohgroup")
     with open(datapath, 'rb') as f:
         states, actions, tasks = pickle.load(f)
@@ -1051,6 +1065,7 @@ ax.get_figure()
 
 
 
+
 # wofb healthy vs autism, overhead of similar trials
 datapath=Path("Z:/human/wohgroup")
 with open(datapath, 'rb') as f:
@@ -1086,6 +1101,17 @@ ind=np.random.randint(0,len(tasks))
 task=tasks1[ind]
 indls1=similar_trials(ind, tasks1,ntrial=5)
 indls2=similar_trials2this(tasks2,task,ntrial=5)
+
+ax=plotoverheadhuman(indls1,states1,tasks1,alpha=0.5,fontsize=5,ax=None,color='b',label=str(datapath1.name))
+ax=plotoverheadhuman(indls2,states2,tasks2,alpha=0.5,fontsize=5,ax=ax,color='orange',label=str(datapath2.name))
+handles, labels = ax.get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+leg=ax.legend(by_label.values(), by_label.keys(),loc='lower right')
+for lh in leg.legendHandles: 
+    lh.set_alpha(1)
+ax.get_figure()
+
+
 with initiate_plot(4, 2, 300) as fig, warnings.catch_warnings():
     warnings.simplefilter('ignore')
     ax=fig.add_subplot(111)
@@ -1103,14 +1129,6 @@ with initiate_plot(4, 2, 300) as fig, warnings.catch_warnings():
         lh.set_alpha(1)
     ax.get_figure()
 
-ax=plotoverheadhuman(indls1,states1,tasks1,alpha=0.5,fontsize=5,ax=None,color='b',label=str(datapath1.name))
-ax=plotoverheadhuman(indls2,states2,tasks2,alpha=0.5,fontsize=5,ax=ax,color='orange',label=str(datapath2.name))
-handles, labels = ax.get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-leg=ax.legend(by_label.values(), by_label.keys(),loc='lower right')
-for lh in leg.legendHandles: 
-    lh.set_alpha(1)
-ax.get_figure()
 
 
 with initiate_plot(4, 2, 300) as fig, warnings.catch_warnings():
@@ -1313,6 +1331,78 @@ hcentertasks=np.array(res2)
 plt.scatter(hsidetasks[:,0],hsidetasks[:,1])
 plt.scatter(hcentertasks[:,0],hcentertasks[:,1])
 
+
+# curvature from state, max difference from start-end line
+hcost,acost=[],[]
+for task in hsidetasks:
+    indls=similar_trials2this(htasks,task,ntrial=5)
+    for i in indls:
+        end=hstates[i][-1][:2]
+        rotation=xy2pol(end,rotation=False)[1].item()
+        R=np.array([[np.cos(rotation),np.sin(rotation)],[-np.sin(rotation),np.cos(rotation)]])
+        rotatedxy=R@np.array(astates[i][:,:2].T)
+        epcost=np.max(rotatedxy[1])
+        hcost.append(epcost)
+    indls=similar_trials2this(atasks,task,ntrial=5)
+    for i in indls:
+        end=astates[i][-1][:2]
+        rotation=xy2pol(end,rotation=False)[1].item()
+        R=np.array([[np.cos(rotation),np.sin(rotation)],[-np.sin(rotation),np.cos(rotation)]])
+        rotatedxy=R@np.array(astates[i][:,:2].T)
+        epcost=np.max(rotatedxy[1])
+        acost.append(epcost)
+hcost,acost=np.array(hcost), np.array(acost)
+plt.hist(hcost[np.where(hcost<1)],bins=30)
+plt.hist(acost[np.where(acost<1)],bins=30)
+print(np.sum(hcost[np.where(hcost<1)],axis=0), np.sum(acost[np.where(acost<1)],axis=0))
+
+
+
+# the curvature from state, smoothness of heading direction
+hcost,acost=[],[]
+for task in hsidetasks:
+    indls=similar_trials2this(htasks,task,ntrial=5)
+    for i in indls:
+        ephead=hstates[i][:,2]
+        # plt.plot(ephead)
+        firstD = np.diff(ephead)
+        normFirstD = (firstD - np.mean(firstD)) / np.std(firstD)
+        roughness = (np.diff(normFirstD) ** 2) / 4
+        # plt.plot(roughness)
+        epcost=sum(roughness)
+        hcost.append(epcost)
+    indls=similar_trials2this(atasks,task,ntrial=5)
+    for i in indls:
+        ephead=astates[i][:,2]
+        # plt.plot(ephead)
+        firstD = np.diff(ephead)
+        normFirstD = (firstD - np.mean(firstD)) / np.std(firstD)
+        roughness = (np.diff(normFirstD) ** 2) / 4
+        # plt.plot(roughness)
+        epcost=sum(roughness)
+        acost.append(epcost)
+hcost,acost=np.array(hcost), np.array(acost)
+print(np.sum(hcost,axis=0), np.sum(acost,axis=0))
+
+
+# the curvature from action. abs(sum(allw))
+hc,ac=[],[]
+d_s,a_s=[],[]
+for task in hsidetasks:
+    indls=similar_trials2this(htasks,task,ntrial=5)
+    for i in indls:
+        epaction=hactions[i]
+        epcost=abs(sum(epaction[:,1]))
+        hc.append(epcost)
+    indls=similar_trials2this(atasks,task,ntrial=5)
+    for i in indls:
+        epaction=aactions[i]
+        epcost=abs(sum(epaction[:,1]))
+        ac.append(epcost)
+    d,a=xy2pol(task, rotation=False)
+hcost,acost=np.array(hc), np.array(ac)
+print(np.sum(hcost,axis=0), np.sum(acost,axis=0))
+
     
 # the magnitude cost
 hcost,acost=[],[]
@@ -1510,12 +1600,155 @@ hcost,acost=np.abs(np.array(hcost)), np.abs(np.array(acost))
 
 
 
+# load data ------------------------------------------------
+datapath=Path("Z:/human/wohgroup")
+with open(datapath, 'rb') as f:
+    hstates, hactions, htasks = pickle.load(f)
+
+datapath=Path("Z:/human/woagroup")
+with open(datapath, 'rb') as f:
+    astates, aactions, atasks = pickle.load(f)
+# get the side tasks (stright trials do not have curvature)
+res=[]
+for task in htasks:
+    d,a=xy2pol(task, rotation=False)
+    # if  env.min_angle/2<=a<env.max_angle/2:
+    if a<=-pi/5*0.7 or a>=pi/5*0.7:
+        res.append(task)
+sidetasks=np.array(res)
 
 
 
 
 
+np.arctan2(2,1)
+xy2pol([1,2],rotation=False)
 
 
-#
 
+
+
+# check end response errors ----------------------------------
+ares=np.array([s[-1].tolist() for s in astates])
+# radial and angular distance response
+ardist=np.linalg.norm(ares[:,:2],axis=1)
+aadist=np.arctan2(ares[:,1],ares[:,0])
+# radial and angular distance target
+atasksda=np.array([xy2pol(t,rotation=False) for t in atasks])
+artar=atasksda[:,0]
+aatar=atasksda[:,1] # hatar=np.arctan2(htasks[:,1],htasks[:,0])
+artarind=np.argsort(artar)
+aatarind=sorted(aatar)
+
+
+hres=np.array([s[-1].tolist() for s in hstates])
+# radial and angular distance response
+hrdist=np.linalg.norm(hres[:,:2],axis=1)
+hadist=np.arctan2(hres[:,1],hres[:,0])
+# radial and angular distance target
+htasksda=np.array([xy2pol(t,rotation=False) for t in htasks])
+hrtar=htasksda[:,0]
+hatar=htasksda[:,1] # hatar=np.arctan2(htasks[:,1],htasks[:,0])
+hrtarind=np.argsort(hrtar)
+hatarind=sorted(hatar)
+
+
+plt.hist(hadist,density=True,bins=30)
+plt.hist(hatar,density=True,bins=30)
+
+plt.hist(hrdist,density=True,bins=30)
+plt.hist(hrtar,density=True,bins=30)
+
+
+with initiate_plot(4,2,300) as f:
+    ax=f.add_subplot(121)
+    ax.scatter(hatar,hadist,s=1,alpha=0.5,color='b')
+    ax.scatter(aatar,aadist,s=1,alpha=0.2,color='r')
+    ax.set_xlim(-0.7,0.7)
+    ax.set_ylim(-2,2)
+    ax.plot([-1,1],[-1,1],'k',alpha=0.5)
+    ax.set_xlabel('target angle')
+    ax.set_ylabel('response angle')
+    # ax.axis('equal')
+    quickspine(ax)
+
+    ax=f.add_subplot(122)
+    ax.scatter(hrtar,hrdist,s=1,alpha=0.5,color='b')
+    ax.scatter(artar,ardist,s=1,alpha=0.3,color='r')
+    # ax.plot([.5,3],[.5,3],'k',alpha=0.5)
+    ax.set_xlim(.5,3)
+    ax.set_ylim(0.5,5)
+    ax.plot([0,3],[0,3],'k',alpha=0.5)
+    ax.set_xlabel('target distance')
+    ax.set_ylabel('response distance')
+    quickspine(ax)
+    # ax.axis('equal')
+    plt.tight_layout()
+
+
+
+res=intobins(hrdist)
+plt.bar(res[0],res[1],alpha=0.5)
+res=intobins(hrtar)
+plt.bar(res[0],res[1],alpha=0.5)
+
+
+bins=np.linspace(0.5,3,50)
+counts=np.histogram(hrtar,bins)[0]
+cumcounts=[0]+np.cumsum(counts).tolist()
+binned=[hrdist[hrtarind][i:j]  for i,j in zip(cumcounts[:-1],cumcounts[1:])]
+binnedmu=[np.mean(x) for x in binned]
+binnedstd=[np.std(x) for x in binned]
+plt.errorbar(bins[1:],binnedmu,yerr=binnedstd)
+plt.plot([0.5,3],[0.5,3])
+
+
+
+counts=np.histogram(artar,bins)[0]
+cumcounts=[0]+np.cumsum(counts).tolist()
+binned=[ardist[artarind][i:j]  for i,j in zip(cumcounts[:-1],cumcounts[1:])]
+binnedmu=[np.mean(x) for x in binned]
+binnedstd=[np.std(x) for x in binned]
+plt.errorbar(bins[1:],binnedmu,yerr=binnedstd)
+plt.plot([0.5,3],[0.5,3])
+plt.axis('equal')
+
+
+from scipy import stats
+rng = np.random.default_rng()
+res = stats.linregress(hrtar, hrdist,intercept=0)
+plt.plot(hrtar, hrdist, 'o', label='original data')
+plt.plot(hrtar, res.intercept + res.slope*hrtar, 'r', label='fitted line')
+plt.legend()
+plt.show()
+
+x=hrtar
+y=hrdist
+x = x[:,np.newaxis]
+a, _, _, _ = np.linalg.lstsq(x, y)
+
+plt.plot(x, y, 'bo')
+plt.plot(x, a*x, 'r-')
+plt.show()
+
+
+
+
+
+# # process the without feedback data, remove the no control at begining
+# with open("Z:/human/woagroup", 'rb') as f:
+#     states, actions, tasks = pickle.load(f)
+# # make sure this is a common thing.
+# ind=np.random.randint(0,1000)
+# plt.plot(actions[ind])
+
+# res=[[],[],[]]
+# for i,(a,s,t) in enumerate(zip(actions,states,tasks)):
+#     start=min(torch.where(torch.norm(a,dim=1)>0.1)[0])-1
+#     if len(a)-start>5 and start!=-1:
+#         res[0].append(s[start:])
+#         res[1].append(a[start:])
+#         res[2].append(t)
+# res[2]=np.array(res[2])
+# with open('Z:/human/woagroup2', 'wb') as handle:
+#     pickle.dump(res, handle, protocol=pickle.HIGHEST_PROTOCOL)

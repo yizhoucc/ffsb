@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib.ticker import MaxNLocator
 import scipy.stats
 from numpy import pi
-from torch import nn
+from torch import nn, threshold
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -82,6 +82,16 @@ import TD3_torch
 from monkey_functions import *
 from Config import Config
 arg = Config()
+
+from matplotlib import font_manager
+from pathlib import Path
+import matplotlib.pyplot as plt
+font_dirs = [Path('C:/Users/24455/iCloudDrive/misc/computer-modern'), ]
+font_files = font_manager.findSystemFonts(fontpaths=font_dirs)
+for font_file in font_files:
+    font_manager.fontManager.addfont(font_file)
+
+
 
 cmaps = OrderedDict()
 cmaps['Qualitative'] = ['Pastel1', 'Pastel2', 'Paired', 'Accent',
@@ -205,7 +215,6 @@ def colorshift(mu, direction, amount, n):
     #     res.append((mu+d).tolist())
     return res
     
-
 
 def mean_confidence_interval(data, confidence=0.95):
     # ci of the mean
@@ -2164,8 +2173,8 @@ def mytick(x,nticks=5, roundto=0):
         return np.linspace(np.floor(np.min(x)), np.ceil(np.max(x)),nticks)
 
 
-def vary_theta_new(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0.3],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10):
-
+def vary_theta_new(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0.3],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10,plotallb=False):
+    # overhead only
   def sample_trials(agent, env, theta, phi, thistask, initv=0.,initw=0., action_noise=0.1,pert=None,):
     agent_actions=[]
     agent_beliefs=[]
@@ -2239,7 +2248,14 @@ def vary_theta_new(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0
                 ax.spines['top'].set_visible(False)
                 ax.spines['right'].set_visible(False)
 
-            for t in range(len(agent_beliefs[0][:,:,0])):
+            if plotallb:
+                for t in range(len(agent_beliefs[0][:,:,0])):
+                    cov=data['agent_covs'][0][t][:2,:2]*200*200
+                    pos=  [agent_beliefs[0][:,:,0][t,0]*200,
+                            agent_beliefs[0][:,:,0][t,1]*200]
+                    plot_cov_ellipse(cov, pos, nstd=3, color=color_settings['b'], ax=ax,alpha=0.05)
+            else:
+                t=len(agent_beliefs[0][:,:,0])-1
                 cov=data['agent_covs'][0][t][:2,:2]*200*200
                 pos=  [agent_beliefs[0][:,:,0][t,0]*200,
                         agent_beliefs[0][:,:,0][t,1]*200]
@@ -2256,7 +2272,7 @@ def vary_theta_new(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0
         plt.tight_layout()
 
 
-def vary_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[[0.7,-0.3]],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10):
+def vary_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0.3],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10, plotallb=False):
 
     def _sample_trials(agent, env, theta, phi, etask, initv=0.,initw=0., action_noise=0.1,pert=None):
         agent_actions=[]
@@ -2350,7 +2366,6 @@ def vary_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[[0.7,-0.3]
             for i in range(3): # overhead, v, w
                 subplotmap[n,i]=fig.add_subplot(3,nplots,i*nplots+n+1)
 
-
         for n in range(nplots):
             theta=n*delta+theta_init
             theta=torch.clamp(theta, 1e-3)
@@ -2373,12 +2388,19 @@ def vary_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[[0.7,-0.3]
                     ax.set_ylabel('world y [cm]')
                     ax.spines['top'].set_visible(False)
                     ax.spines['right'].set_visible(False)
-
-                for t in range(len(agent_beliefs[0][:,:,0])):
+                if plotallb:
+                    for t in range(len(agent_beliefs[0][:,:,0])):
+                        cov=data['agent_covs'][0][t][:2,:2]*200*200
+                        pos=  [agent_beliefs[0][:,:,0][t,0]*200,
+                                agent_beliefs[0][:,:,0][t,1]*200]
+                        plot_cov_ellipse(cov, pos, nstd=3, color=color_settings['b'], ax=ax,alpha=0.05)
+                else:
+                    t=len(agent_beliefs[0][:,:,0])-1
                     cov=data['agent_covs'][0][t][:2,:2]*200*200
                     pos=  [agent_beliefs[0][:,:,0][t,0]*200,
                             agent_beliefs[0][:,:,0][t,1]*200]
                     plot_cov_ellipse(cov, pos, nstd=3, color=color_settings['b'], ax=ax,alpha=0.05)
+
                 if n!=0:
                     ax.set_yticklabels([])
                     # ax.set_xticklabels([])
@@ -2442,7 +2464,51 @@ def vary_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[[0.7,-0.3]
             plt.tight_layout()
 
 
-def two_theta_overhead(agent, env, phi, thetas, labels=['model1','model2'],etask=[[0.7,-0.3]],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10):
+
+def two_theta_curvaturehist(agent, env, phi, thetas, labels=['ASD model','Ctrl model'],etask=[0.5,0.5],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=50):
+    
+    def _eval_curvature2(agent, env, phi, theta, tasks,ntrials=10):
+
+        states=[]
+        actions=[]
+        with suppress():
+            for task in tasks:
+                while len(states)<ntrials:
+                    env.reset(phi=phi, theta=theta, goal_position=task, pro_traj=None,vctrl=0.,wctrl=0. )
+                    epactions,_,_,epstates=run_trial(agent,env,given_action=None, given_state=None, action_noise=0.1)
+                    if len(epstates)>5:
+                        states.append(torch.stack(epstates)[:,:,0])
+                        actions.append(torch.stack(epactions))
+        statecost=[]
+        for s in states:
+            end=s[-1][:2]
+            rotation=xy2pol(end,rotation=False)[1].item()
+            R=np.array([[np.cos(rotation),np.sin(rotation)],[-np.sin(rotation),np.cos(rotation)]])
+            rotatedxy=R@np.array(s[:,:2].T)
+            epcost=np.max(rotatedxy[1])
+            statecost.append(epcost)    
+        actioncost=[]
+        for a in actions:
+            actioncost.append(sum(a[:,1]))
+        res=np.array([statecost,actioncost])
+        return res
+
+    res=[]
+    for n,theta in enumerate(thetas):
+        theta=torch.clamp(theta, 1e-3,3)
+        with torch.no_grad():
+            curvature=_eval_curvature2(agent, env, phi, theta, [etask]*50, ntrials=ntrials)
+        res.append(np.sum(np.abs(curvature),axis=0))
+   
+    barmean=[np.mean(a) for a in res]
+    barerr=percentile_err(res)
+
+    with initiate_plot(3, 3,300) as fig:
+        ax=fig.add_subplot(111)
+        ax.bar(list(range(len(res))),barmean, yerr=barerr)
+
+
+def two_theta_overhead(agent, env, phi, thetas, labels=['model1','model2'],etask=[0.7,-0.3],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10):
 
     def sample_trials(agent, env, theta, phi, thistask, initv=0.,initw=0., action_noise=0.1,pert=None,):
         agent_actions=[]
@@ -2491,28 +2557,46 @@ def two_theta_overhead(agent, env, phi, thetas, labels=['model1','model2'],etask
         ax=fig.add_subplot(111)
         for n,theta in enumerate(thetas):
             theta=torch.clamp(theta, 1e-3)
+            estates=[]
             for i in range(ntrials):
                 with suppress():
                     data=sample_trials(agent, env, theta, phi, etask,initv=initv,initw=initw,pert=pert)
                 estate=data['estate']
+                estates.append(estate)
                 agent_beliefs=data['agent_beliefs']
 
-                # overhead
-                ax.plot(estate[0,:]*200,estate[1,:]*200, color=color_settings['pair'][n],alpha=0.5,label=labels[n])
-                ax.legend()
-                # ax.scatter(estate[0,-1]*200,estate[1,-1]*200, color=color_settings['a'],alpha=0.5)
-                if i==0:
-                    goalcircle = plt.Circle((etask[0]*200,etask[1]*200), 65, color=color_settings['goal'], edgecolor='none', alpha=0.3, linewidth=0.8)
-                    ax.add_patch(goalcircle)
-                    ax.set_aspect('equal')
-                    ax.set_xlabel('world x [cm]')
-                    ax.set_ylabel('world y [cm]')
-                    ax.spines['top'].set_visible(False)
-                    ax.spines['right'].set_visible(False)
+                # # each trial overhead
+                # ax.plot(estate[0,:]*200,estate[1,:]*200, color=color_settings['pair'][n],alpha=0.5,label=labels[n])
+                # ax.legend()
+                # # ax.scatter(estate[0,-1]*200,estate[1,-1]*200, color=color_settings['a'],alpha=0.5)
 
-                ax.set_xticks(mytick(ax.get_xticks(),3,-1))
-                ax.set_yticks(mytick(ax.get_yticks(),3,-1))
-            
+            allxy=[ epstates[:2,:].T.tolist() for epstates in estates ]
+            meanxy=[]
+            while allxy:
+                tmp=[] # xy of this t
+                todel=[]
+                for i, txy in enumerate(allxy):
+                    if txy:
+                        tmp.append(txy.pop(0)) # use deque if too slow
+                    else:
+                        todel.append(i)
+                for i in todel[::-1]:
+                    allxy=allxy[:i]+allxy[i+1:]
+                meanxy.append(np.mean(np.array(tmp),axis=0))
+            meanxy=np.array(meanxy[:-1]) # remove the last nan
+            # mean overhead
+            ax.plot(meanxy[:,0]*200,meanxy[:,1]*200, color=color_settings['pair'][n],alpha=0.5,label=labels[n])
+        ax.legend()        
+        
+        goalcircle = plt.Circle((etask[0]*200,etask[1]*200), 65, color=color_settings['goal'], edgecolor='none', alpha=0.3, linewidth=0.8)
+        ax.add_patch(goalcircle)
+        ax.set_aspect('equal')
+        ax.set_xlabel('world x [cm]')
+        ax.set_ylabel('world y [cm]')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xticks(mytick(ax.get_xticks(),3,-1))
+        ax.set_yticks(mytick(ax.get_yticks(),3,-1))
         handles, labels_ = ax.get_legend_handles_labels()
         by_label = dict(zip(labels_, handles))
         ax.legend(by_label.values(), by_label.keys(),loc='upper right')
@@ -2648,6 +2732,14 @@ def pert_disk(pert):
         sign=-1 if np.any(direction<0) else 1
         theta=np.min(direction) if sign==-1 else np.max(direction)
         ax.plot([theta]*2,[0,1],'k')
+
+
+def pertmeta(pert):
+    direction=np.nan_to_num(pert[:,0]/pert[:,1],0)
+    sign=-1 if np.any(direction<0) else 1
+    theta=np.min(direction) if sign==-1 else np.max(direction)
+    strength=max(np.abs(pert[:,0]))
+    return theta,strength
 
 
 def likelihoodvstime(agent=None, 
@@ -3523,7 +3615,8 @@ def cart2pol(*args):
     return rho, phi
 
 
-def xy2pol(*args, rotation=True): # rotated for the task
+def xy2pol(*args, rotation=True): 
+    # return distance and angle. default rotated left 90 degree for the task
     x=args[0][0]; y=args[0][1]
     d = np.sqrt(x**2 + y**2)
     a = np.arctan2(y, x)+pi/2 if rotation else  np.arctan2(y, x)
@@ -3568,6 +3661,28 @@ def similar_trials2this(tasks, thistask, thisaction=None, actions=None, ntrial=1
     return result
 
 
+def similar_trials2thispert(tasks, thistask,thispertmeta, ntrial=10,pertmeta=None):
+    indls=[] # max heap of dist and ind
+    for i in range(len(tasks)):
+        # target position
+        dx=abs(tasks[i][0]-thistask[0])
+        dy=abs(tasks[i][1]-thistask[1])
+        # pert strength
+        dps=abs(pertmeta[i][1]-thispertmeta[1])*0.1
+        # pert direction
+        dpd=abs(pertmeta[i][0]-thispertmeta[0])/pi/10
+        # pert timing
+        dpt=abs(pertmeta[i][2]-thispertmeta[2])*0.005
+        d=-1*(dx**2+dy**2).item()-dpt-dpd-dps
+        if len(indls)>=ntrial:
+            heapq.heappushpop(indls,(d,i)) # push and pop
+        else:
+            heapq.heappush(indls,(d,i)) # only push
+    result=([i[1] for i in heapq.nlargest(ntrial,indls)])
+
+    return result
+
+
 def normalizematrix(data):
     return (data - np.min(data)) / (np.max(data) - np.min(data))
 
@@ -3584,13 +3699,30 @@ def get_relative_r_ang(px, py, heading_angle, target_x, target_y):
     relative_ang[relative_ang >= np.pi] -= 2 * np.pi
     return relative_r, relative_ang
 
-        
+
+def quickspine(ax):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+
+def quickallspine(ax):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+
+
 @contextmanager
 def initiate_plot(dimx=24, dimy=9, dpi=100, fontweight='normal'):
     plt.rcParams['figure.figsize'] = (dimx, dimy)
     plt.rcParams['font.weight'] = fontweight
     plt.rcParams['mathtext.default'] = 'regular'
-    plt.rcParams["font.family"] = 'Arial'
+    # plt.rcParams["font.family"] = 'Arial'
+    plt.rcParams['font.family'] = 'CMU Serif'
+    plt.rcParams['font.size'] = '14'
+    plt.rcParams['axes.unicode_minus'] = False
+    plt.rcParams['pdf.fonttype'] = 42
+    plt.rcParams['svg.fonttype'] = 'none'
     fig = plt.figure(dpi=dpi)
     yield fig
     plt.show()
@@ -4588,6 +4720,64 @@ def plotoverhead_skip(input):
 
         fig.tight_layout(pad=0)
 
+
+def plotoverhead_simple(states,task,color='b',label='label',ax=None):
+    if ax:
+        for s in states:
+            ax.plot(s[:,0]*200,s[:,1]*200, color=color,alpha=0.5,label=label)
+        ax.legend()        
+        goalcircle = plt.Circle((task[0]*200,task[1]*200), 65, color=color_settings['goal'], edgecolor='none', alpha=0.3, linewidth=0.8)
+        ax.add_patch(goalcircle)
+        ax.set_aspect('equal')
+        ax.set_xlabel('world x [cm]')
+        ax.set_ylabel('world y [cm]')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xticks(mytick(ax.get_xticks(),3,-1))
+        ax.set_yticks(mytick(ax.get_yticks(),3,-1))
+        handles, labels_ = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels_, handles))
+        ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+    else:
+        with initiate_plot(3, 3,300) as fig:
+            ax=fig.add_subplot(111)
+            for s in states:
+                ax.plot(s[:,0]*200,s[:,1]*200, color=color,alpha=0.5,label=label)
+            ax.legend()        
+            goalcircle = plt.Circle((task[0]*200,task[1]*200), 65, color=color_settings['goal'], edgecolor='none', alpha=0.3, linewidth=0.8)
+            ax.add_patch(goalcircle)
+            ax.set_aspect('equal')
+            ax.set_xlabel('world x [cm]')
+            ax.set_ylabel('world y [cm]')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.set_xticks(mytick(ax.get_xticks(),3,-1))
+            ax.set_yticks(mytick(ax.get_yticks(),3,-1))
+            handles, labels_ = ax.get_legend_handles_labels()
+            by_label = dict(zip(labels_, handles))
+            ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+            plt.tight_layout()
+    return ax
+
+
+def select_tar(states, actions, tasks, cond=None):
+    angels=np.array([xy2pol(task, rotation=False)[1] for task in tasks])
+    inds=np.where( (angels<=-pi/4*0.7) | (angels>=pi/4*0.7) )[0]
+    print(inds)
+    states_= [states[i] for i in inds]
+    actions_= [actions[i] for i in inds]
+    tasks_=tasks[inds]
+    return states_,actions_,tasks_
+ 
+
+
+def intobins(data, nbin=10):
+    bins=np.histogram(data)[1]
+    bins=np.diff(bins)/2+bins[:-1]
+    counts=np.apply_along_axis(lambda a: np.histogram(a, bins=nbin)[0], 0, data)
+    return bins, counts
+
+
 # change theta in direction of mattered most eigen vector 
 def matter_most_eigen_direction():
     theta_mean=torch.tensor([[0.5],
@@ -4652,13 +4842,13 @@ def histdfcol():
     plt.show()
 
 
-def colorgrad_line(x,y,z,ax=None, linewidth=2):
+def colorgrad_line(x,y,z,ax=None, linewidth=2,cmap='viridis'):
     x,y,z=np.array(x),np.array(y),np.array(z)
     points = np.array([x, y]).T.reshape(-1, 1, 2)
     segments = np.concatenate([points[:-1], points[1:]], axis=1)
     colors=np.array(z)
     if ax:
-        lc = LineCollection(segments, cmap='viridis')
+        lc = LineCollection(segments, cmap=cmap)
         lc.set_array(colors)
         lc.set_linewidth(linewidth)
         line = ax.add_collection(lc)
@@ -4799,6 +4989,7 @@ def get_stops(states, tasks, thistask, env, theta, agent,pert=None):
 
 
 def run_trial(agent=None,env=None,given_action=None, given_state=None, action_noise=0.1,pert=None):
+    # return epactions,epbliefs,epbcov,epstates
     # 10 a 10 s. 
     # when both
     # use a1 and s2
@@ -4851,6 +5042,20 @@ def run_trial(agent=None,env=None,given_action=None, given_state=None, action_no
     return epactions,epbliefs,epbcov,epstates
 
 
+def run_trials(agent, env, phi, theta, task,ntrials=10):
+    # return states and actions
+    states=[]
+    actions=[]
+    with suppress():
+        while len(states)<ntrials:
+            env.reset(phi=phi, theta=theta, goal_position=task, pro_traj=None,vctrl=0.,wctrl=0. )
+            epactions,_,_,epstates=run_trial(agent,env,given_action=None, given_state=None, action_noise=0.1)
+            if len(epstates)>5:
+                states.append(torch.stack(epstates)[:,:,0])
+                actions.append(torch.stack(epactions))
+    return states,actions
+
+
 def plotpert(v, w, ax=None,alpha=0.8):
     with initiate_plot(3.8, 1.8, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
@@ -4900,6 +5105,29 @@ def quickoverhead(statelike,ax=None,alpha=0.5):
     ax.legend(by_label.values(), by_label.keys(),loc=2, prop={'size': 6})
 
 
+def percentile_err1d(data,percentile=95):
+    # return asysmetry error for data of categority x samples
+    low=100-percentile
+    high=percentile
+    lower_ci=np.percentile(data,low)
+    upper_ci=np.percentile(data,high)
+    asymmetric_error = np.array([lower_ci, upper_ci]).T 
+    res=np.array([ np.abs( np.mean(data)-asymmetric_error[0]), np.abs(asymmetric_error[1]-np.mean(data)) ] )
+    return res
+
+
+def percentile_err(data,percentile=95):
+    # return asysmetry error for data of categority x samples
+    low=100-percentile
+    high=percentile
+    lower_ci=[np.percentile(i,low) for i in data]
+    upper_ci=[np.percentile(i,high) for i in data]
+    asymmetric_error = np.array(list(zip(lower_ci, upper_ci))).T # without adjusting for the mean
+    mean=np.array([np.mean(i) for i in data])
+    res=np.array([ np.abs(mean.T-asymmetric_error[0,:] ), np.abs(asymmetric_error[1,:]-mean.T) ] )
+    return res
+
+
 def theta_bar(finaltheta,finalcov=None,xlabels=theta_names,err=None, ax=None, label=None,shift=0,width=0.5, color=None):
     if finalcov is None: err=None
     else: err=torch.diag(finalcov)**0.5 if err is None else err
@@ -4908,7 +5136,10 @@ def theta_bar(finaltheta,finalcov=None,xlabels=theta_names,err=None, ax=None, la
         if ax is None:
             ax = fig.add_subplot(111)
         # Create bars and choose color
-        ax.bar([i+shift for i in range(len(finaltheta))], finaltheta.view(-1),width,yerr=err,label=label, color=color)
+        if type(finaltheta) is torch.tensor:
+            ax.bar([i+shift for i in range(len(finaltheta))], finaltheta.view(-1),width,yerr=err,label=label, color=color)
+        else:
+            ax.bar([i+shift for i in range(len(finaltheta))], finaltheta.reshape(-1),width,yerr=err,label=label, color=color)
         # title and axis names
         ax.set_ylabel('inferred parameter value')
         ax.set_xticks([i for i in range(len(xlabels))])
@@ -5581,11 +5812,29 @@ def plotw_fill(indls,resirc,actions=None,percentile=5,**kwargs):
         return  ax
 
 
-
 def getcbarnorm(min,mid,max):
     divnorm=matplotlib.colors.TwoSlopeNorm(vmin=min, vcenter=mid, vmax=max)
     return divnorm
 
 
+def eval_curvature(agent, env, phi, theta, tasks,vctrl=0.,wctrl=0.,ntrials=10):
+    actions=[]
+    with suppress():
+        for task in tasks:
+            for _ in range(ntrials):
+                env.reset(phi=phi, theta=theta, pro_traj=None,vctrl=0.,wctrl=0. )
+                epactions,_,_,_=run_trial(agent,env,given_action=None, given_state=None, action_noise=0.1)
+                if len(epactions)>5:
+                    actions.append(torch.stack(epactions))
+    cur=abs(sum([sum(a[:,1]) for a in actions]))
+    return cur
 
 
+def npsummary(nparray):
+    print("mean ", np.mean(nparray))
+    print("std ", np.std(nparray))
+    print("med ", np.median(nparray))
+    print("range ", np.min(nparray),np.max(nparray))
+
+
+    

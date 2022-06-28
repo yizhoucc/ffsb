@@ -49,19 +49,25 @@ agent=agent_.actor.mu.cpu()
 
 
 print('loading data')
-datapath=Path("Z:/human/hgroup")
-savename=datapath.parent/('subinvside'+datapath.name)
+datapath=Path("Z:/human/woagroup2")
+savename=datapath.parent/('1'+datapath.name)
 
 with open(datapath, 'rb') as f:
     states, actions, tasks = pickle.load(f)
+# random select
+indls=np.random.randint(0,len(tasks),100)
+states=[states[i] for i in indls]
+actions=[actions[i] for i in indls]
+tasks=tasks[indls]
 
-res=[]
-for task in tasks:
-    d,a=xy2pol(task, rotation=False)
-    # if  env.min_angle/2<=a<env.max_angle/2:
-    if a<=env.min_angle*0.7 or a>=env.max_angle*0.7:
-        res.append(task)
-tasks=np.array(res)
+# select by side
+# res=[]
+# for task in tasks:
+#     d,a=xy2pol(task, rotation=False)
+#     # if  env.min_angle/2<=a<env.max_angle/2:
+#     if a<=env.min_angle*0.7 or a>=env.max_angle*0.7:
+#         res.append(task)
+# tasks=np.array(res)
 
 
 # states, actions, tasks=states[:500], actions[:500], tasks[:500]

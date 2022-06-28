@@ -116,40 +116,31 @@ l=np.exp(l)
 p=l*1/np.sum(l, axis=1).reshape(-1,1)
 
 
-with open('{}obsdenslog'.format(name), 'wb') as handle:
-        pickle.dump((obsvls, p), handle, protocol=pickle.HIGHEST_PROTOCOL)
+# with open('{}obsdenslog'.format(name), 'wb') as handle:
+#         pickle.dump((obsvls, p), handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+with open('{}obsdensloglong'.format('bruno'), 'rb') as handle:
+    obsvls, p=pickle.load(handle)
 basecolor=hex2rgb(color_settings['o'])
 colors=colorshift(basecolor, basecolor, 1, len(densities))
-
-
-with initiate_plot(9,3) as fig:
+with initiate_plot(3,3) as fig:
+    ax=fig.add_subplot(1,1,1)
     for i in range(len(densities)):
-        if i!=0:
-            ax.set_yticks([])
-            ax.set_yticklabels([])
-            ax=fig.add_subplot(1,4,i+1, sharey=ax)
-        else:
-            ax=fig.add_subplot(1,4,1)
-            ax.set_ylabel('probability')
-        ax.set_xlim(0,max(obsvls))
-        ax.set_xticks([0,0.1,0.2,0.5])
         pdd,d=p[i], densities[i]
-        ax.fill_between(obsvls,pdd, label='density {}'.format(str(d)),color=colors[i],alpha=0.8,edgecolor='none')
-        ax.set_xlabel('observation noise std [m/s]')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.set_ylim(0,np.max(p)*1.2)
-        ax.legend()
-        
+        # ax.fill_between(obsvls,pdd, label='density {}'.format(str(d)),color=colors[i],alpha=1/len(densities),edgecolor='none')
+        ax.plot(obsvls,pdd, label='density {}'.format(str(d)),color=colors[i],alpha=0.8)
 
-# np.random.normal(0,1,size=(5,env.episode_len,2)).shape
+    ax.set_yticks([])
+    ax.set_yticklabels([])
+    ax.set_ylabel('probability')
+    ax.set_xlim(0,max(obsvls))
+    ax.set_xticks([0,0.1,0.2,0.5])
+    ax.set_xlabel('observation noise std [m/s]')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylim(0,np.max(p)*1.2)
+    leg=ax.legend()
+    for lh in leg.legendHandles: 
+        lh.set_alpha(1)
 
-
-# env.obs_traj=np.random.normal(0,1,size=(5,env.episode_len,2))
-
-
-
-
-# env.obs_traj[int(env.trial_timer.item())]*env.noise_scale

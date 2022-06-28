@@ -37,6 +37,7 @@ because calculations such as computing reward etc are not required during the in
 defines the rational policy.
 vect cur_action, policy(vect cur_belief)
 
+## endnote
 and that's it!
 other minor things that could be relavent are:
 inital theta (where we want to start), number of samples for marginalization.

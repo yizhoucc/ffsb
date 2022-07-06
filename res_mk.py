@@ -369,7 +369,7 @@ for x,y in tars:
         values.append(v)
 values=np.array(values)
 # plot
-with initiate_plot(3, 3,300) as fig:
+with initiate_plot(2, 2,300) as fig:
     ax=fig.add_subplot(111)
     ax.set_aspect('equal')
     ax.set_xlabel('world x [cm]')
@@ -382,6 +382,11 @@ with initiate_plot(3, 3,300) as fig:
     fig.colorbar(im, ax=ax,label='value')
     # ax.scatter([0.],[0.],marker='*')
 
+# save the value map
+with open('valuemap33', 'wb+') as f:
+    pickle.dump((values,tars), f, protocol=pickle.HIGHEST_PROTOCOL)
+with open('valuemap33', 'rb') as f:
+    values,tars= pickle.load(f)
 
 # % histogram of skips number vs value ----------------------
 
@@ -498,7 +503,9 @@ with initiate_plot(2,2,300) as f:
 
 
 # % model the history skip effect, by logistic regression ---------------------
-df=data['vnormdf']
+filenamecommom=Path('Z:\\victor_normal')
+with open(filenamecommom/'packed', 'rb') as f:
+    df = pickle.load(f)
 # o1 label the trial type list
 subdf=df[(df.category=='skip') | (df.category=='normal')]
 tasks=np.vstack([(np.array(subdf.target_y)/400),(np.array(subdf.target_x)/400)])
@@ -562,10 +569,12 @@ for i in range(num_steps, len(encodedtrialtype)-num_steps):
     inputpreverr=np.zeros(num_steps)
     inputprevd=np.zeros(num_steps)
     inputpreva=np.zeros(num_steps)
+    for j in range(0,num_steps):
+        inputvalue[j]=totalvalues[i-j]
     for j in range(1,num_steps):
         inputtype[j]=encodedtrialtype[i-j]
         inputreward[j]=rewarded[i-j]
-        inputvalue[j]=totalvalues[i-j]
+        # inputvalue[j]=totalvalues[i-j]
         # inputpreverr[j]=preverr[i-j]
         # inputprevd[j]=prevd[i-j]
         # inputpreva[j]=preva[i-j]
@@ -608,7 +617,7 @@ for i in range(2):
         ax.bar(np.arange(num_steps,num_steps*2)+3*1,model.coef_.flatten()[num_steps:num_steps*2],label='rewarded')
         ax.bar(np.arange(num_steps*2,num_steps*3)+3*2,model.coef_.flatten()[num_steps*2:num_steps*3],label='value')   
         ax.bar(np.arange(num_steps*3,num_steps*4)+3*3,model.coef_.flatten()[num_steps*3:num_steps*4],label='radial err')
-        ax.bar(np.arange(num_steps*4,num_steps*5)+3*4,model.coef_.flatten()[num_steps*4:num_steps*5],label='ddistance')
+        ax.bar(np.arange(num_steps*4,num_steps*5)+3*4,model.coef_.flatten()[num_steps*4:num_steps*5],label='distance')
         ax.bar(np.arange(num_steps*5,num_steps*6)+3*5,model.coef_.flatten()[num_steps*5:num_steps*6],label='angle')
         ax.legend(loc='upper right', bbox_to_anchor=(0,0))
         # ax.set_xticks([0,num_steps,num_steps+3,num_steps*2+3,num_steps*2+6,num_steps*3+6])
@@ -635,7 +644,7 @@ for i in range(2):
 
 
 # vary n steps
-maxnumsteps=9
+maxnumsteps=8
 numsamples=100
 totalaccs=[]
 for num_steps in range(1,maxnumsteps+1):
@@ -644,16 +653,17 @@ for num_steps in range(1,maxnumsteps+1):
         inputtype=np.zeros(num_steps)
         inputreward=np.zeros(num_steps)
         inputvalue=np.zeros(num_steps)
-        inputpreverr=np.zeros(num_steps)
-        inputprevd=np.zeros(num_steps)
-        inputpreva=np.zeros(num_steps)
+        # inputpreverr=np.zeros(num_steps)
+        # inputprevd=np.zeros(num_steps)
+        # inputpreva=np.zeros(num_steps)
+        for j in range(0,num_steps):
+            inputvalue[j]=totalvalues[i-j]
         for j in range(1,num_steps):
             inputtype[j]=encodedtrialtype[i-j]
             inputreward[j]=rewarded[i-j]
-            inputvalue[j]=totalvalues[i-j]
-            inputpreverr[j]=preverr[i-j]
-            inputprevd[j]=prevd[i-j]
-            inputpreva[j]=preva[i-j]
+            # inputpreverr[j]=preverr[i-j]
+            # inputprevd[j]=prevd[i-j]
+            # inputpreva[j]=preva[i-j]
         lrdata.append(np.hstack([inputtype,inputreward,inputvalue, inputpreverr, inputprevd, inputpreva]))
     lrdata=np.array(lrdata)
 
@@ -664,13 +674,13 @@ for num_steps in range(1,maxnumsteps+1):
 
     totalacc=[]
     for i in range(numsamples):
-        splitpoint=np.random.randint(0,len(lrdata)-300)
+        splitpoint=np.random.randint(0,len(lrdata)-500)
         trainx=np.concatenate((x[:splitpoint],x[splitpoint+100:]),axis=0)
         trainy=np.concatenate((y[:splitpoint],y[splitpoint+100:]),axis=0)
         valx=x[splitpoint:splitpoint+100]
         valy=y[splitpoint:splitpoint+100]
-        testx=x[splitpoint+100:splitpoint+300]
-        testy=y[splitpoint+100:splitpoint+300]
+        testx=x[splitpoint+100:splitpoint+500]
+        testy=y[splitpoint+100:splitpoint+500]
         # use distance and angle to predict cur type
         model = LogisticRegression(fit_intercept=False)
         model.fit(trainx,trainy)
@@ -685,7 +695,9 @@ totalaccs=np.array(totalaccs)
 
 with initiate_plot(2,2,300) as f:
     ax=f.add_subplot(111)
-    ax.errorbar(list(range(1,maxnumsteps+1)),np.mean(totalaccs,axis=1),yerr=np.std(totalaccs,axis=1))
+    yerr=np.std(totalaccs,axis=1)
+    # yerr=percentile_err2d(totalaccs,axis=1,percentile=95).T
+    ax.errorbar(list(range(1,maxnumsteps+1)),np.mean(totalaccs,axis=1),yerr=yerr)
     plt.plot([1,maxnumsteps],[0.8881578947368421,0.8881578947368421], label='chance level')
     quickspine(ax)
     ax.set_xticks([1,maxnumsteps-1])
@@ -694,31 +706,34 @@ with initiate_plot(2,2,300) as f:
     ax.set_ylabel('prediction accuracy')
     ax.text(1,1,'skip prediction acc sampled from {} samples, \nerrorbar shows std'.format(numsamples))
     ax.legend()
+    # quicksave('acc vs numhistory')
 
 
-# vary variables
-def permutation(x,prevres=[]):
-    # permutation of variables in list of x
-    if x==[]:
-        return prevres
-    if len(x)==1:
-        return [p+x for p in prevres]+prevres
-    curres=permutation(x[1:])
-    curres=[]
-    for cur in prevres:
-        curres.append(cur+[x[0]])
-        curres.append(cur)
-    return curres
 
-permutation([1,2,3])
+# vary variable combinations  ---------------------
 
+def combination(x):
+    res=[]
+    for c in range(len(x)): # count
+        for starti in range(len(x)-c):
+            i=starti
+            curres=[]
+            while len(curres)<c+1 and i<len(x):
+                curres.append(x[i])
+                i+=1
+            if curres:
+                res.append(curres)
+    return res
 
-nvariable=6
-num_steps=5
+dependentvarnames=['skip','rewarded','value']
+dependentvarvalues=[encodedtrialtype,rewarded,totalvalues]
+dependentvarsets=combination([0,1,2])
+
+num_steps=6
 numsamples=100
-totalaccs=[[None]*nvariable for _ in range(nvariable)]
-for vi in range(nvariable):
-    for vj in range(nvariable):
+totalaccs=[]
+totalcoefs=[]
+for paramset in dependentvarsets:
         lrdata=[]
         for i in range(num_steps, len(encodedtrialtype)-num_steps):
             inputtype=np.zeros(num_steps)
@@ -727,13 +742,17 @@ for vi in range(nvariable):
             inputpreverr=np.zeros(num_steps)
             inputprevd=np.zeros(num_steps)
             inputpreva=np.zeros(num_steps)
+            for j in range(0,num_steps):
+                if 2 in paramset:
+                    inputvalue[j]=totalvalues[i-j]            
             for j in range(1,num_steps):
-                inputtype[j]=encodedtrialtype[i-j]
-                inputreward[j]=rewarded[i-j]
-                inputvalue[j]=totalvalues[i-j]
-                inputpreverr[j]=preverr[i-j]
-                inputprevd[j]=prevd[i-j]
-                inputpreva[j]=preva[i-j]
+                if 0 in paramset:
+                    inputtype[j]=encodedtrialtype[i-j]
+                if 1 in paramset:
+                    inputreward[j]=rewarded[i-j]
+                # inputpreverr[j]=preverr[i-j]
+                # inputprevd[j]=prevd[i-j]
+                # inputpreva[j]=preva[i-j]
             lrdata.append(np.hstack([inputtype,inputreward,inputvalue, inputpreverr, inputprevd, inputpreva]))
         lrdata=np.array(lrdata)
 
@@ -741,7 +760,7 @@ for vi in range(nvariable):
         y=encodedtrialtype[num_steps:][:len(lrdata)]
         x=np.array(x)
         y=np.array(y)
-
+        totalcoef=[]
         totalacc=[]
         for i in range(numsamples):
             splitpoint=np.random.randint(0,len(lrdata)-300)
@@ -756,15 +775,63 @@ for vi in range(nvariable):
             model.fit(trainx,trainy)
             # print("val acc: %.2f" % model.score(valx, valy, sample_weight=None))
             # print("acc: %.2f" % model.score(testx, testy, sample_weight=None))
+            totalcoef.append(model.coef_.flatten())
             totalacc.append(model.score(testx, testy, sample_weight=None))
             # totalacc.append(model.score(testx, testy, sample_weight=None)-(1-np.count_nonzero(testy)/len(testy))) # above chance
         # print('mean acc ',totalacc/numsamples)
         totalaccs.append(totalacc)
-
+        totalcoefs.append(totalcoef)
 totalaccs=np.array(totalaccs)
+totalcoefs=np.array(totalcoefs)
+
+# acc
+with initiate_plot(3,2,300) as f:
+    ax=f.add_subplot(111)
+    quickspine(ax)   
+    ax.bar(list(range(len(dependentvarsets))),np.mean(totalaccs,axis=1),yerr=np.std(totalaccs,axis=1))
+    ax.set_xticks(list(range(len(dependentvarsets))))
+    ax.set_xticklabels([''.join([str(ss) for ss in s]) for s in dependentvarsets])
+    ax.set_xlabel('dependent variable sets')
+    ax.set_ylabel('skip prediction acc')
+    ax.text(0,-1,'0,1,2 stands for type, reward, and value')
+    # quicksave('dependent variable sets acc')
+
+
+# coefs
+nbyn=int(len(dependentvarsets)**0.5) if len(dependentvarsets)**0.5//1==0 else int(len(dependentvarsets)**0.5//1+1)
+nrow=nbyn
+ncol=len(dependentvarsets)//nrow if (len(dependentvarsets)//nrow)//1==0 else int(np.ceil(len(dependentvarsets)/nrow))
+fig,axs=plt.subplots(nrow, ncol,figsize=(2*nrow,2*ncol) ,dpi=300,sharey=True)
+for i in range(nrow):
+    for j in range(ncol):
+        cur=i*ncol+j
+        ax=axs[i,j]
+        quickspine(ax)
+        coefmu=np.mean(totalcoefs[cur],axis=0)
+        coefstd=np.std(totalcoefs[cur],axis=0)
+        ax.bar(list(range(num_steps)),coefmu[:num_steps],yerr=coefstd[:num_steps], label='skipped')
+        ax.bar(np.arange(num_steps,num_steps*2)+3*1,coefmu[num_steps:num_steps*2],yerr=coefstd[num_steps:num_steps*2],label='rewarded')
+        ax.bar(np.arange(num_steps*2,num_steps*3)+3*2,coefmu[num_steps*2:num_steps*3],yerr=coefstd[num_steps*2:num_steps*3],label='value')   
+        if i!=nrow-1:
+            ax.set_xticks([])
+            ax.set_xticklabels([])
+        else:
+            ax.set_xticks([num_steps//2+1,num_steps+num_steps//2+4,num_steps*2+num_steps//2+7])
+            ax.set_xticklabels(dependentvarnames)
+            ax.set_xlabel('previous ith trial type')
+        if j==0:
+            ax.set_ylabel('coef')
+        if i==j==0:
+            ax.legend(loc='upper right', bbox_to_anchor=(-1,0))
+    # quicksave('dependent combination coef')
+
+
+
+
 
 with initiate_plot(2,2,300) as f:
-    ax=f.add_subplot(111)
+    ax=plt.subplot(nbyn, int(np.ceil(len(dependentvarsets)//nbyn)),len(dependentvarsets))
+
     ax.errorbar(list(range(1,maxnumsteps+1)),np.mean(totalaccs,axis=1),yerr=np.std(totalaccs,axis=1))
     plt.plot([1,maxnumsteps],[0.8881578947368421,0.8881578947368421], label='chance level')
     quickspine(ax)
@@ -832,10 +899,44 @@ with initiate_plot(2,1,300) as f:
     ax.text(-100,1,'prediction from {} step history'.format(str(num_steps)))
 
 
-# threshold the value map
 
-# gradually change the threshold, to form a row of subplots, with percentage of skips
+# vary 2 param ---------------------
+'''
+we found that process noise w and obs noise w are possitively correlated,
+test if this is true
+by varying the two parameters
+'''
+# load the data
+theta,_,_=process_inv("Z:/bruno_pert/cmafull_b_pert", removegr=False)
+with open('Z:/victor_pert/packed','rb') as f:
+    df = pickle.load(f)
+df=datawash(df)
+df=df[df.category=='normal']
+df=df[df.target_r>200]
+states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
 
+
+# vary the two params
+midpoint=np.array(theta).T
+gridreso=15
+dx,dy=np.zeros((11)),np.zeros((11))
+dx[3]=1 # pro noise
+dy[5]=1 # obs noise
+X,Y=np.linspace(0,2,gridreso), np.linspace(0,2,gridreso)
+paramls=[]
+for i in range(gridreso):
+    for j in range(gridreso):
+        htheta=torch.tensor(dx*X[i]+dy*Y[j]+midpoint).float().view(-1,1)
+        paramls.append(htheta)
+
+
+Z=ray.get([getlogll.remote(each) for each in paramls])
+with open('distinguishparamZnoisecost3finer19', 'wb+') as f:
+        pickle.dump((paramls,Z), f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+# with open('distinguishparamZnoisecost3finer19', 'rb') as f:
+#     paramls,Z= pickle.load(f) 
 
 
 

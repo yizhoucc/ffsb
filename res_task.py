@@ -1,12 +1,37 @@
-    # % fig: optimal solution for inverse achieved
-    # % likelihood surface theta trajectory (many trajectories)
-    # % bar plot, error bar showing parameters
-    # % eigen vectors of hessian,
-    # % covariance of hessian
-    # % correlation of covariance
-    # % theta varing by first eigen vector (the mattered most direction)
-    # % this fig is confirmation, we can use the model as if its the monkey's brain
-    # % fig: infered internal model has similar behaviors to monkeys on testdataset
-    # % TODO. same trials overhead, Acceleration/color gradient velocity path, path simlar and stop similar
-    # % same trials control curves
-    # % example monkey error trial explained. overhead belief and mk path
+
+
+from plot_ult import *
+
+# ----------------------------
+
+
+# A. The firefly task in overhead view. ----------------------------
+# schema
+
+
+# B. An example control trajectory. ----------------------------
+# schema
+
+
+# C. An example path. ----------------------------
+# schema
+
+
+# D. Target locations are randomly drawn within a certain range. Red means monkey skipped this targets. ----------------------------
+# load all df
+print('loading data')
+datapath=Path("Z:\\bruno_normal\\packed")
+with open(datapath,'rb') as f:
+    df = pickle.load(f)
+df=datawash(df)
+df=df[df.category=='normal']
+# plot
+overheaddf_tar(df[:1000])
+overheaddf_path(df,list(range(1000)))
+
+
+# E. Monkey paths. ----------------------------
+# load all df
+# plot
+
+

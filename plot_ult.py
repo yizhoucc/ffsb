@@ -90,8 +90,9 @@ font_dirs = [Path('C:/Users/24455/iCloudDrive/misc/computer-modern'), ]
 font_files = font_manager.findSystemFonts(fontpaths=font_dirs)
 for font_file in font_files:
     font_manager.fontManager.addfont(font_file)
-
-
+plt.rcParams['font.family'] = 'CMU Serif'
+plt.rcParams['font.size'] = '14'
+plt.rcParams['axes.unicode_minus'] = False
 
 cmaps = OrderedDict()
 cmaps['Qualitative'] = ['Pastel1', 'Pastel2', 'Paired', 'Accent',
@@ -3727,7 +3728,10 @@ def initiate_plot(dimx=24, dimy=9, dpi=100, fontweight='normal'):
     yield fig
     plt.show()
     
-    
+def quicksave(name):
+    plt.savefig('C:/Users/24455/iCloudDrive/misc/602e8a45552ffee5239628ae/figures/{}.svg'.format(name), dpi='figure', format='svg',bbox_inches="tight")
+
+
 def set_violin_plot(bp, facecolor, edgecolor, linewidth=1, alpha=1, ls='-', hatch=r''):
     plt.setp(bp['bodies'], facecolor=facecolor, edgecolor=edgecolor, 
              linewidth=linewidth, alpha=alpha ,ls=ls, hatch=hatch)
@@ -5105,6 +5109,11 @@ def quickoverhead(statelike,ax=None,alpha=0.5):
     ax.legend(by_label.values(), by_label.keys(),loc=2, prop={'size': 6})
 
 
+def percentile_err2d(data,axis=0,percentile=95):
+    fun=lambda x: percentile_err1d(x,percentile=percentile)
+    return np.apply_along_axis(fun, axis,data)
+
+
 def percentile_err1d(data,percentile=95):
     # return asysmetry error for data of categority x samples
     low=100-percentile
@@ -5421,6 +5430,8 @@ def get_ci(log, low=5, high=95, threshold=2,ind=-1):
     return res
     
 
+
+
 def twodatabar(data1,data2,err1=None,err2=None,labels=None,shift=0.4,width=0.5,ylabel=None,xlabel=None,color=['b','r'],xname=''):
     xs=list(range(max(len(data1),len(data2))))
     label1=labels[0] if labels else None
@@ -5513,8 +5524,10 @@ def overheaddf_tar(df, alpha=1,**kwargs):
         fig.tight_layout(pad=0)
         ax.plot(np.linspace(0, 230 + 7),
                 np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
-        ax.scatter(df[df.rewarded].target_x,df[df.rewarded].target_y, c='k',alpha=alpha, edgecolors='none',marker='.', s=2, lw=1)
-        ax.scatter(df[~df.rewarded].target_x,df[~df.rewarded].target_y, c='r',alpha=alpha,edgecolors='none', marker='.', s=2, lw=1)
+        ax.scatter(df[df.rewarded].target_x,df[df.rewarded].target_y, c='k',alpha=alpha, edgecolors='none',marker='.', s=9, lw=1,label='rewarded')
+        ax.scatter(df[~df.rewarded].target_x,df[~df.rewarded].target_y, c=[1,0.5,0.5],alpha=alpha,edgecolors='none', marker='.', s=9, lw=1,label='unrewarded')
+        ax.legend(loc='upper right', bbox_to_anchor=(0,0))
+        quicksave('all tar overhead')
 
 
 def overheaddf_path(df,indls, alpha=0.5,**kwargs):
@@ -5543,6 +5556,7 @@ def overheaddf_path(df,indls, alpha=0.5,**kwargs):
 
         for trial_i in indls:
             ax.plot(df.iloc[trial_i].pos_x,df.iloc[trial_i].pos_y,c=pathcolor, lw=0.1, ls='-', alpha=alpha)
+        quicksave('all trial path')
 
 
 def conditional_cov(covyy,covxx, covxy):
@@ -5575,6 +5589,9 @@ def process_inv(res, removegr=True, ci=5,ind=-1):
     print(res)
     with open(res, 'rb') as f:
         log = pickle.load(f)
+    if ind>=len(log): ind=-1
+    elif ind<=-len(log): ind=1
+    print('using ind: ',ind)
     finalcov=torch.tensor(log[ind][0]._C).float()
     finaltheta=torch.tensor(log[ind][0]._mean).view(-1,1)
     theta=torch.cat([finaltheta[:6],finaltheta[-4:]])

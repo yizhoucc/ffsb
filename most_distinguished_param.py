@@ -12,6 +12,7 @@ final result is a heat map
 
 # imports
 # ---------------------------------------------------------------------------------
+import matplotlib
 from playsound import playsound
 import matplotlib.pyplot as plt
 from sklearn import svm
@@ -34,7 +35,7 @@ from matplotlib import pyplot as plt
 import time
 from stable_baselines3 import TD3
 torch.manual_seed(0)
-from numpy import pi
+from numpy import linspace, pi
 from InverseFuncs import *
 from monkey_functions import *
 from FireflyEnv import ffacc_real
@@ -45,7 +46,7 @@ from pathlib import Path
 arg = Config()
 import os
 from timeit import default_timer as timer
-from plot_ult import ll2array, run_trial, sample_all_tasks, initiate_plot,process_inv, eval_curvature, xy2pol,suppress, quickspine, select_tar
+from plot_ult import ll2array, normalizematrix, npsummary, run_trial, sample_all_tasks, initiate_plot,process_inv, eval_curvature, xy2pol,suppress, quickspine, select_tar
 
 
 # load agent and task --------------------------------------------------------
@@ -240,7 +241,7 @@ abias=totalbias(mus[0][1],mus[0][3],mus[0][5])
 hbias=totalbias(mus[1][1],mus[1][3],mus[1][5])
 
 c=totalgivenop(mus[0][5],mus[0][3])
-pogiventotal(mus[0][5],auncertainty)
+# pogiventotal(mus[0][5],auncertainty)
 
 X,Y=np.linspace(-1,1,gridreso), np.linspace(-1,1,gridreso)
 paramls=[]
@@ -513,24 +514,24 @@ for i in range(gridreso):
 # with open('distinguishparamZcostgain2', 'wb+') as f:
 #         pickle.dump((paramls,Z), f, protocol=pickle.HIGHEST_PROTOCOL)
 
-with open('distinguishparamZcostgain2', 'rb+') as f:
-    paramls,Z= pickle.load(f)
-formatedZ=np.array(Z).reshape(int(len(Z)**0.5),int(len(Z)**0.5)).T
-truedelta=mus[1]-mus[0]
+# with open('distinguishparamZcostgain2', 'rb+') as f:
+#     paramls,Z= pickle.load(f)
+# formatedZ=np.array(Z).reshape(int(len(Z)**0.5),int(len(Z)**0.5)).T
+# truedelta=mus[1]-mus[0]
 
-with initiate_plot(3,3,300) as f:
-    ax=f.add_subplot(111)
-    # im=ax.imshow(formatedZ[:,2:],origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='auto')
-    im=ax.imshow(formatedZ[:,1:-1],origin='lower', extent=(X[0],X[-1],Y[1],Y[-2]),aspect='auto',vmin=-103, vmax=-73)
-    # im=ax.contourf(formatedZ,origin='lower', extent=(X[2],X[-1],Y[0],Y[-1]),vmin=-103, vmax=-73)
-    ax.set_aspect('equal')
-    plt.colorbar(im,label='joint log likelihood') 
-    ax.scatter(0,0,label='zero') # midpoint, 0,0
-    ax.set_xlabel('delta w cost')
-    ax.set_ylabel('delta assumed control gain')
-    ax.scatter(truedelta[5]/2,truedelta[3]/2,label='inferred delta') # inferred delta
-    # ax.legend()
-    quickspine(ax)
+# with initiate_plot(3,3,300) as f:
+#     ax=f.add_subplot(111)
+#     # im=ax.imshow(formatedZ[:,2:],origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='auto')
+#     im=ax.imshow(formatedZ[:,1:-1],origin='lower', extent=(X[0],X[-1],Y[1],Y[-2]),aspect='auto',vmin=-103, vmax=-73)
+#     # im=ax.contourf(formatedZ,origin='lower', extent=(X[2],X[-1],Y[0],Y[-1]),vmin=-103, vmax=-73)
+#     ax.set_aspect('equal')
+#     plt.colorbar(im,label='joint log likelihood') 
+#     ax.scatter(0,0,label='zero') # midpoint, 0,0
+#     ax.set_xlabel('delta w cost')
+#     ax.set_ylabel('delta assumed control gain')
+#     ax.scatter(truedelta[5]/2,truedelta[3]/2,label='inferred delta') # inferred delta
+#     # ax.legend()
+#     quickspine(ax)
 
 
 
@@ -556,23 +557,23 @@ for i in range(gridreso):
 # [p[0][8] for p in paramls]
 # [p[1][8] for p in paramls]
 
-# vary v and w cost
-with open('distinguishparamZvwcost2', 'rb+') as f:
-    paramls,Z= pickle.load(f)
-formatedZ=np.array(Z).reshape(int(len(Z)**0.5),int(len(Z)**0.5)).T
-truedelta=mus[1]-mus[0]
+# # vary v and w cost
+# with open('distinguishparamZvwcost2', 'rb+') as f:
+#     paramls,Z= pickle.load(f)
+# formatedZ=np.array(Z).reshape(int(len(Z)**0.5),int(len(Z)**0.5)).T
+# truedelta=mus[1]-mus[0]
 
-with initiate_plot(3,3,300) as f:
-    ax=f.add_subplot(111)
-    # im=ax.imshow(formatedZ[:,2:],origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='auto')
-    im=ax.imshow(formatedZ[:,2:],origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='equal',vmin=-103, vmax=-73)
-    plt.colorbar(im,label='joint log likelihood') 
-    ax.scatter(0,0,label='zero') # midpoint, 0,0
-    ax.set_xlabel('delta w cost')
-    ax.set_ylabel('delta v cost')
-    ax.scatter(truedelta[5]/2,truedelta[3]/2,label='inferred delta') # inferred delta
-    # ax.legend()
-    quickspine(ax)
+# with initiate_plot(3,3,300) as f:
+#     ax=f.add_subplot(111)
+#     # im=ax.imshow(formatedZ[:,2:],origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='auto')
+#     im=ax.imshow(formatedZ[:,2:],origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='equal',vmin=-103, vmax=-73)
+#     plt.colorbar(im,label='joint log likelihood') 
+#     ax.scatter(0,0,label='zero') # midpoint, 0,0
+#     ax.set_xlabel('delta w cost')
+#     ax.set_ylabel('delta v cost')
+#     ax.scatter(truedelta[5]/2,truedelta[3]/2,label='inferred delta') # inferred delta
+#     # ax.legend()
+#     quickspine(ax)
 
 # vary v and w gain ----------------------------------------------------------------------
 dx,dy=np.zeros((11)),np.zeros((11))
@@ -591,39 +592,213 @@ for i in range(gridreso):
 #         pickle.dump((paramls,Z), f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-with open('distinguishparamZvwgain', 'rb+') as f:
-    paramls,Z= pickle.load(f)
-formatedZ=np.array(Z).reshape(int(len(Z)**0.5),int(len(Z)**0.5)).T
-truedelta=mus[1]-mus[0]
 
+
+
+
+
+
+# vary two noises w for burno pert data ----------------------------------------------
+
+'''
+we found that process noise w and obs noise w are possitively correlated,
+test if this is true
+by varying the two parameters
+'''
+# load the data
+num_sample=300
+theta,_,_=process_inv("Z:/bruno_pert/cmafull_b_pert", removegr=False)
+with open('Z:/victor_pert/packed','rb') as f:
+    df = pickle.load(f)
+df=datawash(df)
+df=df[df.category=='normal']
+df=df[df.target_r>200]
+states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
+states, actions, tasks=states[:num_sample], actions[:num_sample], tasks[:num_sample]
+# vary the two params
+base=np.array(theta).reshape(-1)
+base[3]=0
+base[5]=0
+gridreso=15
+dx,dy=np.zeros((11)),np.zeros((11))
+dx[3]=1 # pro noise
+dy[5]=1 # obs noise
+X,Y=np.linspace(0,2,gridreso), np.linspace(0,2,gridreso)
+paramls=[]
+for i in range(gridreso):
+    for j in range(gridreso):
+        htheta=torch.tensor(dx*X[i]+dy*Y[j]+midpoint).float().view(-1,1)
+        paramls.append(htheta)
+
+# logll function
+env=ffacc_real.FireFlyPaper(arg)
+phi=torch.tensor([[0.5],
+            [pi/2],
+            [0.001],
+            [0.001],
+            [0.001],
+            [0.001],
+            [0.13],
+            [0.001],
+            [0.001],
+            [0.001],
+            [0.001],
+    ])
+agent_=TD3.load('trained_agent/paper.zip')
+agent=agent_.actor.mu.cpu()
+@ray.remote
+def getlogll(x):
+    if torch.any(x>2) or torch.any(x<=0):
+        return None
+    with torch.no_grad():
+        return  monkeyloss_(agent, actions, tasks, phi, torch.tensor(x).view(-1,1), env, action_var=0.01,num_iteration=1, states=states, samples=5,gpu=False).item()
+
+# Z=ray.get([getlogll.remote(each) for each in paramls])
+# with open('varytwonoiseburnopert', 'wb+') as f:
+#         pickle.dump((paramls,Z), f, protocol=pickle.HIGHEST_PROTOCOL)
+# with open('varytwonoiseburnopert', 'rb') as f:
+#     paramls,Z= pickle.load(f) 
+
+# formatedZ=np.array(Z).reshape(int(len(Z)**0.5),int(len(Z)**0.5)).T
+# with initiate_plot(3,3,300) as f:
+#     ax=f.add_subplot(111)
+#     im=ax.imshow(-formatedZ,origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='equal')
+#     plt.colorbar(im,label='log likelihood') 
+#     ax.set_xlabel('process noise w')
+#     ax.set_ylabel('obs noise w')
+#     quickspine(ax)
+    # quicksave('two noise log likelihood burno pert')
+
+
+
+# vary along pc direction ----------------------------------------------
+# background ---------------------
+
+# load data
+datapath=Path("Z:\\bruno_pert\\packed")
+with open(datapath,'rb') as f:
+    df = pickle.load(f)
+df=datawash(df)
+df=df[df.category=='normal']
+df=df[df.target_r>200]
+states, actions, tasks=monkey_data_downsampled(df[:100],factor=0.0025)
+
+# from cov, find the eig axis we are most sure about
+theta,cov,err=process_inv("Z:/bruno_pert/cmafull_packed_bruno_pert", removegr=False)
+ev, evector=torch.eig(torch.tensor(cov),eigenvectors=True)
+ev=ev[:,0]
+ev,esortinds=ev.sort(descending=False)
+evector=evector[:,esortinds]
+axis1=evector[:,0].reshape(-1,1)
+axis2=evector[:,1].reshape(-1,1)
+
+# vary the two axis to cover the possible range, calculate the backgrond and plot
+# X=np.linspace(-1.2,0.085,15)
+# Y=np.linspace(-0.3,0.195,15)
+# vary by eig value
+gridreso=11
+numev=6
+X,Y=np.linspace(-1,1,gridreso)*ev[0].item()*numev,np.linspace(-1,1,gridreso)*ev[1].item()*numev
+
+paramls=[]
+for i in range(gridreso):
+    for j in range(gridreso):
+        htheta=torch.tensor(axis1*X[i]+axis2*Y[j]+theta).float().view(-1,1)
+        paramls.append(htheta)
+[1  for pp  in paramls if torch.any(pp<0)]
+
+print('starting background')
+Z=ray.get([getlogll.remote(each) for each in paramls])
+with open('background bruno pert', 'wb+') as f:
+        pickle.dump((paramls,Z), f, protocol=pickle.HIGHEST_PROTOCOL)
+with open('background bruno pert', 'rb') as f:
+    paramls,Z= pickle.load(f) 
+# Z=normalizematrix(Z)
+formatedZ=np.array(Z).reshape(int(len(Z)**0.5),int(len(Z)**0.5)).T
+
+masked_array = np.ma.masked_invalid(formatedZ.astype('float'))
+cmap = matplotlib.cm.get_cmap()
+cmap.set_bad('black',1.)
+im=plt.contourf(masked_array[:-2,:-2]*-1, levels=[-30,-20,-15,-14,-13,-12],interpolation='nearest', cmap=cmap)
+plt.colorbar(im)
+
+# project the inverse trajectory onto the background
+
+sys.exit()
+for i in range(11):
+    print(i)
+    print(min([pp[i] for pp in paramls]),(max([pp[i] for pp in paramls])))
+    
 with initiate_plot(3,3,300) as f:
     ax=f.add_subplot(111)
-    # im=ax.imshow(formatedZ[:,2:],origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='auto')
-    im=ax.imshow(formatedZ[2:-2,2:],origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='equal',vmin=-103, vmax=-73)
-    plt.colorbar(im,label='joint log likelihood') 
+    im=ax.imshow(formatedZ[:,2:],origin='lower', extent=(X[0]+midpoint[8],X[-1]+midpoint[8],Y[0]+midpoint[7],Y[-1]+midpoint[7]),aspect='auto')
+    plt.colorbar(im,label='curvature') 
     ax.scatter(0,0,label='zero') # midpoint, 0,0
-    ax.set_xlabel('delta w gain')
-    ax.set_ylabel('delta v gain')
-    ax.scatter(truedelta[5]/2,truedelta[3]/2,label='inferred delta') # inferred delta
+    ax.set_xlabel('delta w cost')
+    ax.set_ylabel('delta v cost')
+    # ax.scatter(truedelta[5]/2,truedelta[3]/2,label='inferred delta') # inferred delta
     # ax.legend()
-    quickspine(ax)
 
 
 
+def tmp(name):
+    with open(name, 'rb') as f:
+        slog = pickle.load(f)
+    log=slog
+    res=[l[2] for l in log]
+    allsamples=[]
+    alltheta=[]
+    loglls=[]
+    for r in res:
+        for point in r:
+            alltheta.append(torch.tensor(point[0]))
+            loglls.append(torch.tensor(point[1]))
+            allsamples.append([point[1],point[0]])
+    alltheta=torch.stack(alltheta)
+    logllsall=torch.tensor(loglls).flatten()
+    allsamples.sort(key=lambda x: x[0])
+    allthetameans=np.array([l[0]._mean for l in log])
+    alltheta=alltheta[50:]
+    logllsall=logllsall[50:]
+    mu=np.mean(np.asfarray(alltheta),0).astype('float32')
+    score, evectors, evals = pca(np.asfarray(alltheta))
+    x=score[:,0] # pc1
+    y=score[:,1] # pc2
+    z=logllsall
+    npixel=9
 
+    finalcov=log[-1][0]._C
+    realfinalcov=np.cov(np.array([l[0] for l in log[-1][2]]).T)
 
+    finaltheta=log[-1][0]._mean
+    pcfinaltheta=((finaltheta.reshape(-1)-mu)@evectors).astype('float32')
+    finalcovpc=(evectors.T@finalcov@evectors).astype('float32')
+    realfinalcovpc=(evectors.T@realfinalcov@evectors).astype('float32')
+    pccov=evectors.T@(np.cov(alltheta.T))@evectors
+    allthetameanspc=((allthetameans-mu)@evectors).astype('float32')
+    with initiate_plot(3, 3.5, 300) as fig, warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ax = fig.add_subplot(111)
+        plot_cov_ellipse(pccov[:2,:2], pcfinaltheta[:2], alpha=0.3,nstd=1,ax=ax)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        s = ax.scatter(x,y, c=z,alpha=0.5,edgecolors='None', cmap='jet')
+        ax.set_xlabel('projected parameters')
+        ax.set_ylabel('projected parameters')
+        c = fig.colorbar(s, ax=ax)
+        ax.locator_params(nbins=3, axis='y')
+        ax.locator_params(nbins=3, axis='x')
+        # c.clim(min(np.log(loglls)), max(np.log(loglls))) 
+        c.set_label('- log likelihood')
+        # c.set_ticks([min((loglls)),max((loglls))])
+        c.ax.locator_params(nbins=4)
+        # ax.set_xlim(xlow,xhigh)
+        # ax.set_ylim(ylow,yhigh)
+        ax.plot(allthetameanspc[:,0],allthetameanspc[:,1])
 
-
-
-
-
-
-
-
-
-
-
-
+# name='Z:/bruno_pert/testtemp3packed_bruno_pert'
+# process_inv(name)
+# tmp(name)
 
 
 

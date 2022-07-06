@@ -50,6 +50,7 @@ print('process data')
 states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
 print('done process data')
 
+
 # decide if to continue
 optimizer=None
 log=[]

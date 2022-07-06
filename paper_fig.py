@@ -26,17 +26,6 @@ plt.rcParams['svg.fonttype'] = 'none'
 
 
 
-    # 3.2 overhead view, similar trials, stopping positions distribution similar
-
-    # 3.3 overhead view, skipped trials boundary similar
-
-    # 3.4 control curves, similar trials, similar randomness
-
-    # 3.5 group similar trials, uncertainty grow along path, vs another theta
-
-    # 4. validation in other (perturbation) trials
-
-    # 4.1 overhead path of agent vs monkey in a perturbation trial, path similar
     # check agent performance
     print('loading data')
     datapath=Path("Z:\\human\\hgroup")
@@ -58,8 +47,6 @@ plt.rcParams['svg.fonttype'] = 'none'
     plt.plot((torch.cat(epstates,1)).T[:,0],(torch.cat(epstates,1)).T[:,1])
     plt.scatter(tasks[ind][0],tasks[ind][1])
     plt.axis('equal')
-
-
 
 
     agent_=TD3.load('trained_agent/paper.zip')
@@ -88,7 +75,7 @@ plt.rcParams['svg.fonttype'] = 'none'
     plotctrl(res)
 
 
-
+    #---------------------------------------------------------------------
     # one monkey's belief overhead
     ind=np.random.randint(low=0, high=len(tasks))
     input={
@@ -108,9 +95,6 @@ plt.rcParams['svg.fonttype'] = 'none'
         'use_mk_data':True
     }
     single_trial_overhead()
-
-
-
 
     #---------------------------------------------------------------------
     #  one monkey trial overhead, not for paper
@@ -231,7 +215,6 @@ plt.rcParams['svg.fonttype'] = 'none'
     print(df.iloc[ind].perturb_wpeak)
 
     irc_pert(agent, env, phi, theta,etask=tasks[ind],initv=actions[ind][0][0],initw=actions[ind][0][1],mkactions=actions[ind],pert=pert)
-
 
 
 
@@ -454,7 +437,7 @@ def getlogll(x):
     with torch.no_grad():
         return  monkeyloss_(agent, actions, tasks, phi, torch.tensor(x).t(), env, action_var=0.01,num_iteration=1, states=states, samples=5,gpu=False).item()
 
-with open(data_path/'cmafull_packed_bruno_pert', 'rb') as f:
+with open('Z:\\bruno_pert\\cmafull_b_pert', 'rb') as f:
     slog = pickle.load(f)
 log=slog
 res=[l[2] for l in log]

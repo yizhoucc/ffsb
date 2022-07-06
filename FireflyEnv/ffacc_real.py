@@ -3117,12 +3117,15 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         vw[1] =  vw[1] + noisew
         return vw.view(-1,1)
     
+
     def obs_err(self,):
         return torch.distributions.Normal(0,torch.ones(2)).sample()*(self.theta[4:6].view(-1))
+
 
     def observations_mean(self, s):
         vw = s.view(-1)[-2:]
         return vw.view(-1,1)
+
 
     def get_distance(self, state=None, distance2goal=True): 
         state=self.s if state is None else state
@@ -3134,11 +3137,14 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             relative_distance = torch.sqrt((px)**2+(py)**2).view(-1)
         return position, relative_distance
     
+
     def rewarded(self): # stop within radius
         return self.if_agent_stop() and (self.get_distance(state=self.b)[1]<=self.goal_r)
 
+
     def skipped(self): # miss the target very far, not necesssary skip
         return (self.get_distance(state=self.b,distance2goal=False)[1]<=self.goal_r) and self.trial_timer<5
+
 
     def forward(self, action,task_param,state=None, giving_reward=None):
         action=torch.tensor(action).reshape(1,-1)

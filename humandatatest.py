@@ -13,7 +13,7 @@ arg = Config()
 env=ffacc_real.FireFlyPaper(arg)
 
 # load the mat
-def loadmat(filename):
+def loadmat(filename,key='subjects'):
     '''
     this function should be called instead of direct spio.loadmat
     as it cures the problem of not properly recovering python dictionaries
@@ -339,9 +339,9 @@ packed=(states, actions, tasks)
 #     pickle.dump(packed, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 # save per sub
-for i in range(len(hdata)):
-    savename="hsub{}".format(str(i))
-    states, actions, tasks=process_human_data([hdata[i]], env)
+for i in range(len(adata)):
+    savename="asub{}".format(str(i))
+    states, actions, tasks=process_human_data([adata[i]], env)
     packed=(states, actions, tasks)
     with open('Z:/human/{}'.format(savename), 'wb') as handle:
         pickle.dump(packed, handle, protocol=pickle.HIGHEST_PROTOCOL)

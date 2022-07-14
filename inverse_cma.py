@@ -32,16 +32,18 @@ import os
 
 
 print('loading data')
-datapath=Path("Z:\\victor_pert\\packed")
+datapath=Path("Z:\\\jimmy_pert\\packed")
 ith=1 # ith density 
-savename=datapath.parent/('preall'+datapath.name)
+savename=datapath.parent/('des1sub1000laterconstraint'+datapath.name)
 # savename=datapath.parent/('fullfixre{}'.format(str(ith))+datapath.name)
 with open(datapath,'rb') as f:
     df = pickle.load(f)
 df=datawash(df)
 df=df[df.category=='normal']
 df=df[df.target_r>200]
+df=df[2*len(df)//3:]
 densities=sorted(pd.unique(df.floor_density))
+# df=df[df.floor_density==densities[1]] # marco has two density
 # df=df[df.floor_density==densities[ith]]
 # floor density are in [0.0001, 0.0005, 0.001, 0.005]
 # q monkey density are in [0.000001, 0.0001, 0.001, 0.005]
@@ -49,6 +51,12 @@ densities=sorted(pd.unique(df.floor_density))
 print('process data')
 states, actions, tasks=monkey_data_downsampled(df,factor=0.0025)
 print('done process data')
+
+# random select subset of data
+# indls=np.random.randint(len(tasks)//2,len(tasks),200)
+# states=[states[i] for i in indls]
+# actions=[actions[i] for i in indls]
+# tasks=np.array(tasks)[indls]
 
 
 # decide if to continue
@@ -115,7 +123,7 @@ if not optimizer:
     optimizer = CMA(mean=np.array(cur_mu), sigma=0.5,population_size=14)
     optimizer.set_bounds(np.array([
     [0.1, 0.1, 0.01, 0.01, 0.01, 0.01, 0.129, 0.01, 0.01, 0.01, 0.01],
-    [1.,2,1,1,1,1,0.131,1,1,1,1]],dtype='float32').transpose())
+    [1.,2,1.5,1.5,1.5,1.5,0.131,1,1,1,1]],dtype='float32').transpose())
 
 # re inverse each density
 # with open('Z:\\bruno_normal/preallpacked', 'rb') as f:
@@ -135,6 +143,7 @@ for generation in range(len(log),len(log)+99):
         x = optimizer.ask().astype('float32')
         xs.append(x)
     solutions=ray.get([getlogll.remote(p) for p in xs])
+    meanlogll=np.mean(solutions)
     solutions=[[x,s] for x,s in zip(xs,solutions)]
     optimizer.tell(solutions)
     log.append([copy.deepcopy(optimizer), xs, solutions])
@@ -143,7 +152,7 @@ for generation in range(len(log),len(log)+99):
     # plt.show()
     with open(savename, 'wb') as handle:
         pickle.dump(log, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    print("generation: ",generation)
+    print("generation: ",generation,'logll: ',meanlogll)
     print(["{0:0.2f}".format(i) for i in optimizer._mean])
     print(["{0:0.2f}".format(i) for i in np.diag(optimizer._C)**0.5])
     if optimizer.should_stop():

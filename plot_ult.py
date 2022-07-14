@@ -19,6 +19,7 @@ import heapq
 from collections import namedtuple
 import torch
 import os
+import scipy.io as spio
 os.chdir('C:\\Users\\24455\\iCloudDrive\\misc\\ffsb')
 import numpy as np
 from scipy.stats import tstd
@@ -5109,6 +5110,28 @@ def quickoverhead(statelike,ax=None,alpha=0.5):
     ax.legend(by_label.values(), by_label.keys(),loc=2, prop={'size': 6})
 
 
+def quickoverhead_state(statelike,taskslike,ax=None,alpha=0.5):
+  with initiate_plot(4, 2, 300) as fig, warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    ax = fig.add_subplot(111) if not ax else ax
+    for given_state in statelike:
+        ax.plot(given_state[:,0],given_state[:,1],color='grey')
+    ax.scatter(taskslike[:,0],taskslike[:,1],s=2,color='grey')
+    ax.axis('equal')
+    ax.set_xlabel('world x')
+    ax.set_ylabel('world y')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    # ax.spines['bottom'].set_visible(False)
+    # ax.spines['left'].set_visible(False)
+    # legend and label
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys(),loc=2, prop={'size': 6})
+    return ax
+
+
+
 def percentile_err2d(data,axis=0,percentile=95):
     fun=lambda x: percentile_err1d(x,percentile=percentile)
     return np.apply_along_axis(fun, axis,data)
@@ -5140,7 +5163,7 @@ def percentile_err(data,percentile=95):
 def theta_bar(finaltheta,finalcov=None,xlabels=theta_names,err=None, ax=None, label=None,shift=0,width=0.5, color=None):
     if finalcov is None: err=None
     else: err=torch.diag(finalcov)**0.5 if err is None else err
-    with initiate_plot(12, 4, 300) as fig, warnings.catch_warnings():
+    with initiate_plot(10, 3, 300) as fig, warnings.catch_warnings():
         warnings.simplefilter('ignore')
         if ax is None:
             ax = fig.add_subplot(111)
@@ -5430,8 +5453,6 @@ def get_ci(log, low=5, high=95, threshold=2,ind=-1):
     return res
     
 
-
-
 def twodatabar(data1,data2,err1=None,err2=None,labels=None,shift=0.4,width=0.5,ylabel=None,xlabel=None,color=['b','r'],xname=''):
     xs=list(range(max(len(data1),len(data2))))
     label1=labels[0] if labels else None
@@ -5582,7 +5603,7 @@ def correlation_from_covariance(covariance):
     return correlation
 
 
-def process_inv(res, removegr=True, ci=5,ind=-1):
+def process_inv(res, removegr=True, ci=5,ind=-1,usingbest=False):
     # get final theta and cov 
     if type(res) == str:
         res=Path(res)
@@ -5591,7 +5612,9 @@ def process_inv(res, removegr=True, ci=5,ind=-1):
         log = pickle.load(f)
     if ind>=len(log): ind=-1
     elif ind<=-len(log): ind=1
-    print('using ind: ',ind)
+    if usingbest:
+        ind= np.argmin([np.mean([l[1] for l in eachlog[2]]) for eachlog in log[:ind]])
+    print('using ind: ',ind, 'final logll : ', np.mean([l[1] for l in log[ind][2]]) )
     finalcov=torch.tensor(log[ind][0]._C).float()
     finaltheta=torch.tensor(log[ind][0]._mean).view(-1,1)
     theta=torch.cat([finaltheta[:6],finaltheta[-4:]])
@@ -5848,10 +5871,138 @@ def eval_curvature(agent, env, phi, theta, tasks,vctrl=0.,wctrl=0.,ntrials=10):
 
 
 def npsummary(nparray):
+    print("n samples ", len(nparray))
     print("mean ", np.mean(nparray))
     print("std ", np.std(nparray))
     print("med ", np.median(nparray))
     print("range ", np.min(nparray),np.max(nparray))
 
 
-    
+def process_human_data(subjectls, env):
+    taskall,actionall,stateall=[],[],[]
+    for sub in subjectls:
+
+        # tasks 
+        worldscale=200
+        r=np.array(sub['targ']['r'])/worldscale
+        theta=np.array(sub['targ']['theta'])
+        tasks=np.vstack([r*np.cos(theta),r*np.sin(theta)]).T
+        if taskall!=[]:
+            taskall=np.vstack([taskall,tasks])
+        else:
+            taskall=tasks
+
+        # actions
+        ntrial=len(sub['vel']['v'])
+        actions=[]
+        for i in range(ntrial):
+            epactions=np.vstack([down_sampling(sub['vel']['v'][i],orignal_dt=0.0012*8)/worldscale,down_sampling(sub['vel']['w'][i],orignal_dt=0.0012*8)/90]).T
+            actions.append(torch.tensor(epactions).float())
+        actionall+=actions
+
+        # states
+        def run_trial(env,given_action,pert=None,
+                    phi=torch.tensor([[1],   
+                        [pi/2],   
+                        [1e-8],   
+                        [1e-8],   
+                        [0.0],   
+                        [0.0],   
+                        [0.13],   
+                        [0.5],   
+                        [0.5],   
+                        [0.5],   
+                        [0.5]])):
+
+            def _collect():
+                epstates.append(env.s)
+            # saves
+            epstates=[]
+            env.reset(phi=phi)
+            t=0
+            while t<len(given_action):
+                env.step(given_action[t]) 
+                _collect()
+                t+=1
+            env.step(given_action[-1]) 
+            _collect()
+            return torch.stack(epstates, axis=0)[1:,:,0]
+        env.terminal_vel=0.0 # prevent the asseertion of stop error
+        states=[]
+        for a in actions:
+            epstates=run_trial(env,a)
+            states.append(epstates)
+        stateall+=states
+    return stateall,actionall,taskall
+
+
+def loadmat(filename,key='subjects'):
+    '''
+    this function should be called instead of direct spio.loadmat
+    as it cures the problem of not properly recovering python dictionaries
+    from mat files. It calls the function check keys to cure all entries
+    which are still mat-objects
+    '''
+    # def _check_keys(data):
+    #     '''
+    #     checks if entries in dictionary are mat-objects. If yes
+    #     todict is called to change them to nested dictionaries
+    #     '''
+    #     for key in data:
+    #         print(key,type(data[key]))
+    #         if isinstance(data[key], spio.matlab.mio5_params.mat_struct):
+    #             data[key] = _todict(data[key])
+    #     return data
+
+    def _check_keys(data):
+        res=[]
+        for d in data:
+            print(d,type(d))
+            if isinstance(d, spio.matlab.mio5_params.mat_struct):
+                d = _todict(d)
+            res.append(d)
+        return res
+
+    def _todict(matobj):
+        '''
+        A recursive function which constructs from matobjects nested dictionaries
+        '''
+        d = {}
+        for strg in matobj._fieldnames:
+            elem = matobj.__dict__[strg]
+            if isinstance(elem, spio.matlab.mio5_params.mat_struct):
+                d[strg] = _todict(elem)
+            elif isinstance(elem, np.ndarray):
+                d[strg] = _tolist(elem)
+            else:
+                d[strg] = elem
+        return d
+
+    def _tolist(ndarray):
+        '''
+        A recursive function which constructs lists from cellarrays
+        (which are loaded as numpy ndarrays), recursing into the elements
+        if they contain matobjects.
+        '''
+        elem_list = []
+        for sub_elem in ndarray:
+            if isinstance(sub_elem, spio.matlab.mio5_params.mat_struct):
+                elem_list.append(_todict(sub_elem))
+            elif isinstance(sub_elem, np.ndarray):
+                elem_list.append(_tolist(sub_elem))
+            else:
+                elem_list.append(sub_elem)
+        return elem_list
+
+    data = spio.loadmat(filename, struct_as_record=False, squeeze_me=True)
+    data=data[key]
+    data=_check_keys(data)
+    return data
+
+
+def quickleg(ax,loc='lower right',bbox_to_anchor=(-1,-1)):
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    leg=ax.legend(by_label.values(), by_label.keys(),loc='lower right',bbox_to_anchor=bbox_to_anchor)
+    for lh in leg.legendHandles: 
+        lh.set_alpha(1)

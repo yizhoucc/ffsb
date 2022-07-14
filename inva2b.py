@@ -13,7 +13,6 @@ X, y = make_blobs(n_samples=400, centers=2, random_state=6)
 clf = svm.SVC(kernel="linear", C=1000)
 clf.fit(X, y)
 
-env.terminal_vel=0.2
 
 
 
@@ -58,8 +57,8 @@ ortho_db_yy = neg_slope * db_xx - bias
 
 # plot the decision function
 
-# plt.scatter(X[:, 0], X[:, 1], c=y, s=30, cmap=plt.cm.Paired)
-# ax = plt.gca()
+plt.scatter(X[:, 0], X[:, 1], c=y, s=30, cmap=plt.cm.Paired)
+ax = plt.gca()
 ax.set_xlim(ax.get_xlim())
 ax.set_ylim(ax.get_ylim())
 

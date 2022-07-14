@@ -53,7 +53,8 @@ logs={'a':'Z:/human/fixragroup','h':'Z:/human/clusterpaperhgroup'}
     
 for isub in range(numhsub):
     dataname="hsub{}".format(str(isub))
-    savename=Path("invhsub{}".format(str(isub)))
+    foldername='persub1cont'
+    savename=Path("Z:/human/{}/invhsub{}".format(foldername,str(isub)))
     invtag='h'
     
     #load data
@@ -73,9 +74,13 @@ for isub in range(numhsub):
         print('starting new inverse ...')
         init_theta,init_cov,_=process_inv(logs[invtag],removegr=False)
         optimizer = CMA(mean=np.array(init_theta.view(-1)), sigma=max(torch.diag(init_cov)).item()**0.5,population_size=14)
-        optimizer.set_bounds(np.array([
-        [0.1, 0.1, 0.01, 0.01, 0.01, 0.01, 0.129, 0.01, 0.01, 0.01, 0.01],
-        [2.,2,1,1,1,1,0.131,1,1,1,1]],dtype='float32').transpose())
+    # optimizer.set_bounds(np.array([
+    # [0.1, 0.1, 0.01, 0.01,0.499, 0.499, 0.129, 0.01, 0.01, 0.01, 0.01],
+    # [2.,2,2,2,0.5,0.5,0.131,2,2,1,1]],dtype='float32').transpose())
+    optimizer.set_bounds(np.array([
+    [0.1, 0.1, 0.01, 0.01,0.01, 0.01, 0.129, 0.01, 0.01, 0.01, 0.01],
+    [2.,2,2,2,1.5,1.5,0.131,2,2,1,1]],dtype='float32').transpose())
+
 
     # use localhost
     ray.init(log_to_driver=False,ignore_reinit_error=True)

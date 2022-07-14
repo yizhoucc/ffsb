@@ -31,6 +31,31 @@ from pathlib import Path
 arg = Config()
 
 
+# % theta hist ---------------------
+logls=[
+    Path('Z:/bruno_pert/cmafull_b_pert'),
+    Path('Z:/schro_pert/cmafull_packed_schro_pert'),
+    Path('Z:/q_pert/cma180paper_packed'),
+    Path('Z:/victor_pert/cmafull_victor_pert_ds'),
+    Path('Z:/jimmy_pert/des1sub200packed'),
+    Path('Z:/marco_pert/des1sub200packed'),
+]
+monkeynames=['bruno', 'schro', 'quigley','victor','jimmy','maraco']
+
+mus,covs,errs=[],[],[]
+for inv in logls:
+    finaltheta,finalcov, err=process_inv(inv,ind=60)
+    mus.append(finaltheta)
+    covs.append(finalcov)
+    errs.append(err)
+
+ax=multimonkeytheta(monkeynames, mus, covs, errs, )
+ax.set_yticks([0,1,2])
+ax.plot(np.linspace(-1,9),[2]*50)
+ax.get_figure()
+
+
+
 # % example inferred belief in one trial ---------------------
 # load the inferred theta
 theta,_,_=process_inv("Z:/bruno_pert/cmafull_b_pert", removegr=False)
@@ -114,7 +139,7 @@ with initiate_plot(2, 2, 300) as fig, warnings.catch_warnings():
 
 # % radial error and miss rate vs density ---------------------
 # load the behavior data
-monkeys=['bruno', 'schro','victor','q']
+monkeys=['bruno', 'schro','victor','quigley']
 
 mk2beh={}
 for m in monkeys:
@@ -188,19 +213,16 @@ with initiate_plot(3,3) as fig:
 
 
 
-
-
 # % victor respond differently to pert ---------------------
-
 # load victor pert data and control pert data
 data={}
-
 filenamecommom=Path('Z:\\victor_pert')
 with open(filenamecommom/'packed', 'rb') as f:
     df = pickle.load(f)
     df=datawash(df)
     df=df[(df.category=='normal') & (df.floor_density==0.005)] # verify the density
     # df=df[~df.perturb_start_time.isnull()] # pert only trial
+data['vdf']=df
 data['vpert']=monkey_data_downsampled(df,factor=0.0025)
 data['vpertmisc']=df_downsamplepert(df,factor=0.0025)
 
@@ -208,11 +230,32 @@ filenamecommom=Path('Z:\\bruno_pert')
 with open(filenamecommom/'packed', 'rb') as f:
     df = pickle.load(f)
     df=datawash(df)
-    df=df[df.category=='normal']
     df=df[(df.category=='normal') & (df.floor_density==0.005)] # verify the density
     # df=df[~df.perturb_start_time.isnull()] # pert only trial
+data['bdf']=df
 data['bpert']=monkey_data_downsampled(df,factor=0.0025)
 data['bpertmisc']=df_downsamplepert(df,factor=0.0025)
+
+filenamecommom=Path('Z:\\jimmy_pert')
+with open(filenamecommom/'packed', 'rb') as f:
+    df = pickle.load(f)
+    df=datawash(df)
+    df=df[(df.category=='normal') & (df.floor_density==0.005)] # verify the density
+    # df=df[~df.perturb_start_time.isnull()] # pert only trial
+data['jdf']=df
+data['jpert']=monkey_data_downsampled(df,factor=0.0025)
+data['jpertmisc']=df_downsamplepert(df,factor=0.0025)
+
+filenamecommom=Path('Z:\\marco_pert')
+with open(filenamecommom/'packed', 'rb') as f:
+    df = pickle.load(f)
+    df=datawash(df)
+    df=df[(df.category=='normal') & (df.floor_density==0.005)] # verify the density
+    # df=df[~df.perturb_start_time.isnull()] # pert only trial
+data['mdf']=df
+data['mpert']=monkey_data_downsampled(df,factor=0.0025)
+data['mpertmisc']=df_downsamplepert(df,factor=0.0025)
+
 
 # select a task, and get similar tasks to this
 done=False
@@ -247,6 +290,100 @@ ax=plotoverhead_simple(substates,thetask,color='b',label='bruno',ax=ax)
 ax.get_figure()
 
 
+# jimmy
+done=False
+while not done:
+    ind=np.random.randint(0,len(data['jpert'][2]))
+    done=data['jpertmisc'][1][ind][0]!=0
+# ind=227
+thetask=data['jpert'][2][ind]
+thispert=data['jpertmisc'][1][ind]
+# plt.plot(data['jpertmisc'][0][ind])
+indls=similar_trials2thispert(data['jpert'][2], thetask,thispert, ntrial=3,pertmeta=data['jpertmisc'][1])
+substates=[data['jpert'][0][i] for i in indls]
+subactions1=[data['jpert'][1][i] for i in indls]
+subtasks=np.array(data['jpert'][2])[indls]
+subperts=[data['jpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['jpertmisc'][1])[indls]
+ax=plotoverhead_simple(substates,thetask,color='r',label='jimmy',ax=None)
+indls=similar_trials2thispert(data['bpert'][2], thetask,thispert, ntrial=3,pertmeta=data['bpertmisc'][1])
+substates=[data['bpert'][0][i] for i in indls]
+subactions=[data['bpert'][1][i] for i in indls]
+subtasks=np.array(data['bpert'][2])[indls]
+subperts=[data['bpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['bpertmisc'][1])[indls]
+ax=plotoverhead_simple(substates,thetask,color='b',label='bruno',ax=ax)
+ax.get_figure()
+
+with initiate_plot(2,1,300) as f:
+    ax=f.add_subplot(111)
+    quickspine(ax)
+    for a in subactions1:
+        plt.plot(a,'r', label='jimmy')
+    for a in subactions:
+        plt.plot(a,'b',label='bruno')
+    quickleg(ax)
+
+# marco
+done=False
+while not done:
+    ind=np.random.randint(0,len(data['mpert'][2]))
+    done=data['mpertmisc'][1][ind][0]!=0
+# ind=227
+thetask=data['mpert'][2][ind]
+thispert=data['mpertmisc'][1][ind]
+plt.plot(data['mpertmisc'][0][ind])
+indls=similar_trials2thispert(data['mpert'][2], thetask,thispert, ntrial=3,pertmeta=data['mpertmisc'][1])
+substates=[data['mpert'][0][i] for i in indls]
+subactions1=[data['mpert'][1][i] for i in indls]
+subtasks=np.array(data['mpert'][2])[indls]
+subperts=[data['mpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['mpertmisc'][1])[indls]
+ax=plotoverhead_simple(substates,thetask,color='r',label='marco',ax=None)
+indls=similar_trials2thispert(data['bpert'][2], thetask,thispert, ntrial=3,pertmeta=data['bpertmisc'][1])
+substates=[data['bpert'][0][i] for i in indls]
+subactions=[data['bpert'][1][i] for i in indls]
+subtasks=np.array(data['bpert'][2])[indls]
+subperts=[data['bpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['bpertmisc'][1])[indls]
+ax=plotoverhead_simple(substates,thetask,color='b',label='bruno',ax=ax)
+ax.get_figure()
+
+with initiate_plot(2,1,300) as f:
+    ax=f.add_subplot(111)
+    quickspine(ax)
+    for a in subactions1:
+        plt.plot(a,'r', label='marco')
+    for a in subactions:
+        plt.plot(a,'b',label='bruno')
+    quickleg(ax)
+
+
+# does pert angle affect jimmy
+pertrewardeddf=df[(df.rewarded)&(~df.perturb_start_time.isnull())]
+pertunrewardeddf=df[(~df.rewarded)&(~df.perturb_start_time.isnull())]
+plt.hist(pertrewardeddf.perturb_wpeak)
+plt.hist(pertunrewardeddf.perturb_wpeak,alpha=0.3)
+
+plt.hist(pertrewardeddf.perturb_vpeak)
+plt.hist(pertunrewardeddf.perturb_vpeak,alpha=0.3)
+
+# perttheta=np.array([np.max(np.abs(i[:,1])) for i in data['jpertmisc'][0]])
+# pertinds=np.where(perttheta!=0)[0]
+# pertmask = np.zeros(len(perttheta), dtype=int)
+# pertmask[pertmask] = 1
+# rewardmask=np.array(data['jdf'].rewarded)*1
+# rewardedinds=np.array([i for i,a in enumerate(data['jdf'].rewarded) if a])
+# rewardedpert = (pertmask == 1) & (rewardmask == 1)
+
+# pertthetamasked=perttheta[pertmask]
+# # rewardedmasked=rewarded[pertmask]
+# # plt.hist(pertthetamasked,bins=30)
+# plt.hist(pertthetamasked[rewardedpert],bins=30)
+
+# sum(rewarded)/len(df)
+# sum(rewardedmasked)/len(pertmask)
+
 # show victor is good/same when doing normal trials ------------------
 # select a non pert task, and get similar tasks to this
 done=False
@@ -271,7 +408,6 @@ subpertmeta=np.array(data['vpertmisc'][1])[indls]
 #     plt.plot(p)
 
 ax=plotoverhead_simple(substates,thetask,color='r',label='victor',ax=None)
-
 indls=similar_trials2thispert(data['bpert'][2], thetask,thispert, ntrial=5,pertmeta=data['bpertmisc'][1])
 substates=[data['bpert'][0][i] for i in indls]
 subactions=[data['bpert'][1][i] for i in indls]
@@ -282,7 +418,65 @@ ax=plotoverhead_simple(substates,thetask,color='b',label='bruno',ax=ax)
 ax.get_figure()
 
 
+# check other two monkey, if doing good pert
+# marco seems good by overhead path
+filenamecommom=Path('Z:\\marco_pert')
+with open(filenamecommom/'packed', 'rb') as f:
+    df = pickle.load(f)
+    df=datawash(df)
+    df=df[(df.category=='normal') & (df.floor_density==0.005)] # verify the density
+    # df=df[~df.perturb_start_time.isnull()] # pert only trial
+data['mdf']=df
+data['mpert']=monkey_data_downsampled(df,factor=0.0025)
+data['mpertmisc']=df_downsamplepert(df,factor=0.0025)
 
+# select a task, and get similar tasks to this
+done=False
+while not done:
+    ind=np.random.randint(0,len(data['mpert'][2]))
+    done=data['mpertmisc'][1][ind][0]!=0
+# ind=227
+thetask=data['mpert'][2][ind]
+thispert=data['mpertmisc'][1][ind]
+plt.plot(data['mpertmisc'][0][ind])
+
+# plot paths
+indls=similar_trials2thispert(data['mpert'][2], thetask,thispert, ntrial=5,pertmeta=data['mpertmisc'][1])
+substates=[data['mpert'][0][i] for i in indls]
+subactions=[data['mpert'][1][i] for i in indls]
+subtasks=np.array(data['mpert'][2])[indls]
+subperts=[data['mpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['mpertmisc'][1])[indls]
+
+ax=plotoverhead_simple(substates,thetask,color='r',label='marco',ax=None)
+indls=similar_trials2thispert(data['bpert'][2], thetask,thispert, ntrial=5,pertmeta=data['bpertmisc'][1])
+substates=[data['bpert'][0][i] for i in indls]
+subactions=[data['bpert'][1][i] for i in indls]
+subtasks=np.array(data['bpert'][2])[indls]
+subperts=[data['bpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['bpertmisc'][1])[indls]
+ax=plotoverhead_simple(substates,thetask,color='b',label='bruno',ax=ax)
+ax.get_figure()
+
+# plot actions
+for suba in subactions:
+    plt.plot(suba)
+for p in subperts:
+    plt.plot(p)
+
+# marco reward status
+len(data['mdf'][data['mdf'].rewarded])/len(data['mdf'])
+len(data['bdf'][data['bdf'].rewarded])/len(data['bdf'])
+len(data['vdf'][data['vdf'].rewarded])/len(data['vdf'])
+
+len(data['mdf'][(data['mdf'].rewarded) & data['mdf'].perturb_start_time.isnull()])/len(data['mdf'][data['mdf'].perturb_start_time.isnull()])
+len(data['bdf'][(data['bdf'].rewarded) & data['bdf'].perturb_start_time.isnull()])/len(data['bdf'][data['bdf'].perturb_start_time.isnull()])
+len(data['vdf'][(data['vdf'].rewarded) & data['vdf'].perturb_start_time.isnull()])/len(data['vdf'][data['vdf'].perturb_start_time.isnull()])
+
+
+
+
+data['bdf'][:7000]
 # % value map from critic ---------------------
 
 # load the inferred theta
@@ -937,7 +1131,6 @@ with open('distinguishparamZnoisecost3finer19', 'wb+') as f:
 
 # with open('distinguishparamZnoisecost3finer19', 'rb') as f:
 #     paramls,Z= pickle.load(f) 
-
 
 
 

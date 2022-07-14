@@ -7,6 +7,9 @@ from numpy import pi
 import warnings
 from matplotlib import pyplot as plt
 from scipy.signal import resample
+import neo
+from scipy.signal import medfilt
+from scipy.stats import norm
 
 # testing imports
 
@@ -117,7 +120,7 @@ def data_iter(batch_size,states,actions,tasks):
 
 
 def df_downsamplepert(df,factor=0.0025):
-    # perts,pertsmeta
+    '''pert array ,pertsmeta (theta,strength,peak time)'''
     def pertmeta(pert):
         # the theta is the turning radius. - for backward left
         direction=np.nan_to_num(pert[:,0]/pert[:,1],0)
@@ -637,9 +640,9 @@ class MonkeyDataExtractor():
                     session_data.Time > start_marker_times[trial_idx],
                     session_data.Time < end_marker_times[trial_idx])].copy()
                 
-                # Use median filter kernel size as 5 to remove spike noise first.
-                trial_data['ForwardV'] = medfilt(trial_data['ForwardV'], medfilt_kernel)
-                trial_data['AngularV'] = medfilt(trial_data['AngularV'], medfilt_kernel)
+                # # Use median filter kernel size as 5 to remove spike noise first.
+                # trial_data['ForwardV'] = medfilt(trial_data['ForwardV'], medfilt_kernel)
+                # trial_data['AngularV'] = medfilt(trial_data['AngularV'], medfilt_kernel)
                 
                 # cut non-moving head and tail
                 moving_period = np.where(trial_data['ForwardV'].abs() > v_threshold)[0]

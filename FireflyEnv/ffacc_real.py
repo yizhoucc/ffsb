@@ -2842,7 +2842,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             # print('stop')
             self.stop=True 
         # if self.debug:
-        end_current_ep= (self.if_agent_stop() and self.trial_timer>4) or self.trial_timer>=self.episode_len
+        end_current_ep= (self.if_agent_stop()) or self.trial_timer>=self.episode_len
         # else:
         #     end_current_ep= (self.if_agent_stop() and self.prev_d<3*self.goal_r) or self.trial_timer>=self.episode_len or self.prev_d>self.max_distance
         # end_current_ep=self.stop or self.trial_timer>=self.episode_len

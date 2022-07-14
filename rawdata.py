@@ -101,11 +101,14 @@ datapath=Path("Z:\\{}_pert\\packed".format('bruno'))
 with open(datapath,'rb') as f:
     bdf = pickle.load(f)
     bdf=bdf[~bdf.perturb_start_time.isnull()] # pert only trial
-
 datapath=Path("Z:\\{}_pert\\packed".format('schro'))
 with open(datapath,'rb') as f:
     sdf = pickle.load(f)
     sdf=sdf[~sdf.perturb_start_time.isnull()] # pert only trial
+datapath=Path("Z:\\{}_pert\\packed".format('jimmy'))
+with open(datapath,'rb') as f:
+    jdf = pickle.load(f)
+    jdf=jdf[~jdf.perturb_start_time.isnull()] # pert only trial
 
 
 plotmetatrend(df.iloc[:600])
@@ -268,32 +271,48 @@ plt.legend(by_label.values(), by_label.keys())
 
 
 
-# my testing
+# process smr data ---------------------
 from pathlib import Path
-folderpath=Path("D:\mkdata\\q_pert")
+folderpath=Path("D:\mkdata\\jimmy_pert")
 sessions=[x for x in folderpath.iterdir() if x.is_dir()]
 # convert and downsample, saving
 for eachsession in sessions:
     ext=MonkeyDataExtractor(folder_path=eachsession)
+    ext.monkey_class='NYU'
     trajectory=ext()
     # trajectory.to_pickle(eachsession.parent/(str(eachsession)+'_full'))
     dfdownsample(trajectory,eachsession.parent/(str(eachsession)+'_ds'))
     print('file saved')
 # pack all ds data together
-folderpath=Path("D:\mkdata\\q_normal")
+folderpath=Path("D:\mkdata\\jimmy_pert")
 sessions=[x for x in folderpath.iterdir() if x.is_file()]
 packed=None
 for eachsession in sessions:
     with open(eachsession, 'rb') as f:
         df = pickle.load(f)
         packed=pd.concat([packed,df])
-packed.to_pickle('packed')
+packed.to_pickle(folderpath/'packed')
 # load packed
-folderpath=Path("D:\mkdata\\q_pert")
+folderpath=Path("D:\mkdata\\jimmy_pert")
 with open(folderpath/'packed', 'rb') as f:
         df = pickle.load(f)
 
 
+
+# process mat data --------------------
+filename='Z:/jimmy_pert/m73s28.mat'
+# data = spio.loadmat(filename, struct_as_record=False, squeeze_me=True)
+data=loadmat(filename,key='trials_behv')
+data[0].keys()
+data[0]['continuous'].keys()
+data[0]['events'].keys()
+data[0]['logical'].keys()
+data[0]['prs'].keys()
+data[0]['prs'].keys()
+
+data.keys()
+data['continuous'].keys()
+['ptb_angular']
 
 # rewarded curve
 data=list(trajectory.rewarded)

@@ -233,8 +233,6 @@ theta_bar(st,sc )
 
 
 
-corr=correlation_from_covariance(cov)
-
 
 # covariance heatmap -----------------------------------------------------
 inds=[1, 3, 5, 7, 0, 2, 4,6, 8, 9]
@@ -255,6 +253,7 @@ with initiate_plot(5,5,300) as fig:
     
 
 # correlation heatmap -----------------------------------------------------
+corr=correlation_from_covariance(cov)
 inds=[1, 3, 5, 7, 0, 2, 4,6, 8, 9]
 b=torch.diag(torch.tensor(cov),0)
 S=torch.diag(torch.sqrt(b))
@@ -371,10 +370,12 @@ monkeynames=['ASD', 'Ctrl' ]
 logls=[
     Path('Z:/bruno_pert/cmafull_b_pert'),
     Path('Z:/schro_pert/cmafull_packed_schro_pert'),
-    Path('Z:/victor_pert/cmafull_victor_pert_ds'),
     Path('Z:/q_pert/cma180paper_packed'),
+    Path('Z:/victor_pert/cmafull_victor_pert_ds'),
+    Path('Z:/jimmy_pert/des1sub200packed'),
+    Path('Z:/marco_pert/des1sub200packed'),
 ]
-monkeynames=['bruno', 'schro', 'victor', 'quigley']
+monkeynames=['bruno', 'schro', 'quigley','victor','jimmy','maraco']
 
 mus,covs,errs=[],[],[]
 for inv in logls:

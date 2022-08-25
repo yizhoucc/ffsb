@@ -2,6 +2,8 @@
 '''
 if sub inverse produce ridges on logll surface, then group inverse may not be able to find the correct solution.
 '''
+# -------------------------------------------------------------
+from scipy.stats import multivariate_normal
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -12,7 +14,7 @@ from plot_ult import quickallspine
 
 paramspace=[0,1]
 subjectrange=[0.3,0.7]
-covanglerange=[0.6,2]
+covanglerange=[0.6,3.0]
 covratiorange=[3,10]
 nsub=5
 reso=100
@@ -36,9 +38,9 @@ for isub in range(nsub):
     rotation = np.array(((c, -s), (s, c)))
     cov=rotation@cov@rotation.T
     surface=multivariate_normal(mu,cov)
-    subZ=surface.pdf(pos)
+    subZ=np.log(surface.pdf(pos))
     groudtruth.append(subZ)
-    im=ax.contourf(X,Y,subZ, alpha=0.3)
+    im=ax.contourf(X,Y,subZ, alpha=0.1)
 plt.colorbar(im, label='psedo likelihood',alpha=1)
     # plot_cov_ellipse(cov, pos=mu, nstd=1, color=None, ax=ax,edgecolor=None,alpha=0.1)
 ax.set_title('subject inverse')

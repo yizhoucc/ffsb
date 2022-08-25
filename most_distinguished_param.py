@@ -143,11 +143,7 @@ astates, aactions, atasks=select_tar(astates, aactions, atasks)
 hstates, hactions, htasks=hstates[:num_sample], hactions[:num_sample], htasks[:num_sample].astype('float32')
 astates, aactions, atasks=astates[:num_sample], aactions[:num_sample], atasks[:num_sample].astype('float32')
 
-
-
-
 ray.init(log_to_driver=False,ignore_reinit_error=True)
-
 @ray.remote
 def getlogll(x):
     atheta,htheta=x[0],x[1]
@@ -162,15 +158,6 @@ def getlogll(x):
 complexity:
 gridreso**2 *(ntrialT * nsample) * 2
 '''
-
-
-
-
-
-
-
-
-
 
 
 
@@ -348,7 +335,7 @@ for i in range(gridreso):
 
 # with initiate_plot(3,3,300) as f:
 #     ax=f.add_subplot(111)
-#     im=ax.imshow(formatedZ,origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='auto',vmin=-79, vmax=-73)
+#     im=ax.imshow(formatedZ,origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),aspect='auto',vmin=-88, vmax=-73)
 #     # im=ax.imshow(formatedZ[:-1,:],origin='lower', extent=(X[0],X[-2],Y[0],Y[-1]),aspect='auto',vmin=-103, vmax=-73)
 #     # im=ax.contourf(formatedZ,origin='lower', extent=(X[0],X[-1],Y[0],Y[-1]),vmin=-103, vmax=-73)
 #     ax.set_aspect('equal')

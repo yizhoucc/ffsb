@@ -153,9 +153,8 @@ for isub in range(nsub):
 
 # check res
 # ---------------------------
-ntrialpersub=(len(allstates)//nsub)
 path=Path('Z:/simulation')
-datafile=path/'simulationnopert10group50norm'
+datafile=path/'simulation10group150normfixgr'
 subtheta,subcov,suberr=[],[],[]
 
 # ground truth
@@ -163,6 +162,7 @@ if datafile.is_file():
     print('use previous simulation trajectory')
     with open(datafile, 'rb') as f:
         states, actions, tasks, alltruth = pickle.load(f)
+ntrialpersub=(len(alltruth)//nsub)
 # sub inverse
 for isub in range(nsub):
     resfile=datafile.parent/'{}invsub{}'.format(isub,datafile.name)

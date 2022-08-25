@@ -1,4 +1,4 @@
-import imp
+
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -95,7 +95,6 @@ v=[x[1,0] for x in x_list]
 plt.plot(v)
 u=[u[0] for u in u_list]
 plt.plot(u)
-
 
 
 # transforms time-invariant into constant time-varying (list of) matrices
@@ -251,7 +250,7 @@ if __name__ == "__main__":
     # system.define('ABCQRVWX', np.matrix(np.eye(2)))  # define matrices
 
     system.assign_val('ACQRVWXF', [
-        np.matrix([[1,0.2],[0,0.5]]),            #a transition matrix
+        np.matrix([[1,0.1],[0,0.4]]),            #a transition matrix
         # np.matrix([[0],[0.5]]),                  #b control gain
         np.matrix([[0,1]]),                     #c obs gain
         np.matrix([[10,0],[0,1]]),          #q state cost weight

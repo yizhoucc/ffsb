@@ -55,6 +55,32 @@ ax.plot(np.linspace(-1,9),[2]*50)
 ax.get_figure()
 
 
+# plot the inv res scatteers bar (new formating to align with asd data)
+subshift=0.08
+with initiate_plot(7,2,300) as fig:
+    ax=fig.add_subplot(111)
+    quickspine(ax)
+    ax.set_xticks(list(range(10)))
+    ax.set_xticklabels(theta_names, rotation=45, ha='right')
+    ax.set_ylabel('inferred param value')
+    colory=np.linspace(0,2,50) # the verticle range of most parameters
+    colory=torch.linspace(0,2,50) # the verticle range of most parameters
+    for ithsub, logfile in enumerate(logls): # each mk subject
+        if ithsub==0: # bruno
+            basecolor=[41/255,171/255,1]
+        elif ithsub==3:
+            basecolor=[57/255,181/255,74/255]
+        else:
+            basecolor=[0,0,1]
+        log=process_inv(logfile,ind=60)
+        for i, mu in enumerate(log[0]): # each parameter
+            std=(torch.diag(log[1])**0.5)[i]*0.1
+            prob=lambda y: torch.exp(-0.5*(y-mu)**2/std**2)
+            proby=prob(colory)
+            for j in range(len(colory)-1):
+                c=proby[j].item()
+                plt.plot([i-(ithsub)*subshift,i-(ithsub)*subshift],[colory[j],colory[j+1]],c=basecolor, alpha=c,linewidth=3)
+
 
 # % example inferred belief in one trial ---------------------
 # load the inferred theta
@@ -463,6 +489,8 @@ for suba in subactions:
     plt.plot(suba)
 for p in subperts:
     plt.plot(p)
+for suba in substates:
+    plt.plot(suba)
 
 # marco reward status
 len(data['mdf'][data['mdf'].rewarded])/len(data['mdf'])
@@ -476,7 +504,57 @@ len(data['vdf'][(data['vdf'].rewarded) & data['vdf'].perturb_start_time.isnull()
 
 
 
-data['bdf'][:7000]
+
+# all mk that has pert together ----------------------
+# select a task
+done=False
+while not done:
+    ind=np.random.randint(0,len(data['mpert'][2]))
+    done=data['mpertmisc'][1][ind][0]!=0
+# ind=227
+# ind=6172
+thetask=data['mpert'][2][ind]
+thispert=data['mpertmisc'][1][ind]
+plt.plot(data['mpertmisc'][0][ind])
+
+indls=similar_trials2thispert(data['mpert'][2], thetask,thispert, ntrial=3,pertmeta=data['mpertmisc'][1])
+substates=[data['mpert'][0][i] for i in indls]
+subactions=[data['mpert'][1][i] for i in indls]
+subtasks=np.array(data['mpert'][2])[indls]
+subperts=[data['mpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['mpertmisc'][1])[indls]
+ax=plotoverhead_simple(substates,thetask,color='r',label='marco',ax=None)
+
+indls=similar_trials2thispert(data['bpert'][2], thetask,thispert, ntrial=3,pertmeta=data['bpertmisc'][1])
+substates=[data['bpert'][0][i] for i in indls]
+subactions=[data['bpert'][1][i] for i in indls]
+subtasks=np.array(data['bpert'][2])[indls]
+subperts=[data['bpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['bpertmisc'][1])[indls]
+ax=plotoverhead_simple(substates,thetask,color='b',label='bruno',ax=ax)
+
+indls=similar_trials2thispert(data['vpert'][2], thetask,thispert, ntrial=3,pertmeta=data['vpertmisc'][1])
+substates=[data['vpert'][0][i] for i in indls]
+subactions=[data['vpert'][1][i] for i in indls]
+subtasks=np.array(data['vpert'][2])[indls]
+subperts=[data['vpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['vpertmisc'][1])[indls]
+ax=plotoverhead_simple(substates,thetask,color='k',label='victor',ax=ax)
+
+
+indls=similar_trials2thispert(data['jpert'][2], thetask,thispert, ntrial=3,pertmeta=data['jpertmisc'][1])
+substates=[data['jpert'][0][i] for i in indls]
+subactions=[data['jpert'][1][i] for i in indls]
+subtasks=np.array(data['jpert'][2])[indls]
+subperts=[data['jpertmisc'][0][i] for i in indls]
+subpertmeta=np.array(data['jpertmisc'][1])[indls]
+ax=plotoverhead_simple(substates,thetask,color='g',label='jimmy',ax=ax)
+ax.get_figure()
+
+quicksave('allmkpert overhead ind={}'.format(ind),fig=ax.get_figure())
+
+
+
 # % value map from critic ---------------------
 
 # load the inferred theta

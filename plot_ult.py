@@ -4,6 +4,7 @@ import enum
 import imp
 from pathlib import Path
 from tkinter import PhotoImage
+from turtle import color
 import numpy as np
 from matplotlib.ticker import MaxNLocator
 import scipy.stats
@@ -206,6 +207,17 @@ def hex2rgb(hexstr):
     if hexstr[0] =='#':
         hexstr=hexstr.lstrip('#')
     return [int(hexstr[i:i+2], 16)/255 for i in (0, 2, 4)]
+
+
+def colorlinspace(color1,color2,n=10):
+    # return n by color matrix
+    if type(color1)==str:
+        color1=hex2rgb(color1)
+    if type(color2)==str:
+        color2=hex2rgb(color2)
+    color1=np.array(color1)
+    color2=np.array(color2)
+    return np.linspace(color1,color2,n)
 
 
 def colorshift(mu, direction, amount, n):
@@ -2175,7 +2187,7 @@ def mytick(x,nticks=5, roundto=0):
         return np.linspace(np.floor(np.min(x)), np.ceil(np.max(x)),nticks)
 
 
-def vary_theta_new(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0.3],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10,plotallb=False):
+def vary_theta_new(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0.3],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10,plotallb=False, gradientpath=True, gradientreso=10,savename=None):
     # overhead only
   def sample_trials(agent, env, theta, phi, thistask, initv=0.,initw=0., action_noise=0.1,pert=None,):
     agent_actions=[]
@@ -2235,14 +2247,20 @@ def vary_theta_new(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0
                 data=sample_trials(agent, env, theta, phi, etask,initv=initv,initw=initw,pert=pert)
             estate=data['estate']
             agent_beliefs=data['agent_beliefs']
-            agent_actions=data['agent_actions']
+            agent_actions=data['agent_actions'][0]
             
-            # overhead
             ax = subplotmap[n]
-            ax.plot(estate[0,:]*200,estate[1,:]*200, color=color_settings['s'],alpha=0.5)
-            ax.scatter(estate[0,-1]*200,estate[1,-1]*200, color=color_settings['a'],alpha=0.5)
+            if not gradientpath:
+                ax.plot(estate[0,:]*200,estate[1,:]*200, color=color_settings['s'],alpha=0.5)
+            else:
+                for t in range(estate.shape[1]-1):
+                    colorbinsize=1/gradientreso
+                    colormap=colorlinspace([0,0,1],[0.1,1,0.1],gradientreso)
+                    c=colormap[int(abs(agent_actions[t,1].item())/colorbinsize)]
+                    ax.plot([estate[0,t]*200, estate[0,t+1]*200],[estate[1,t]*200, estate[1,t+1]*200],c=c,alpha=1,linewidth=0.5)
+            ax.scatter(estate[0,-1]*200,estate[1,-1]*200, edgecolor='none', color=color_settings['s'],alpha=1)
             if i==0:
-                goalcircle = plt.Circle((etask[0]*200,etask[1]*200), 65, color=color_settings['goal'], edgecolor='none', alpha=0.3, linewidth=0.8)
+                goalcircle = plt.Circle((etask[0]*200,etask[1]*200), 65, edgecolor='k', facecolor='none', alpha=1, linewidth=5)
                 ax.add_patch(goalcircle)
                 ax.set_aspect('equal')
                 ax.set_xlabel('world x [cm]')
@@ -2261,7 +2279,8 @@ def vary_theta_new(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0
                 cov=data['agent_covs'][0][t][:2,:2]*200*200
                 pos=  [agent_beliefs[0][:,:,0][t,0]*200,
                         agent_beliefs[0][:,:,0][t,1]*200]
-                plot_cov_ellipse(cov, pos, nstd=3, color=color_settings['b'], ax=ax,alpha=0.05)
+                plot_cov_ellipse(cov, pos, nstd=3, edgecolor=color_settings['b'],color='none', ax=ax,alpha=1,linewidth=0.5)
+                
             if n!=0:
                 ax.set_yticklabels([])
                 # ax.set_xticklabels([])
@@ -2272,7 +2291,8 @@ def vary_theta_new(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0
         ax.set_xticks(mytick(ax.get_xlim(),3,-1))
         ax.set_yticks(mytick(ax.get_ylim(),3,-1))
         plt.tight_layout()
-
+    if savename:
+        quicksave(savename)
 
 def vary_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0.3],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=10, plotallb=False):
 
@@ -2464,7 +2484,6 @@ def vary_theta(agent, env, phi, theta_init, theta_final,nplots,etask=[0.7,-0.3],
                     ax.plot(np.arange(len(mkactions))/10,mkactions[:,1],alpha=0.7, color=color_settings['a'])
 
             plt.tight_layout()
-
 
 
 def two_theta_curvaturehist(agent, env, phi, thetas, labels=['ASD model','Ctrl model'],etask=[0.5,0.5],initv=0.,initw=0.,mkactions=None, pert=None,ntrials=50):
@@ -3729,8 +3748,11 @@ def initiate_plot(dimx=24, dimy=9, dpi=100, fontweight='normal'):
     yield fig
     plt.show()
     
-def quicksave(name):
-    plt.savefig('C:/Users/24455/iCloudDrive/misc/602e8a45552ffee5239628ae/figures/{}.svg'.format(name), dpi='figure', format='svg',bbox_inches="tight")
+def quicksave(name,fig=None):
+    if not fig:
+        plt.savefig('C:/Users/24455/iCloudDrive/misc/602e8a45552ffee5239628ae/figures/{}.svg'.format(name), dpi='figure', format='svg',bbox_inches="tight")
+    else:
+        fig.savefig('C:/Users/24455/iCloudDrive/misc/602e8a45552ffee5239628ae/figures/{}.svg'.format(name), dpi='figure', format='svg',bbox_inches="tight")
 
 
 def set_violin_plot(bp, facecolor, edgecolor, linewidth=1, alpha=1, ls='-', hatch=r''):
@@ -4740,9 +4762,10 @@ def plotoverhead_simple(states,task,color='b',label='label',ax=None):
         ax.spines['right'].set_visible(False)
         ax.set_xticks(mytick(ax.get_xticks(),3,-1))
         ax.set_yticks(mytick(ax.get_yticks(),3,-1))
-        handles, labels_ = ax.get_legend_handles_labels()
-        by_label = dict(zip(labels_, handles))
-        ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+        quickleg(ax)
+        # handles, labels_ = ax.get_legend_handles_labels()
+        # by_label = dict(zip(labels_, handles))
+        # ax.legend(by_label.values(), by_label.keys(),loc='upper right')
     else:
         with initiate_plot(3, 3,300) as fig:
             ax=fig.add_subplot(111)
@@ -4758,9 +4781,10 @@ def plotoverhead_simple(states,task,color='b',label='label',ax=None):
             ax.spines['right'].set_visible(False)
             ax.set_xticks(mytick(ax.get_xticks(),3,-1))
             ax.set_yticks(mytick(ax.get_yticks(),3,-1))
-            handles, labels_ = ax.get_legend_handles_labels()
-            by_label = dict(zip(labels_, handles))
-            ax.legend(by_label.values(), by_label.keys(),loc='upper right')
+            quickleg(ax)
+            # handles, labels_ = ax.get_legend_handles_labels()
+            # by_label = dict(zip(labels_, handles))
+            # ax.legend(by_label.values(), by_label.keys(),loc='upper right')
             plt.tight_layout()
     return ax
 
@@ -5110,13 +5134,17 @@ def quickoverhead(statelike,ax=None,alpha=0.5):
     ax.legend(by_label.values(), by_label.keys(),loc=2, prop={'size': 6})
 
 
-def quickoverhead_state(statelike,taskslike,ax=None,alpha=0.5):
+def quickoverhead_state(statelike,taskslike,ax=None,alpha=0.5,goalcircle=False):
   with initiate_plot(4, 2, 300) as fig, warnings.catch_warnings():
     warnings.simplefilter('ignore')
     ax = fig.add_subplot(111) if not ax else ax
     for given_state in statelike:
         ax.plot(given_state[:,0],given_state[:,1],color='grey')
-    ax.scatter(taskslike[:,0],taskslike[:,1],s=2,color='grey')
+    if goalcircle:
+        for eachtask in taskslike:
+            ax.add_patch(plt.Circle((eachtask[0],eachtask[1]), 0.13, color=color_settings['goal'], alpha=0.5, edgecolor='none'))
+    else:
+        ax.scatter(taskslike[:,0],taskslike[:,1],s=2,color=color_settings['goal'])
     ax.axis('equal')
     ax.set_xlabel('world x')
     ax.set_ylabel('world y')

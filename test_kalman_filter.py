@@ -149,14 +149,14 @@ task=Test(state,
     process_noise=np.asarray([10.,10.]),
     observation_noise=np.asarray([10.,10.]))
 
-#     x=[]
-#     y=[]
-#     for i in range(10):
-#         task.KF(action)
-#         x.append(task.s[0])
-#         y.append(task.s[1])
-#         print(task.s)
-#         print(task.P[1,1])
+    # x=[]
+    # y=[]
+    # for i in range(10):
+    #     task.KF(action)
+    #     x.append(task.s[0])
+    #     y.append(task.s[1])
+    #     print(task.s)
+    #     print(task.P[1,1])
     
 def plot_path(task,steps,state=None,action=None):
     state=np.asarray([0,0,0,0,0]) if state is None else state

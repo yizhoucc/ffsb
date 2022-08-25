@@ -4,29 +4,8 @@ import matplotlib.pyplot as plt
 from sklearn import svm
 from sklearn.datasets import make_blobs
 import numpy as np
-from plot_ult import plotoverhead_simple, quickallspine, quickspine, run_trial, similar_trials2this, vary_theta,vary_theta_ctrl,vary_theta_new
+from plot_ult import plotoverhead_simple, quickallspine, quicksave, quickspine, run_trial, similar_trials2this, vary_theta,vary_theta_ctrl,vary_theta_new
 
-# we create 40 separable points
-X, y = make_blobs(n_samples=400, centers=2, random_state=6)
-
-# fit the model, don't regularize for illustration purposes
-clf = svm.SVC(kernel="linear", C=1000)
-clf.fit(X, y)
-
-
-
-
-
-# # plot support vectors
-# ax.scatter(
-#     clf.support_vectors_[:, 0],
-#     clf.support_vectors_[:, 1],
-#     s=100,
-#     linewidth=1,
-#     facecolors="none",
-#     edgecolors="k",
-# )
-# plt.show()
 
 def calc_svm_decision_boundary(svm_clf, xmin, xmax):
     """Compute the decision boundary"""
@@ -35,7 +14,6 @@ def calc_svm_decision_boundary(svm_clf, xmin, xmax):
     xx = np.linspace(xmin, xmax, 200)
     yy = -w[0]/w[1] * xx - b/w[1]
     return xx, yy
-
 
 # Computes the decision boundary of a trained classifier
 db_xx, db_yy = calc_svm_decision_boundary(clf, -35, 35)
@@ -47,15 +25,6 @@ neg_slope = -1 / -clf.coef_[0][0]
 bias = clf.intercept_[0] / clf.coef_[0][1]
 ortho_db_yy = neg_slope * db_xx - bias
 
-
-# # get the separating hyperplane
-# w = clf.coef_[0]
-# a = -w[0] / w[1]
-# xx = np.linspace(-5, 5)
-# yy = a * xx - (clf.intercept_[0]) / w[1]
-
-
-# plot the decision function
 
 plt.scatter(X[:, 0], X[:, 1], c=y, s=30, cmap=plt.cm.Paired)
 ax = plt.gca()
@@ -87,9 +56,7 @@ vary_theta_ctrl(agent, env, phi, theta_init, theta_final,3,etask=[0.5,0.3])
 
 # vary ASD to healthy --------------------------------------------------------------------
 
-
-
-
+# load theta distribution
 logls=['Z:/human/fixragroup','Z:/human/clusterpaperhgroup']
 monkeynames=['ASD', 'Ctrl' ]
 
@@ -105,14 +72,6 @@ thetas=torch.tensor(mus)
 theta_init=thetas[0]
 theta_final=thetas[1]
 
-
-
-# ax=multimonkeytheta(monkeynames, mus, covs, errs, )
-# ax.set_yticks([0,1,2])
-# ax.plot(np.linspace(-1,9),[2]*50)
-# ax.get_figure()
-
-# load theta distribution
 alltag=[]
 alltheta=[]
 loglls=[]
@@ -143,6 +102,30 @@ w = clf.coef_[0] # the normal vector
 midpoint=(mus[0]+mus[1])/2
 lb=np.array([0,0,0,0,0,0,0.129,0,0,0,0])
 hb=np.array([1,2,1,1,1,1,0.131,2,2,1,1])
+
+
+
+
+# vary ASD to healthy
+vary_theta(agent, env, phi, theta_init, theta_final,5,etask=[0.5,0.3], ntrials=10)
+vary_theta_ctrl(agent, env, phi, theta_init, theta_final,3,etask=[0.5,0.3])
+
+
+# vary small gain to correct
+theta_init=midpoint.copy();theta_final=midpoint.copy()
+theta_init[1]=0
+theta_final[1]=2
+theta_init,theta_final=torch.tensor(theta_init).view(-1,1).float(),torch.tensor(theta_final).view(-1,1).float()
+vary_theta_new(agent, env, phi, theta_init, theta_final,5,etask=[1,1], ntrials=20)
+quicksave('0 wgain to 2')
+
+
+# ax=multimonkeytheta(monkeynames, mus, covs, errs, )
+# ax.set_yticks([0,1,2])
+# ax.plot(np.linspace(-1,9),[2]*50)
+# ax.get_figure()
+
+
 
 theta_init=np.min(midpoint-lb)/w[np.argmin(hb-midpoint)]*-w*5+midpoint
 theta_final=np.min(midpoint-lb)/w[np.argmin(midpoint-lb)]*w*5+midpoint

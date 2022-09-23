@@ -21,7 +21,7 @@ from collections import namedtuple
 import torch
 import os
 import scipy.io as spio
-os.chdir('C:\\Users\\24455\\iCloudDrive\\misc\\ffsb')
+# os.chdir('C:\\Users\\24455\\iCloudDrive\\misc\\ffsb')
 import numpy as np
 from scipy.stats import tstd
 from matplotlib import pyplot as plt 

@@ -24,7 +24,7 @@ arg = Config()
 
 
     # old version
-'''
+
     env=ffacc_real.FireFlyPaper(arg)
     env.debug=True
 
@@ -373,11 +373,7 @@ arg = Config()
         background_data=None)
     plt.imshow(bk)
 
-'''
 
-
-
-'''
 
     #-- mis and validation-------------------------------------------------------------------
     alllogll=[]

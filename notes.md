@@ -345,7 +345,7 @@ neural activities, in progress
     decoding, policy
 
 
-spike sorting and pipeline for multi array
+ting and pipeline for multi array
     Split and distribute the raw data into workers, 
     Butterworth filter and spatial whitening, 
     mean-shift cluster the neural spike events

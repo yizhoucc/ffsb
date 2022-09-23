@@ -32,14 +32,23 @@ arg = Config()
 
 
 # % theta hist ---------------------
+datafolder=Path(os.getenv('datafolder'))
 logls=[
-    Path('Z:/bruno_pert/cmafull_b_pert'),
-    Path('Z:/schro_pert/cmafull_packed_schro_pert'),
-    Path('Z:/q_pert/cma180paper_packed'),
-    Path('Z:/victor_pert/cmafull_victor_pert_ds'),
-    Path('Z:/jimmy_pert/des1sub200packed'),
-    Path('Z:/marco_pert/des1sub200packed'),
+    datafolder/('bruno_pert/cmafull_b_pert'),
+    datafolder/('schro_pert/cmafull_packed_schro_pert'),
+    datafolder/('q_pert/cma180paper_packed'),
+    datafolder/('victor_pert/cmafull_victor_pert_ds'),
+    datafolder/('jimmy_pert/des1sub200packed'),
+    datafolder/('marco_pert/des1sub200packed'),
 ]
+# logls=[
+#     Path('Z:/bruno_pert/cmafull_b_pert'),
+#     Path('Z:/schro_pert/cmafull_packed_schro_pert'),
+#     Path('Z:/q_pert/cma180paper_packed'),
+#     Path('Z:/victor_pert/cmafull_victor_pert_ds'),
+#     Path('Z:/jimmy_pert/des1sub200packed'),
+#     Path('Z:/marco_pert/des1sub200packed'),
+# ]
 monkeynames=['bruno', 'schro', 'quigley','victor','jimmy','maraco']
 
 mus,covs,errs=[],[],[]

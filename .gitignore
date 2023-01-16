@@ -1,19 +1,10 @@
 *.pyc
 *.xml
 *.json
-data/
-DDPG*/
 .vscode/settings.json
-inverse_data/
-*.zip
 .ipynb_checkpoints/Untitled-checkpoint.ipynb
 .ipynb_checkpoints/Untitled1-checkpoint.ipynb
 *checkpoint.ipynb
 .ipynb_checkpoints/plot_notebook-checkpoint.ipynb
 .ipynb_checkpoints
-monkey_data/
-Digraph.gv.pdf
-Tensorboard/*
-Digraph.gv
-Pseudocode for generic Inverse Rational Control.py
-process_mkdraw.py
+

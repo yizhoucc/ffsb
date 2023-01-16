@@ -31,7 +31,7 @@ env.no_skip=True
 n_actions = env.action_space.shape[-1]
 action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.5 * np.ones(n_actions))        
 modelname=None
-modelname='rerere_52000_6_6_18_30_2_20'
+# modelname='rerere_52000_6_6_18_30_2_20'
 note='8' 
 from stable_baselines3 import TD3
 

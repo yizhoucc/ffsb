@@ -1,7 +1,7 @@
-import os
+import sys
+sys.path.append('..')
 import pandas as pd
 from numpy.lib.npyio import save
-os.chdir(r"C:\Users\24455\iCloudDrive\misc\ffsb")
 import numpy as np
 from cmaes import CMA
 import copy
@@ -32,16 +32,16 @@ import os
 
 
 print('loading data')
-datapath=Path("Z:\\victor_pert\\packed")
+datapath=Path("example_data")
 ith=1 # ith density 
 savename=datapath.parent/('preall'+datapath.name)
 # savename=datapath.parent/('fullfixre{}'.format(str(ith))+datapath.name)
 with open(datapath,'rb') as f:
     df = pickle.load(f)
-df=datawash(df)
-df=df[df.category=='normal']
-df=df[df.target_r>200]
-densities=sorted(pd.unique(df.floor_density))
+# df=datawash(df)
+# df=df[df.category=='normal']
+# df=df[df.target_r>200]
+# densities=sorted(pd.unique(df.floor_density))
 # df=df[df.floor_density==densities[ith]]
 # floor density are in [0.0001, 0.0005, 0.001, 0.005]
 # q monkey density are in [0.000001, 0.0001, 0.001, 0.005]
@@ -72,7 +72,7 @@ phi=torch.tensor([[0.5],
             [0.001],
             [0.001],
     ])
-agent_=TD3.load('trained_agent/paper.zip')
+agent_=TD3.load('paper')
 agent=agent_.actor.mu.cpu()
 
 

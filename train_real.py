@@ -7,7 +7,6 @@ import numpy as np
 from numpy import pi
 import time
 from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
-from reward_functions import reward_singleff
 from FireflyEnv import ffacc_real
 import torch
 

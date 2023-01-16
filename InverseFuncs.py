@@ -10,7 +10,6 @@ from numpy import pi
 import sys
 # ----- single inverse dependencies.
 import torch
-from tqdm import tqdm
 import torch.nn as nn
 from torch.autograd import grad
 from InverseFuncs import *
@@ -26,7 +25,7 @@ import numpy as np
 import itertools
 from concurrent import futures
 from monkey_functions import data_iter
-from tqdm import tqdm
+
 
 def reset_theta_log(gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
     '''

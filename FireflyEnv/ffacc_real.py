@@ -3036,7 +3036,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         return next_s.view(-1,1)
 
 
-    def belief_step(self, previous_b,previous_P, o, a, task_param=None):
+    def belief_step(self, previous_b,previous_P, o, a, task_param=None,predictiononly=False):
         task_param = self.theta if task_param is None else task_param
         I = torch.eye(5)
         H = torch.tensor([[0.,0.,0.,1,0.],[0.,0.,0.,0.,1]])
@@ -3045,6 +3045,9 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         predicted_b = self.update_state(previous_b)
         predicted_b = self.apply_action(predicted_b,a)
         predicted_P = self.A@(previous_P)@(self.A.t())+self.Q 
+        if predictiononly:
+            return predicted_b,predicted_P
+
         if not is_pos_def(predicted_P):
             print('predicted not pos def')
             print('action ,', a)

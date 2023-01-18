@@ -3,6 +3,7 @@
 *.json
 data/
 DDPG*/
+res/
 .vscode/settings.json
 inverse_data/
 *.zip

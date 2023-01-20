@@ -1,32 +1,59 @@
 
 # collections of functions for inverse control
-
-import pickle
 import warnings
 import torch
-from torch import nn
 import numpy as np
 from numpy import pi
 import sys
 # ----- single inverse dependencies.
 import torch
-from tqdm import tqdm
-import torch.nn as nn
 from torch.autograd import grad
 from InverseFuncs import *
 from collections import deque
 import torch
 import numpy as np
 import time
-from torch import nn
 from collections import deque
-import tqdm
 import torch 
 import numpy as np
-import itertools
-from concurrent import futures
-from monkey_functions import data_iter
-from tqdm import tqdm
+
+def convert_unit(monkey_data, factor=0.005):
+    return monkey_data*factor
+
+
+def monkey_data_downsampled(df,factor=0.0025):
+    states = []
+    actions = []
+    tasks=[]
+    index=0
+    while index<df.shape[0]:
+        trial=df.iloc[index]
+        try:
+            if len(trial.action_v)>2:
+                xs=convert_unit(torch.tensor(trial.pos_y, dtype=torch.float), factor=factor)
+                ys=-convert_unit(torch.tensor(trial.pos_x, dtype=torch.float), factor=factor)
+                hs=pi/180*torch.tensor(trial.head_dir, dtype=torch.float)-pi/2
+                vs=convert_unit(torch.tensor(trial.pos_v, dtype=torch.float),factor=factor)
+                ws=pi/180*torch.tensor(trial.pos_w, dtype=torch.float)
+                state=torch.stack([xs,ys,hs,vs,ws]).t()
+                
+                wctrls=torch.tensor(trial.action_w).float()
+                vctrls=torch.tensor(trial.action_v).float()
+                action=[vctrls,wctrls]
+                action=torch.stack(action).t()
+
+                task=[convert_unit(trial.target_y,factor=factor),-convert_unit(trial.target_x,factor=factor)]
+
+                states.append(state)
+                actions.append(action)
+                tasks.append(task)
+        except:
+            print('no',index)
+            index+=1
+            continue
+        index+=1
+    return states, actions, tasks
+
 
 def reset_theta_log(gains_range, std_range, goal_radius_range, Pro_Noise = None, Obs_Noise = None):
     '''
@@ -482,96 +509,6 @@ def monkeyloss_(agent=None,
         return loglls
     return logPr/len(tasks)+0.01*regularization
 
-
-def monkeyloss_turnoffdata(agent=None, 
-            actions=None, 
-            tasks=None, 
-            phi=None, 
-            theta=None, 
-            env=None,
-            stimdur=None,
-            num_iteration=1, 
-            states=None, 
-            samples=1, 
-            gpu=False,
-            action_var=0.1,
-            debug=False):
-    if gpu:
-        logPr = torch.zeros(1).cuda()[0] #torch.FloatTensor([])
-    else:
-        logPr = torch.zeros(1)[0] #torch.FloatTensor([])
-    
-    def _wrapped_call(ep, task):     
-        logPr_ep = torch.zeros(1).cuda()[0] if gpu else torch.zeros(1)[0]   
-        for sample_index in range(samples): 
-            mkactionep = actions[ep]
-            if mkactionep==[] or mkactionep.shape[0]==0:
-                continue
-            env.reset(theta=theta, phi=phi, goal_position=task, vctrl=mkactionep[0][0],wctrl=mkactionep[0][1])
-            numtime=len(mkactionep[1:])
-
-            # compare mk data and agent actions
-            for t,mk_action in enumerate(mkactionep[1:]): # use a t and s t (treat st as st+1)
-                # agent's action
-                action = agent(env.decision_info)
-                # agent's obs, last step obs doesnt matter.
-                if t<len(states[ep])-1:
-                    if type(states[ep])==list:
-                        nextstate=states[ep][1:][t]
-                    elif type(states[ep])==torch.Tensor:
-                        nextstate=states[ep][1:][t].view(-1,1)
-                    obs=env.observations(nextstate)
-                    # agent's belief
-                    print(stimdur[ep])
-                    if stimdur is not None and t>=stimdur[ep]:
-                        env.b, env.P=env.belief_step(env.b,env.P, obs, torch.tensor(mk_action).view(1,-1), predictiononly=True)
-                    else:
-                        env.b, env.P=env.belief_step(env.b,env.P, obs, torch.tensor(mk_action).view(1,-1))
-                    previous_action=mk_action # current action is prev action for next time
-                    env.trial_timer+=1
-                    env.decision_info=env.wrap_decision_info(
-                                                previous_action=torch.tensor(previous_action), 
-                                                time=env.trial_timer)
-                # loss
-                action_loss = -1*logll(torch.tensor(mk_action),action,std=np.sqrt(action_var))
-                obs_loss = -1*logll(error=env.obs_err(), std=theta[4:6].view(1,-1))
-                logPr_ep = logPr_ep + action_loss.sum() + obs_loss.sum()
-                del action_loss
-                del obs_loss
-            # if agent has not stop, compare agent action vs 0,0
-            agentstop=torch.norm(action)<env.terminal_vel
-            while not agentstop and env.trial_timer<40:
-                action = agent(env.decision_info)
-                agentstop=torch.norm(action)<env.terminal_vel
-                obs=(torch.tensor([0.5,pi/2])*action+env.obs_err()).t()
-                env.b, env.P=env.belief_step(env.b,env.P, obs, torch.tensor(action).view(1,-1))
-                # previous_action=torch.tensor([0.,0.]) # current action is prev action for next time
-                previous_action=action
-                env.trial_timer+=1
-                env.decision_info=env.wrap_decision_info(
-                previous_action=torch.tensor(previous_action), 
-                                            time=env.trial_timer)
-                # loss
-                action_loss = -1*logll(torch.tensor(torch.zeros(2)),action,std=np.sqrt(action_var))
-                obs_loss = -1*logll(error=env.obs_err(), std=theta[4:6].view(1,-1))
-                logPr_ep = logPr_ep + action_loss.sum() + obs_loss.sum()
-                del action_loss
-                del obs_loss
-
-        return logPr_ep/samples/env.trial_timer.item()
-    
-    tik=time.time()
-    loglls=[]
-    for ep, task in enumerate(tasks):
-        logPr_ep=_wrapped_call(ep, task)
-        logPr += logPr_ep
-        loglls.append(logPr_ep)
-        del logPr_ep
-    regularization=torch.sum(1/(theta+1e-4))
-    print('calculate loss time {:.0f}'.format(time.time()-tik))
-    if debug:
-        return loglls
-    return logPr/len(tasks)+0.01*regularization
 
 
 def monkeyloss_sim(agent=None, 

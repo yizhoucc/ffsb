@@ -1,10 +1,10 @@
 import gym
 from gym import spaces
-from gym.core import ObservationWrapper, RewardWrapper
-from matplotlib.colors import rgb2hex
+# from gym.core import ObservationWrapper, RewardWrapper
+# from matplotlib.colors import rgb2hex
 from numpy import pi
 import numpy as np
-from FireflyEnv.env_utils import *
+from firefly_task.env_utils import *
 
 
 
@@ -2668,7 +2668,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.action_space = spaces.Box(low=-1., high=1.,shape=(2,), dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high,shape=(1,obsdim),dtype=np.float32)
 
-
     def reset(self,
                 pro_gains = None, 
                 pro_noise_stds = None,
@@ -2700,17 +2699,17 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.trial_sum_cost=0.
         self.trial_sum_reward=0.
         self.rewardgiven=False
-        vctrl=vctrl if vctrl else abs(torch.zeros(1).normal_(0., 0.3))
-        wctrl=wctrl if wctrl else torch.zeros(1).normal_(0., 0.3)
+        vctrl=vctrl if vctrl is not None else abs(torch.zeros(1).normal_(0., 0.3))
+        wctrl=wctrl if wctrl is not None else torch.zeros(1).normal_(0., 0.3)
         # vctrl=torch.zeros(1)
         # wctrl=torch.zeros(1)
         self.reset_state(goal_position=goal_position,vctrl=vctrl,wctrl=wctrl)
         self.reset_belief()
         self.o=torch.tensor([[0],[0]])
         self.decision_info=self.wrap_decision_info(b=self.b, previous_action=self.previous_action, time=self.trial_timer, task_param=self.theta)
-        self.obs_traj=obs_traj
-        self.pro_traj=pro_traj
         if self.debug:
+            self.obs_traj=obs_traj
+            self.pro_traj=pro_traj
             self.trial_costs=[]
             self.trial_rewards=[]
             self.trial_actions=[]
@@ -2719,7 +2718,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             self.covs=[self.P.clone()]
             self.actions=[]
         return self.decision_info.view(1,-1)
-
 
     def reset_state(self,goal_position=None,vctrl=0.,wctrl=0.):
         if goal_position is not None: # use the given position
@@ -2739,7 +2737,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         [vctrl*self.phi[0]],
         [wctrl*self.phi[1]]])
 
-
     def reset_belief(self,vctrl=0.,wctrl=0.): 
         self.P = torch.eye(5) * 1e-8 
         self.P[0,0]=(self.theta[9]*0.05)**2 # sigma xx
@@ -2750,7 +2747,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         [0.],
         [vctrl*self.theta[0]],
         [wctrl*self.theta[1]]])
-
 
     def wrap_decision_info(self,
             b=None,
@@ -2780,7 +2776,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             vecL, 
             task_param.view(-1)])
         return decision_info.view(1, -1)
-
 
     def reset_task_param(self,                
                 pro_gains = None,
@@ -2828,8 +2823,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         phi[10]=inital_y_std if inital_y_std is not None else phi[10]
         return phi
 
-
-    def step(self, action,next_state=None):
+    def step(self, action,next_state=None,predictiononly=False):
         action=torch.tensor(action).reshape(1,-1)
         self.a=action
         _, self.prev_d=self.get_distance(state=self.b)
@@ -2842,7 +2836,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             # print('stop')
             self.stop=True 
         # if self.debug:
-        end_current_ep= (self.if_agent_stop()) or self.trial_timer>=self.episode_len
+        end_current_ep= self.if_agent_stop() or self.trial_timer>=self.episode_len
         # else:
         #     end_current_ep= (self.if_agent_stop() and self.prev_d<3*self.goal_r) or self.trial_timer>=self.episode_len or self.prev_d>self.max_distance
         # end_current_ep=self.stop or self.trial_timer>=self.episode_len
@@ -2852,7 +2846,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         else:
             self.s=next_state
         self.o=self.observations(self.s)
-        self.b, self.P=self.belief_step(self.b,self.P,self.o,action)
+        self.b, self.P=self.belief_step(self.b,self.P,self.o,action,predictiononly=predictiononly)
         self.decision_info=self.wrap_decision_info(previous_action=action,task_param=self.theta)
         # eval
         reward, cost = self.caculate_reward()
@@ -2900,20 +2894,21 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.previous_action=action
         return self.decision_info, float(signal), end_current_ep, {}
 
-
     def state_step(self,a, s): # update xy, then apply new action as new v and w
         next_s = self.update_state(s)
         px, py, angle, v, w = torch.split(next_s.view(-1), 1)
         noisev=torch.distributions.Normal(0,torch.ones(1)).sample()*self.pro_noisev*self.noise_scale   
         noisew=torch.distributions.Normal(0,torch.ones(1)).sample()*self.pro_noisew*self.noise_scale 
-        if self.pro_traj is not None:
-            noisev=self.pro_traj[int(self.trial_timer.item()),0]*self.noise_scale 
-            noisew=self.pro_traj[int(self.trial_timer.item()),1]*self.noise_scale
+        if self.debug and self.pro_traj is not None:
+            noisev=self.pro_traj[int(self.trial_timer.item())]*self.noise_scale 
+            noisew=self.pro_traj[int(self.trial_timer.item())]*self.noise_scale
+        # else:
+        #     noisev=self.pro_traj[int(self.episode_time.item())]#*self.pro_noise  
+        #     noisew=self.pro_traj[int(self.episode_time.item())]#*self.pro_noise  
         v = self.pro_gainv * torch.tensor(1.0)*a[0,0] + noisev
         w = self.pro_gainw * torch.tensor(1.0)*a[0,1] + noisew
         next_s = torch.cat((px, py, angle, v, w)).view(1,-1)
         return next_s.view(-1,1)
-
 
     def update_state(self, state): # use v and w to update x y and heading
         px, py, angle, v, w = torch.split(state.view(-1), 1)
@@ -2932,7 +2927,28 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         next_s = torch.stack((px, py, angle, v, w ))
         return next_s.view(-1,1)
 
+    #  v2  
+    # def caculate_rewardv2(self):
+        # cost=self.action_cost(self.a, self.previous_action)
+        # _,d= self.get_distance(state=self.b)
+        # if self.stop:
+        #     if d<=self.goal_r: # stop and reached goal
+        #         reward=torch.tensor([1.])*self.reward
+        #     else: # stop but not reached goal
+        #         if self.goal_r/d>1/3: # if agent is somewhat near the goal
+        #             reward = (self.goal_r/d)**1*self.reward*0.1*(1-self.cost_scale)
+        #         else: # seems the agent gives up
+        #             reward=torch.tensor([0.]) 
+        #             cost+=0.1*(1-self.cost_scale)
+        #         if reward>self.reward or reward<0:
+        #             raise RuntimeError
+        # else:
+        #     # _,d= self.get_distance()
+        #     # reward=(self.goal_r/d)**2
+        #     reward=torch.tensor([0.])
+        # reward+= (1-self.cost_scale)*self.reward*min(self.goal_r/d,1)*0.01
 
+        # v2
     def caculate_reward(self):
         reward=torch.tensor([0.])
         cost=self.action_cost(self.a, self.previous_action)
@@ -2968,7 +2984,7 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         # reward-=torch.norm(self.a)*self.dt
         return reward.item(), cost.item()
 
-   
+    #v3
     def caculate_rewardv3(self):
         reward=torch.tensor([0.])
         cost=self.action_cost(self.a, self.previous_action)
@@ -2980,7 +2996,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             reward = self.reward * reward_prob 
         return reward.item(), cost.item()
     
-
     def action_cost(self, action, previous_action):
         # action is row vector
         action[0,0]=1.0 if action[0,0]>1.0 else action[0,0]
@@ -2998,7 +3013,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         scalar=self.reward/mincost
         cost=cost*scalar
         return cost*self.cost_scale
-
 
     def unpack_theta(self):
         self.pro_gainv=self.phi[0]
@@ -3021,12 +3035,10 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         self.R[0,0] = self.obs_noisev**2 if self.obs_noisev**2 > 1e-4 else self.obs_noisev**2+1e-4
         self.R[1,1] = self.obs_noisew**2 if self.obs_noisew**2 > 1e-4 else self.obs_noisew**2+1e-4
 
-
     def if_agent_stop(self,sys_vel=None):
         sys_vel=sys_vel if sys_vel else self.sys_vel
         stop=(sys_vel <= self.terminal_vel)
         return stop
-
 
     def apply_action(self,state,action):
         px, py, angle, v, w = torch.split(state.view(-1), 1)
@@ -3034,7 +3046,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         w=action[0,1]*self.pro_gainw_hat*torch.ones(1)
         next_s = torch.stack((px, py, angle, v, w))
         return next_s.view(-1,1)
-
 
     def belief_step(self, previous_b,previous_P, o, a, task_param=None,predictiononly=False):
         task_param = self.theta if task_param is None else task_param
@@ -3045,8 +3056,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         predicted_b = self.update_state(previous_b)
         predicted_b = self.apply_action(predicted_b,a)
         predicted_P = self.A@(previous_P)@(self.A.t())+self.Q 
-        if predictiononly:
-            return predicted_b,predicted_P
 
         if not is_pos_def(predicted_P):
             print('predicted not pos def')
@@ -3059,6 +3068,8 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             APA = self.A@(previous_P)@(self.A.t())
             print("APA:", APA)
             print("APA +:", is_pos_def(APA))
+        if predictiononly:
+            return predicted_b,predicted_P
 
         error = o - H@predicted_b
         S = H@(predicted_P)@(H.t()) + self.R 
@@ -3082,7 +3093,6 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         
         return b, P
 
-
     def transition_matrix(self,b, a): 
         angle=b[2,0]
         vel=b[3,0]
@@ -3098,13 +3108,11 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         A[2, 4] =  self.dt*self.pro_gainw_hat
         return A
 
-
     def reached_goal(self):
         # use real location
         _,distance=self.get_distance(state=self.s)
         reached_bool= (distance<=self.goal_r)
         return reached_bool
-
 
     def observations(self, state): 
         s=state.clone()
@@ -3120,15 +3128,12 @@ class FireFlyReady(gym.Env, torch.nn.Module):
         vw[1] =  vw[1] + noisew
         return vw.view(-1,1)
     
-
     def obs_err(self,):
         return torch.distributions.Normal(0,torch.ones(2)).sample()*(self.theta[4:6].view(-1))
-
 
     def observations_mean(self, s):
         vw = s.view(-1)[-2:]
         return vw.view(-1,1)
-
 
     def get_distance(self, state=None, distance2goal=True): 
         state=self.s if state is None else state
@@ -3140,14 +3145,11 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             relative_distance = torch.sqrt((px)**2+(py)**2).view(-1)
         return position, relative_distance
     
-
     def rewarded(self): # stop within radius
         return self.if_agent_stop() and (self.get_distance(state=self.b)[1]<=self.goal_r)
 
-
     def skipped(self): # miss the target very far, not necesssary skip
         return (self.get_distance(state=self.b,distance2goal=False)[1]<=self.goal_r) and self.trial_timer<5
-
 
     def forward(self, action,task_param,state=None, giving_reward=None):
         action=torch.tensor(action).reshape(1,-1)

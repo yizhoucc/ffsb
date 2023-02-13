@@ -171,3 +171,7 @@ resdir.mkdir(parents=True, exist_ok=True)
 
 with open(resdir/'0202collapsemodelbelief', 'wb+') as f:
     pickle.dump(res, f)
+
+
+
+

@@ -1,3 +1,7 @@
 [Notification]
 
 token = mWBcxqxVNZRUzECXxiLxs5
+
+
+[Datafolder]
+data = /data

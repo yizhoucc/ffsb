@@ -1,6 +1,10 @@
-sys.path.append('.')
-sys.path.append('..')
-sys.path.append('../..')
+# sys.path.append(os.path.abspath('.'))
+import sys
+sys.path.append(os.path.abspath('..'))
+sys.path.append(os.path.abspath('../..'))
+import os
+os.chdir('../..')
+print(os.getcwd())
 import numpy as np
 import torch
 from numpy import pi
@@ -34,12 +38,12 @@ from pathlib import Path
 
 import configparser
 from plot_ult import *
-import os
-import sys
-os.chdir('../..')
-print(os.getcwd())
 
-resdir = 'Z:/neuraltest/res'
+
+config = configparser.ConfigParser()
+config.read_file(open('privateconfig'))
+resdir=config['Datafolder']['data']
+# resdir = 'Z:/neuraltest/res'
 resdir = Path(resdir)
 
 
@@ -58,7 +62,7 @@ def time_stamps_rebin(time_stamps, binwidth_ms=20):
 
 # from data handler, load the data and cut ----------------------------------
 print('start loading...')
-dat = loadmat('Z:/neuraltest/m53s31.mat')
+dat = loadmat(resdir/'neuraltest/m53s31.mat')
 
 # lfp_beta = loadmat('/Volumes/TOSHIBA EXT/dataset_firefly/lfp_beta_m53s50.mat')
 # lfp_alpha = loadmat('/Volumes/TOSHIBA EXT/dataset_firefly/lfp_alpha_m53s50.mat')
@@ -98,7 +102,7 @@ y, X, trial_idx = exp_data.concatenate_inputs(
 
 
 
-datapath="Z:/neuraltest/1208pack"
+datapath=resdir/"neuraltest/1208pack"
 with open(datapath,'rb') as f:
     states, actions, tasks = pickle.load(f)
     
@@ -108,13 +112,9 @@ with open(datapath,'rb') as f:
 warnings.filterwarnings('ignore')
 torch.manual_seed(42)
 arg = Config()
-config = configparser.ConfigParser()
-config.read_file(open('privateconfig'))
-token = config['Notification']['token']
-
 
 print('loading data')
-datapath = Path("Z:/neuraltest/1208pack")
+datapath = Path(resdir/"neuraltest/1208pack")
 with open(datapath, 'rb') as f:
     states, actions, tasks = pickle.load(f)
 
@@ -136,7 +136,7 @@ agent_ = TD3.load('trained_agent/paper.zip')
 agent = agent_.actor.mu.cpu()
 
 
-invfile = Path('Z:/neuraltest/inv_schroall_constrain_nopert_part2')
+invfile = Path(resdir/'neuraltest/inv_schroall_constrain_nopert_part2')
 finaltheta, finalcov, err = process_inv(
     invfile, removegr=False, usingbest=False)
 
@@ -153,8 +153,8 @@ for ind in range(len(tasks)):
     else:
         _, _, ep_beliefs, ep_covs = run_trials(agent=agent, env=env, phi=phi, theta=theta, task=tasks[ind], ntrials=ntrial,
                                                pert=None, given_obs=None, return_belief=True, given_action=actions[ind], given_state=states[ind])
-        beliefs.append(ep_beliefs)
-        covs.append(ep_covs)
+        beliefs.append(ep_beliefs[0]-ep_beliefs[0][0])
+        covs.append(ep_covs[0])
         assert len(ep_beliefs[0]) == len(actions[ind])
 
 
@@ -162,16 +162,21 @@ for ind in range(len(tasks)):
 mask = [True if i not in removemask else False for i in trial_idx]
 
 res={k:v[mask] for k,v in X.items()}
-res['y']=y[:, mask]
+res['y']=y[:, mask].T
 res['trial_idx']=trial_idx[mask]
-res['belief']= np.vstack(beliefs)[:, :, 0].T
+b= np.vstack(beliefs)[:, :, 0].T
 res['cov']= np.vstack(covs)
 
 resdir.mkdir(parents=True, exist_ok=True)
+resdir = Path(resdir)/'neuraltest/res'
 
-with open(resdir/'0202collapsemodelbelief', 'wb+') as f:
+b[[0,1,3]]=b[[0,1,3]]*500
+b[[2,4]]=b[[2,4]]*180/pi
+res['belief']=b.T
+
+
+
+with open(resdir/'0220collapsemodelbelief', 'wb+') as f:
     pickle.dump(res, f)
-
-
 
 

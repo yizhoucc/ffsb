@@ -122,8 +122,7 @@ class emptyStruct(object):
             strprint += '%s:\t%s\n'%(key,self.__dict__[key])
         return strprint
             
-                                    
-
+                        
 class behavior_experiment(object):
     """
     Description
@@ -358,7 +357,6 @@ class behavior_experiment(object):
             for name in prs[k].dtype.names:
                  setattr(self.prs[k], name, prs[k][name][0][0][0,0])
                 
-            
         
     def get_fly_pos(self,trials_behv):
         """
@@ -377,6 +375,7 @@ class behavior_experiment(object):
             self.continuous.x_fly[i] = np.nanmedian(x_fly[i][i_beg: i_stop])
             self.continuous.y_fly[i] = np.nanmedian(y_fly[i][i_beg: i_stop])
         return
+
 
     def extract_eye_track(self,behav_stat,info):
 
@@ -425,6 +424,7 @@ class behavior_experiment(object):
 
         return
 
+
     def itegrate_path(self,velocity):
         """
         Description
@@ -440,6 +440,7 @@ class behavior_experiment(object):
 
         return integr_path
     
+
     def radial_distance_from_position(self):
         """
         Description
@@ -479,6 +480,7 @@ class behavior_experiment(object):
 
         return integr_path
 
+
     def t_flyOFF_compute(self,trials_behv):
         """
         Description
@@ -487,6 +489,7 @@ class behavior_experiment(object):
         """
         dict_offtime = {key: trials_behv[key]['events']['t_targ'].all().flatten() + self.flyON_dur for key in range(trials_behv.shape[0])}
         return dict_offtime
+
 
     def create_event_time_binned(self,event,edges,t_start=None,t_stop=None,select=None):
         bin_event = {}
@@ -522,6 +525,7 @@ class behavior_experiment(object):
             bin_event[ii] = bin_event[ii][(edge_tr > t0) * (edge_tr < t1)]
             ii += 1
         return bin_event
+
 
     def cut_continuous(self, continuous, edges, t_start=None, t_stop=None, select=None,idx0=None,idx1=None,
                        rebin=False):
@@ -599,6 +603,7 @@ class behavior_experiment(object):
 
             ii += 1
         return bin_continous
+
 
 class load_trial_types(object):
     """
@@ -832,6 +837,7 @@ class load_trial_types(object):
         filter = self.trial_type['all'] == all
         return filter
 
+
 def pair_replay_and_active(trials_behv):
     # this based on the fact that active and replay are in blocks of equal size
     repl_bool = np.zeros(trials_behv.shape[0])
@@ -899,6 +905,7 @@ def pair_replay_and_active(trials_behv):
 
         pair_trials = np.hstack((pair_trials, pair))
     return pair_trials
+
 
 if __name__ == '__main__':
     from scipy.io import loadmat

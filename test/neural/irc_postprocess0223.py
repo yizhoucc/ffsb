@@ -82,6 +82,7 @@ var_names = 'rad_vel', 'ang_vel', 'x_monk', 'y_monk'  # ,'t_move'
 y, X, trial_idx = exp_data.concatenate_inputs(
     *var_names, t_start=t_start, t_stop=t_stop, time_stamps=ts)
 
+
 # generate ts for a trial
 id=np.unique(trial_idx)[0]
 ts_=[]

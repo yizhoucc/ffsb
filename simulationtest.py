@@ -31,8 +31,12 @@ import os
 from timeit import default_timer as timer
 from plot_ult import process_inv, run_trial
 from notification import notify
+import configparser
+config = configparser.ConfigParser()
+config.read_file(open('privateconfig'))
+datapath=config['Datafolder']['data']
 
-# --------------------------------------------------------
+# ---------------------------------------------------
 
 
 # load agent and task
@@ -56,9 +60,9 @@ agent=agent_.actor.mu.cpu()
 # create the dataset
 n_normaltrial=0
 n_perttrial=1000
-path=Path('Z:/simulation')
-datafile=path/'0119simulation1000'
-resfile=datafile.parent/'inv2_{}'.format(datafile.name)
+datapath=Path(datapath)/'simulation'
+datafile=(datapath)/'0325simulationpert'
+resfile=datapath/'inv'/'inv0325_{}'.format(datafile.name)
 
 if datafile.is_file():
     print('use previous simulation trajectory')
@@ -138,8 +142,8 @@ def getlogll(x):
 # fresh start
 if not optimizer:
     # init condition, we want to at least cover some dynamic range
-    init_theta=torch.tensor([[0.5],   
-            [1.0],   
+    init_theta=torch.tensor([[1],   
+            [pi/2],   
             [0.5],   
             [0.5],   
             [0.5],   

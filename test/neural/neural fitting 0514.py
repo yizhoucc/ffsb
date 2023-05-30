@@ -1,4 +1,13 @@
 
+print('''
+0514 todo
+cross validation for every fit, maybe belief does better in cv
+    simlar.
+
+''')
+
+
+
 import sys
 import os
 sys.path.append(os.path.abspath('..'))
@@ -7,6 +16,7 @@ os.chdir('../..')
 print(os.getcwd())
 import numpy as np
 import torch
+from sklearn.cross_decomposition import CCA
 from numpy import pi
 from matplotlib import pyplot as plt
 from firefly_utils.data_handler import data_handler
@@ -53,40 +63,15 @@ from sklearn.linear_model import Ridge
 from sklearn.model_selection import GridSearchCV
 
 
-
 config = configparser.ConfigParser()
 config.read_file(open('privateconfig'))
 resdir=config['Datafolder']['data']
 resdir = Path(resdir)
 
 
+dat = loadmat(resdir/'neuraltest/m53s31.mat') # this is a example session with good recording, more neurons
+# dat = loadmat(resdir/'neural/m53s36.mat') # this is a pert example
 
-
-datafiles=list((resdir/"neural").glob("*.mat"))
-ind=1
-# dat = loadmat(datafiles[ind])
-# dat = loadmat(resdir/'neuraltest/m53s31.mat') # this is a example session with good recording, more neurons
-dat = loadmat(resdir/'neural/m53s36.mat') # this is a pert example
-# dat['trials_behv']['continuous'][0].zle
-# dat['trials_behv']['continuous'][0].zre
-# dat['trials_behv']['continuous'][0].yle
-# dat['prs'][0]['height']
-# dat['trials_behv']['continuous'].shape
-# dat['trials_behv']['continuous'][0].shape
-# dat['trials_behv']['continuous'][0][0].shape
-# dat['trials_behv']['continuous'][0][0][0].shape
-# dat['trials_behv']['continuous'][0][0][0]['zle'].shape
-# dat['trials_behv']['continuous'][0][0][0]['zle'][0].shape
-# dat['trials_behv']['continuous'][0][0]['zle'][0].shape
-# dat['trials_behv']['continuous'][0][0][0][0]['zle'].shape
-# plt.plot(dat['trials_behv']['continuous'][0][0][0][0]['zle'])
-# continuous=dat['trials_behv']['continuous']
-# prs=dat['prs']
-# i=0
-# r_belief,theta_belief= eyepos2flypos(continuous[i].zle,continuous[i].zre,continuous[i].yle,continuous[i].yre,prs.height)
-
-
-# print(dat.keys())
 behav_stat_key = 'behv_stats'
 spike_key = 'units'
 behav_dat_key = 'trials_behv'
@@ -97,11 +82,8 @@ post_trial_dur = 0.5
 exp_data = data_handler(dat, behav_dat_key, spike_key, lfp_key, behav_stat_key, pre_trial_dur=pre_trial_dur, extract_fly_and_monkey_xy=True,
                         post_trial_dur=post_trial_dur,extract_cartesian_eye_and_firefly=True,
                         lfp_beta=None, lfp_alpha=None, extract_lfp_phase=True)
-
-
 # list(exp_data.behav.continuous.__dict__.keys())
 exp_data.set_filters('all', True)
-# rebin to 0.1 sec
 ts = exp_data.rebin_time_stamps(0.1)
 t_targ=dict_to_vec(exp_data.behav.events.t_targ)
 t_start=t_targ
@@ -477,14 +459,17 @@ with initiate_plot(6, 3, 200) as f:
 
 
 # mk centric, belief
+trainx, trainy, testx, testy,mask=splitdataxy(modelX, belief_rel)
 linreg = linear_model.LinearRegression()
-linreg.fit(modelX, belief_rel)
-print('linear regression score',linreg.score(modelX, belief_rel))
-pred  = linreg.predict(modelX)
-every=5
+linreg.fit(trainx, trainy)
+print('linear regression score',linreg.score(testx, testy))
+pred  = linreg.predict(testx)
+plot_pred(pred[:,0],testy[:,0], title='belief egocentric x', unit='cm',every=1)
+plot_pred(pred[:,1],testy[:,1], title='belief egocentric y', unit='cm',every=1)
+
 with initiate_plot(6, 3, 200) as f:
     ax=f.add_subplot(121)
-    thispred,thistrue=pred[::every,0],belief_rel[::every,0]
+    thispred,thistrue=pred[::every,0],testy[::every,0]
     predvstrue1(thispred,thistrue,ax)
     plt.xlabel('pred [cm]')
     plt.ylabel('true [cm]')
@@ -493,7 +478,7 @@ with initiate_plot(6, 3, 200) as f:
     ax.plot([vmin,vmax],[vmin,vmax],'k')
     quickspine(ax)
     ax=f.add_subplot(122)
-    thispred,thistrue=pred[::every,1],belief_rel[::every,1]
+    thispred,thistrue=pred[::every,1],testy[::every,1]
     predvstrue1(thispred,thistrue,ax)
     plt.xlabel('pred [cm]')
     plt.ylabel('true [cm]')
@@ -503,20 +488,25 @@ with initiate_plot(6, 3, 200) as f:
     quickspine(ax)
     plt.tight_layout()
 
+
+
 # mk centric, polar, belief
 states_rel=np.hstack(states_rel).T
 belief_heading = beliefs[:,2][non_nan]
-belief_dist, belief_heading_rel=cordxy2pol(belief_rel[:,0],belief_rel[:,1],belief_heading)
+belief_dist, belief_heading_rel=cordxy2pol(belief_rel[:,0].copy(),belief_rel[:,1].copy(),belief_heading)
 belief_polar_rel=np.vstack([belief_dist, belief_heading_rel]).T
 
+trainx, trainy, testx, testy,mask=splitdataxy(modelX, belief_polar_rel)
 linreg = linear_model.LinearRegression()
-linreg.fit(modelX, belief_polar_rel)
-print('linear regression score',linreg.score(modelX, belief_polar_rel))
-pred  = linreg.predict(modelX)
-every=5
+linreg.fit(trainx, trainy)
+print('linear regression score',linreg.score(testx, testy))
+pred  = linreg.predict(testx)
+plot_pred(pred[:,0],testy[:,0], title='belief relative distance', unit='cm',every=1)
+plot_pred(pred[:,1],testy[:,1], title='belief relative angle', unit='degree',every=1)
+
 with initiate_plot(6, 3, 200) as f:
     ax=f.add_subplot(121)
-    thispred,thistrue=pred[::every,0],belief_polar_rel[::every,0]
+    thispred,thistrue=pred[::every,0],testy[::every,0]
     predvstrue1(thispred,thistrue,ax)
     plt.xlabel('pred [cm]')
     plt.ylabel('true [cm]')
@@ -525,7 +515,7 @@ with initiate_plot(6, 3, 200) as f:
     ax.plot([vmin,vmax],[vmin,vmax],'k')
     quickspine(ax)
     ax=f.add_subplot(122)
-    thispred,thistrue=pred[::every,1],belief_polar_rel[::every,1]
+    thispred,thistrue=pred[::every,1],testy[::every,1]
     predvstrue1(thispred,thistrue,ax)
     plt.xlabel('pred [degree]')
     plt.ylabel('true [degree]')
@@ -536,24 +526,16 @@ with initiate_plot(6, 3, 200) as f:
     plt.tight_layout()
 
 
+
 # r--> belief heading (world centric heading)
 belief_heading = beliefs[:,2][non_nan]
-
+trainx, trainy, testx, testy,mask=splitdataxy(modelX, belief_heading)
 linreg = linear_model.LinearRegression()
-linreg.fit(modelX, belief_heading)
-print('linear regression score',linreg.score(modelX, belief_heading))
-pred  = linreg.predict(modelX)
-every=5
-with initiate_plot(3, 3, 200) as f:
-    ax=f.add_subplot(111)
-    thispred,thistrue=pred[::every],belief_heading[::every]
-    predvstrue1(thispred,thistrue,ax)
-    plt.xlabel('pred [degree]')
-    plt.ylabel('true [degree]')
-    plt.title('belief heading direction')
-    vmin,vmax=limplot(ax)
-    ax.plot([vmin,vmax],[vmin,vmax],'k')
-    quickspine(ax)
+linreg.fit(trainx, trainy)
+print('linear regression score',linreg.score(testx, testy))
+pred  = linreg.predict(testx)
+plot_pred(pred,testy, title='belief heading direction', unit='degree',every=1)
+
 
 
 # r --> time in each trial
@@ -564,66 +546,219 @@ for itrial in range(len(trials)):
     trialtime.append(fulltime[:thistime])
 trialtime=np.hstack(trialtime).T
 len(trialtime)
+trainx, trainy, testx, testy,mask=splitdataxy(modelX, trialtime)
+linreg = linear_model.LinearRegression()
+linreg.fit(trainx, trainy)
+print('linear regression score',linreg.score(testx, testy))
+pred  = linreg.predict(testx)
+plot_pred(pred,testy, title='time in a trial', unit='s',every=1)
+
+
+
+# r --> uncertainty summary statistics in each trial
+uncertainty=[c[:2,:2].flatten()[[0,1,3]] for c in covs]
+uncertainty=np.array(uncertainty)
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), uncertainty)
 
 linreg = linear_model.LinearRegression()
-linreg.fit(modelX, trialtime)
-print('linear regression score',linreg.score(modelX, trialtime))
-pred  = linreg.predict(modelX)
-every=5
-with initiate_plot(3, 3, 200) as f:
-    ax=f.add_subplot(111)
-    thispred,thistrue=pred[::every],trialtime[::every]
-    predvstrue1(thispred,thistrue,ax)
-    plt.xlabel('pred [degree]')
-    plt.ylabel('true [degree]')
-    plt.title('time in a trial')
-    vmin,vmax=limplot(ax)
-    ax.plot([vmin,vmax],[vmin,vmax],'k')
-    quickspine(ax)
+linreg.fit(trainx, trainy)
+print('linear regression score',linreg.score(testx, testy))
+pred  = linreg.predict(testx)
+plot_pred(pred[:,0],testy[:,0], title='uncertainty x', unit='cm',every=1)
+plot_pred(pred[:,1],testy[:,1], title='uncertainty xy correlation', unit='cm',every=1)
+plot_pred(pred[:,2],testy[:,2], title='uncertainty y', unit='cm',every=1)
 
 
-# r --> uncertainty diag in each trial
-trialtime=[]
-fulltime=np.arange(0,7,0.1)
-for itrial in range(len(trials)):
-    thistime=len(X['x_monk'][trial_idx==trials[itrial]])
-    trialtime.append(fulltime[:thistime])
-trialtime=np.hstack(trialtime).T
-len(trialtime)
+
+# r --> uncertainty summary statistics in each trial and time
+together=np.hstack([uncertainty,trialtime.reshape(-1,1)**2,])
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), together)
 
 linreg = linear_model.LinearRegression()
-linreg.fit(modelX, trialtime)
-print('linear regression score',linreg.score(modelX, trialtime))
-pred  = linreg.predict(modelX)
-every=5
-with initiate_plot(3, 3, 200) as f:
+linreg.fit(trainx, trainy)
+print('linear regression score',linreg.score(testx, testy))
+pred  = linreg.predict(testx)
+plot_pred(pred[:,0],testy[:,0], title='uncertainty x', unit='cm',every=1)
+plot_pred(pred[:,1],testy[:,1], title='uncertainty xy correlation', unit='cm',every=1)
+plot_pred(pred[:,2],testy[:,2], title='uncertainty y', unit='cm',every=1)
+plot_pred(pred[:,3],testy[:,3], title='time squared', unit='s^2',every=1)
+
+
+# cca test on uncertainty and time, seems time still important
+uncertainty=[c[:2,:2].flatten()[[0,1,3]] for c in covs]
+uncertainty=np.array(uncertainty)
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), uncertainty)
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), together)
+cca = CCA(n_components=1)
+cca.fit(trainx, trainy)
+trainxc, trainyc = cca.transform(trainx, trainy)
+testxc, testyc = cca.transform(trainx, trainy)
+plot_pred(trainxc.reshape(-1),trainyc.reshape(-1), title='uncertainty x', unit='cm',every=1)
+
+testxc.shape
+testyc.shape
+linreg = linear_model.LinearRegression()
+linreg.fit(trainxc, trainyc)
+print('linear regression score',linreg.score(testx, testy))
+pred  = linreg.predict(testxc)
+plot_pred(pred[:,0],testyc[:,0], title='uncertainty CCA transformed', unit='a.u.',every=1)
+
+
+plt.plot(cca.x_weights_)
+plt.plot(cca.x_loadings_)
+plt.plot(cca.x_rotations_)
+
+with initiate_plot(3,2,200) as f:
     ax=f.add_subplot(111)
-    thispred,thistrue=pred[::every],trialtime[::every]
-    predvstrue1(thispred,thistrue,ax)
-    plt.xlabel('pred [degree]')
-    plt.ylabel('true [degree]')
-    plt.title('time in a trial')
-    vmin,vmax=limplot(ax)
-    ax.plot([vmin,vmax],[vmin,vmax],'k')
+    plt.bar(list(range(len(cca.y_weights_))),cca.y_weights_.reshape(-1))
     quickspine(ax)
+    ax.set_xticks([0,1,2,3])
+    ax.set_xticklabels(['sxx', 'sxy','syy','time^2'])
+    plt.ylabel('CCA transform weights')
+
+
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), together)
+cca = CCA(n_components=1)
+cca.fit(trainx, trainy)
+trainxc, trainyc = cca.transform(trainx, trainy)
+testxc, testyc = cca.transform(trainx, trainy)
+plot_pred(trainxc.reshape(-1),trainyc.reshape(-1), title='CCA transformed', unit='cm',every=1)
+
+linreg = linear_model.LinearRegression()
+linreg.fit(trainxc, trainyc)
+pred  = linreg.predict(testxc)
+plot_pred(pred[:,0],testyc[:,0], title='CCA transformed uncertainty and time', unit='a.u.',every=1)
 
 
 
+# cca on belief relative position
+trainx, trainy, testx, testy,mask=splitdataxy(modelX, belief_rel)
+cca = CCA(n_components=1)
+cca.fit(trainx, trainy)
+trainxc, trainyc = cca.transform(trainx, trainy)
+testxc, testyc = cca.transform(trainx, trainy)
+plot_pred(trainxc.reshape(-1),trainyc.reshape(-1), title='CCA transformed neural r vs ego b', unit='a.u.',every=1)
+
+with initiate_plot(3,2,200) as f:
+    ax=f.add_subplot(111)
+    plt.bar(list(range(len(cca.y_weights_))),cca.y_weights_.reshape(-1))
+    quickspine(ax)
+    ax.set_xticks([0,1])
+    ax.set_xticklabels(['x', 'y'])
+    plt.ylabel('CCA transformation weights')
+
+linreg = linear_model.LinearRegression()
+linreg.fit(trainxc, trainyc)
+pred  = linreg.predict(testxc)
+plot_pred(pred[:,0],testyc[:,0], title=r'CCA transformed belief $\mu$', unit='a.u.',every=1)
 
 
 
+# relative cov (rotate ccw 180+heading from mid degree)
+belief_heading = beliefs[:,2][non_nan]
+rotdegree=belief_heading+180
+relativeposcov=[]
+for degree, thiscov in zip(rotdegree, covs):
+    R=np.array([[np.cos(-degree/180*pi),-np.sin(-degree/180*pi)],[np.sin(-degree/180*pi),np.cos(-degree/180*pi)]])
+    relativeposcov.append(R.T@thiscov[:2,:2]@R)
+relativeposcov=np.stack(relativeposcov)
+relativeposcov.shape
+
+# r --> uncertainty summary statistics in each trial, egocentric
+uncertainty=[c[:2,:2].flatten()[[0,1,3]] for c in relativeposcov]
+uncertainty=np.array(uncertainty)
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), uncertainty)
+
+linreg = linear_model.LinearRegression()
+linreg.fit(trainx, trainy)
+print('linear regression score',linreg.score(testx, testy))
+pred  = linreg.predict(testx)
+plot_pred(pred[:,0],testy[:,0], title='uncertainty x', unit=r'$cm^2$',every=1)
+plot_pred(pred[:,1],testy[:,1], title='uncertainty xy correlation', unit=r'$cm^2$',every=1)
+plot_pred(pred[:,2],testy[:,2], title='uncertainty y', unit=r'$cm^2$',every=1)
+
+
+# cca on ego belief uncertainty
+uncertainty=[c[:2,:2].flatten()[[0,1,3]] for c in relativeposcov]
+uncertainty=np.array(uncertainty)
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), uncertainty)
+cca = CCA(n_components=1)
+cca.fit(trainx, trainy)
+trainxc, trainyc = cca.transform(trainx, trainy)
+testxc, testyc = cca.transform(trainx, trainy)
+plot_pred(trainxc.reshape(-1),trainyc.reshape(-1), title='CCA transformed neural r vs ego b', unit='a.u.',every=1)
+
+with initiate_plot(3,2,200) as f:
+    ax=f.add_subplot(111)
+    plt.bar(list(range(len(cca.y_weights_))),cca.y_weights_.reshape(-1))
+    quickspine(ax)
+    ax.set_xticks([0,1,2])
+    ax.set_xticklabels(['sxx', 'sxy','syy'])
+    plt.ylabel('CCA transform weights')
+
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), together)
+cca = CCA(n_components=1)
+cca.fit(trainx, trainy)
+trainxc, trainyc = cca.transform(trainx, trainy)
+testxc, testyc = cca.transform(trainx, trainy)
+plot_pred(trainxc.reshape(-1),trainyc.reshape(-1), title='CCA transformed', unit='cm',every=1)
+
+linreg = linear_model.LinearRegression()
+linreg.fit(trainxc, trainyc)
+pred  = linreg.predict(testxc)
+plot_pred(pred[:,0],testyc[:,0], title='CCA transformed ego-uncertainty', unit='a.u.',every=1)
+
+# cca on ego belief uncertainty+time
+uncertainty=[c[:2,:2].flatten()[[0,1,3]] for c in relativeposcov]
+uncertainty=np.array(uncertainty)
+together=np.hstack([uncertainty,trialtime.reshape(-1,1)**2,])
+
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), together)
+cca = CCA(n_components=1)
+cca.fit(trainx, trainy)
+trainxc, trainyc = cca.transform(trainx, trainy)
+testxc, testyc = cca.transform(trainx, trainy)
+plot_pred(trainxc.reshape(-1),trainyc.reshape(-1), title='CCA transformed neural r vs ego b', unit='a.u.',every=1)
+
+with initiate_plot(3,2,200) as f:
+    ax=f.add_subplot(111)
+    plt.bar(list(range(len(cca.y_weights_))),cca.y_weights_.reshape(-1))
+    quickspine(ax)
+    ax.set_xticks([0,1,2,3])
+    ax.set_xticklabels(['sxx', 'sxy','syy',r'$time^2$'])
+    plt.ylabel('CCA transform weights')
+
+trainx, trainy, testx, testy,mask=splitdataxy(np.power(modelX,2), together)
+cca = CCA(n_components=1)
+cca.fit(trainx, trainy)
+trainxc, trainyc = cca.transform(trainx, trainy)
+testxc, testyc = cca.transform(trainx, trainy)
+plot_pred(trainxc.reshape(-1),trainyc.reshape(-1), title='CCA transformed', unit='cm',every=1)
+
+linreg = linear_model.LinearRegression()
+linreg.fit(trainxc, trainyc)
+pred  = linreg.predict(testxc)
+plot_pred(pred[:,0],testyc[:,0], title='CCA transformed ego-uncertainty + time', unit='a.u.',every=1)
 
 
 
+# population variance -> uncertainty summary stats
+populationvar=np.var(modelX,axis=1).reshape(-1,1)
+trainx, trainy, testx, testy,mask=splitdataxy(populationvar, uncertainty)
+
+linreg = linear_model.LinearRegression()
+linreg.fit(trainx, trainy)
+
+pred  = linreg.predict(testx)
+plot_pred(pred[:,0],testy[:,0], title='uncertainty x', unit=r'$cm^2$',every=1)
+plot_pred(pred[:,1],testy[:,1], title='uncertainty xy correlation', unit=r'$cm^2$',every=1)
+plot_pred(pred[:,2],testy[:,2], title='uncertainty y', unit=r'$cm^2$',every=1)
 
 
+# population change of variance -> change uncertainty summary stats (need 2 floor plane condition)
 
 
-
-
-
-
-
+pred.shape
 
 
 

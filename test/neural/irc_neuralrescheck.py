@@ -1,4 +1,6 @@
 
+import seaborn as sns
+from scipy import stats
 
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn import linear_model
@@ -121,12 +123,15 @@ def splitdata(s, mask=None):
 
 
 
-# load belief and neural data -------------------
+
+
+
+
+# load belief and neural data ------------------------------------
 config = configparser.ConfigParser()
 config.read_file(open('privateconfig'))
 resdir=config['Datafolder']['data']
 resdir = Path(resdir)/'neuraltest'
-
 
 with open(resdir/'res/0220collapsemodelbelief', 'rb') as f:
     res = pickle.load(f)
@@ -136,14 +141,14 @@ X = {k: res[k] for k in ['rad_vel', 'ang_vel', 'x_monk', 'y_monk']}
 trial_idx = res['trial_idx']
 beliefs = res['belief']
 covs = res['cov']
-s = np.vstack([v for v in X.values()])
-s = s.T
+s = np.vstack([v for v in X.values()]).T
 
-s.shape
-beliefs.shape
-y_.shape
+s.shape # state (12027, 4)
+beliefs.shape # belief mean (12027, 5)
+covs.shape # belief cov (12027, 5, 5)
+y_.shape # neural raw (12027, 140)
 
-# define a b-spline
+# define a b-spline. the kernal to process the neural activity
 kernel_len = 7 # should be about +- 325ms 
 knots = np.hstack(([-1.001]*3, np.linspace(-1.001,1.001,5), [1.001]*3))
 tp = np.linspace(-1.,1.,kernel_len)
@@ -157,231 +162,313 @@ with initiate_plot(3,2,200) as f:
     ax.set_xticklabels([-kernel_len*50, kernel_len*50])
     plt.xlabel('time, ms')
     plt.ylabel('coef')
-
-
-modelX = convolve_loop(y_.T, trial_idx, bX) # ts, neurons
+with suppress():
+    modelX = convolve_loop(y_.T, trial_idx, bX) # ts, neurons
 pos_xy = np.hstack((X['x_monk'].reshape(-1,1), X['y_monk'].reshape(-1,1))) # ts, xy
 
-# remove bad data
+modelX.shape # neural processed (12027, 980)
+pos_xy.shape # state xy (12027, 2)
+
+# remove bad data. 1. nan, 2, 
 non_nan = ~np.isnan(pos_xy.sum(axis=1))
+sum(non_nan) # 11331 valid timesteps
+
 modelX = modelX[non_nan]
-pos_xy = pos_xy[non_nan]
-belief_xy = beliefs[:,[0,1]][non_nan]
 
-# make sure belief is right
-ind=0
-ind+=1
-trialind=list(set(trial_idx[non_nan]))[ind]
-xy=pos_xy[trial_idx[non_nan]==trialind]
-plt.plot(xy[:,0], xy[:,1])
-xy=belief_xy[trial_idx[non_nan]==trialind]
-plt.plot(-xy[:,1], xy[:,0])
-plt.scatter(0,0, color='k', marker='v')
-plt.axis('equal')
+y = modelX
+b = beliefs
+b=b[non_nan]
+s=np.hstack( (X['x_monk'].reshape(-1,1), X['y_monk'].reshape(-1,1), X['rad_vel'].reshape(-1,1), X['ang_vel'].reshape(-1,1)) )[non_nan]
+s[np.isnan(s) == True] = 0
 
 
 
 
-model = Ridge()
-clf = GridSearchCV(model, {'alpha':[0.001,0.01,0.1,1,10,100,1000]})
-clf.fit(modelX, pos_xy)
-
-model = Ridge()
-clf = GridSearchCV(model, {'alpha':[0.001,0.01,0.1,1,10,100,1000]})
-clf.fit(modelX, belief_xy)
 
 
-from sklearn import linear_model
-linreg = linear_model.LinearRegression()
-linreg.fit(modelX, belief_xy)
-print('linear regression score',linreg.score(modelX, belief_xy))
-pred  = linreg.predict(modelX)
+
+
+
+
+# fit neural to state/belief, position only
+beliefmodel_ = Ridge()
+beliefmodel = GridSearchCV(beliefmodel_, {'alpha':[0.001,0.01,0.1,1,10,100,1000]})
+beliefmodel.fit(y, b[:,:2])
+print('linear regression score',beliefmodel.score(y, b[:,:2]))
+statemodel_ = Ridge()
+statemodel = GridSearchCV(statemodel_, {'alpha':[0.001,0.01,0.1,1,10,100,1000]})
+statemodel.fit(y, s[:,:2])
+print('linear regression score',statemodel.score(y, s[:,:2]))
 
 every=5
-with initiate_plot(5, 3, 200) as f:
-    ax=f.add_subplot(121)
-    plt.scatter(pred[::every,1],belief_xy[::every,1],s=1, alpha=0.3)
+with initiate_plot(5, 5, 200) as f:
+    pred  = beliefmodel.predict(y)
+    ax=f.add_subplot(221)
+    plt.scatter(pred[::every,1],b[::every,1],s=1, alpha=0.3)
     plt.xlabel('pred')
     plt.ylabel('true')
-    plt.title('pos x')
+    plt.title('belief pos x')
     ax.axis('equal')
     ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
     quickspine(ax)
-    ax=f.add_subplot(122)
-    plt.scatter(pred[::every,0],belief_xy[::every,0],s=1, alpha=0.3)
+    ax=f.add_subplot(222)
+    plt.scatter(pred[::every,0],b[::every,0],s=1, alpha=0.3)
     plt.xlabel('pred')
     plt.ylabel('true')
-    plt.title('pos y')
+    plt.title('belief pos y')
     ax.axis('equal')
     ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
     quickspine(ax)
 
+    pred  = statemodel.predict(y)
+    ax=f.add_subplot(223)
+    plt.scatter(pred[::every,0],s[::every,0],s=1, alpha=0.3)
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('state pos x')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)    
+    ax=f.add_subplot(224)
+    plt.scatter(pred[::every,1],s[::every,1],s=1, alpha=0.3)
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('state pos y')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)
     plt.tight_layout()
 
 
+# fit neural to state/belief, velocity only
+beliefmodel_ = Ridge()
+beliefmodel = GridSearchCV(beliefmodel_, {'alpha':[0.001,0.01,0.1,1,10,100,1000]})
+beliefmodel.fit(y, b[:,[3,4]])
+print('linear regression score',beliefmodel.score(y, b[:,[3,4]]))
+statemodel_ = Ridge()
+statemodel = GridSearchCV(statemodel_, {'alpha':[0.001,0.01,0.1,1,10,100,1000]})
+statemodel.fit(y, s[:,[2,3]])
+print('linear regression score',statemodel.score(y, s[:,[2,3]]))
 
-
-# linear fit ----------------------------------
-b = beliefs
-b[[0,1,3]]=b[[0,1,3]]*500
-b[[2,4]]=b[[2,4]]*180/pi
-s = np.vstack([v for v in X.values()])
-s[np.isnan(s) == True] = 0
-s = s.T
-y = y.T
-b = b.T
-
-
-
-# neural encoding belief
-trainx, testx, mask = splitdata(y)
-
-trainy, testy, _ = splitdata(b[:,[0,1,3,4]], mask=mask)
-reg = linear_model.LinearRegression()
-reg.fit(trainx, trainy)
-y_pred = reg.predict(testx)
-print("Mean squared error: %.2f" % mean_squared_error(testy, y_pred))
-# The coefficient of determination: 1 is perfect prediction
-print("Coefficient of determination: %.2f" % r2_score(testy, y_pred))
-
-plt.axis('equal')
-plt.scatter(b[:,1], b[:,0], s=0.1)
-y_pred = reg.predict(y)
-plt.scatter(y_pred[:,1], y_pred[:,0], s=1)
-plt.show()
-
-plt.scatter(b[:,4], b[:,3], s=0.1)
-y_pred = reg.predict(y)
-plt.scatter(y_pred[:,3], y_pred[:,2], s=1)
-plt.show()
-
-plt.imshow(reg.coef_.reshape(20,-1))
-plt.show()
-
-trainy, testy, _ = splitdata(s, mask=mask)
-reg = linear_model.LinearRegression()
-reg.fit(trainx, trainy)
-y_pred = reg.predict(testx)
-print("Mean squared error: %.2f" % mean_squared_error(testy, y_pred))
-# The coefficient of determination: 1 is perfect prediction
-print("Coefficient of determination: %.2f" % r2_score(testy, y_pred))
-
-plt.axis('equal')
-plt.scatter(s[:,2], s[:,3], s=0.1)
-y_pred = reg.predict(y)
-plt.scatter(y_pred[:,2], y_pred[:,3], s=1)
-plt.show()
-
-plt.scatter(s[:,1], s[:,0], s=0.1)
-y_pred = reg.predict(y)
-plt.scatter(y_pred[:,1], y_pred[:,0], s=1)
-plt.show()
-
-
-plt.imshow(reg.coef_.reshape(20,-1))
-
-
-
-
-# test decoding position only
-trainx, testx, mask = splitdata(y)
-
-trainy, testy, _ = splitdata(b[:,[0,1]], mask=mask)
-reg = linear_model.LinearRegression()
-reg.fit(trainx, trainy, covs[mask][:,0,0]**0.5)
-y_pred = reg.predict(testx)
-print("Mean squared error: %.2f" % mean_squared_error(testy, y_pred))
-# The coefficient of determination: 1 is perfect prediction
-print("Coefficient of determination: %.2f" % r2_score(testy, y_pred))
-
-with initiate_plot(2,2,200) as fig:
-    ax=fig.add_subplot(111)
-    plt.axis('equal')
-    plt.scatter(b[:,1], b[:,0], s=0.1, label='belief position')
-    y_pred = reg.predict(y)
-    plt.scatter(y_pred[:,1], y_pred[:,0], s=1, label='neural encoded belief position')
-    plt.xlim(-400,400)
-    plt.ylim(-100,500)
-    plt.xlabel('world x, cm')
-    plt.ylabel('world y, cm')
+every=5
+with initiate_plot(5, 5, 200) as f:
+    pred  = beliefmodel.predict(y)
+    ax=f.add_subplot(221)
+    plt.scatter(pred[::every,0],b[::every,3],s=1, alpha=0.3)
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('belief v')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
     quickspine(ax)
-    # quickleg(ax)
-    plt.show()
-
-    
-trainy, testy, _ = splitdata(s[:,[2,3]], mask=mask)
-reg = linear_model.LinearRegression()
-reg.fit(trainx, trainy)
-y_pred = reg.predict(testx)
-print("Mean squared error: %.2f" % mean_squared_error(testy, y_pred))
-# The coefficient of determination: 1 is perfect prediction
-print("Coefficient of determination: %.2f" % r2_score(testy, y_pred))
-
-with initiate_plot(2,2,200) as fig:
-    ax=fig.add_subplot(111)
-    plt.axis('equal')
-    plt.scatter(s[:,2], s[:,3], s=0.1)
-    y_pred = reg.predict(y)
-    plt.scatter(y_pred[:,0], y_pred[:,1], s=1)
-    plt.xlabel('world x, cm')
-    plt.ylabel('world y, cm')
+    ax=f.add_subplot(222)
+    plt.scatter(pred[::every,1],b[::every,4],s=1, alpha=0.3)
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('belief w')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
     quickspine(ax)
-    plt.show()
 
-    
-
-
-
-
-# test decoding vel only
-trainx, testx, mask = splitdata(y)
-
-trainy, testy, _ = splitdata(b[:,[3,4]], mask=mask)
-reg = linear_model.LinearRegression()
-reg.fit(trainx, trainy)
-y_pred = reg.predict(testx)
-print("Mean squared error: %.2f" % mean_squared_error(testy, y_pred))
-# The coefficient of determination: 1 is perfect prediction
-print("Coefficient of determination: %.2f" % r2_score(testy, y_pred))
-
-plt.axis('equal')
-plt.scatter(b[:,4], b[:,3], s=0.1)
-y_pred = reg.predict(y)
-plt.scatter(y_pred[:,1], y_pred[:,0], s=1)
-plt.show()
+    pred  = statemodel.predict(y)
+    ax=f.add_subplot(223)
+    plt.scatter(pred[::every,0],s[::every,2],s=1, alpha=0.3)
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('state v')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)    
+    ax=f.add_subplot(224)
+    plt.scatter(pred[::every,1],s[::every,3],s=1, alpha=0.3)
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('state w')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)
+    plt.tight_layout()
 
 
-trainy, testy, _ = splitdata(s[:,[0,1]], mask=mask)
-reg = linear_model.LinearRegression()
-reg.fit(trainx, trainy)
-y_pred = reg.predict(testx)
-print("Mean squared error: %.2f" % mean_squared_error(testy, y_pred))
-# The coefficient of determination: 1 is perfect prediction
-print("Coefficient of determination: %.2f" % r2_score(testy, y_pred))
+# fit to full state and belief(except belief heading direction)
+beliefmodel_ = Ridge()
+beliefmodel = GridSearchCV(beliefmodel_, {'alpha':[0.001,0.01,0.1,1,10,100,1000]})
+beliefmodel.fit(y, b[:,[0,1,3,4]])
+print('linear regression score',beliefmodel.score(y, b[:,[0,1,3,4]]))
+statemodel_ = Ridge()
+statemodel = GridSearchCV(statemodel_, {'alpha':[0.001,0.01,0.1,1,10,100,1000]})
+statemodel.fit(y, s)
+print('linear regression score',statemodel.score(y, s))
 
-plt.axis('equal')
-plt.scatter(s[:,1], s[:,0], s=0.1)
-y_pred = reg.predict(y)
-plt.scatter(y_pred[:,1], y_pred[:,0], s=1)
-plt.show()
+every=5
+with initiate_plot(5, 5, 200) as f:
+    pred  = beliefmodel.predict(y)
+    ax=f.add_subplot(221)
+    # plt.scatter(pred[::every,2],b[::every,3],s=1, alpha=0.3)
+    thispred,thistrue=pred[::every,2],b[::every,3]
+    values = np.vstack([thispred,thistrue])
+    kernel = stats.gaussian_kde(values)(values)
+    sns.kdeplot(
+        x=thispred,
+        y=thistrue,
+        levels=5,
+        fill=True,
+        alpha=0.6,
+        cut=2,
+        ax=ax,)    
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('belief v')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)
+    ax=f.add_subplot(222)
+    # plt.scatter(pred[::every,3],b[::every,4],s=1, alpha=0.3)
+    thispred,thistrue=pred[::every,3],b[::every,4]
+    values = np.vstack([thispred,thistrue])
+    kernel = stats.gaussian_kde(values)(values)
+    sns.kdeplot(
+        x=thispred,
+        y=thistrue,
+        levels=5,
+        fill=True,
+        alpha=0.6,
+        cut=2,
+        ax=ax,)    
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('belief w')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)
+
+    pred  = statemodel.predict(y)
+    ax=f.add_subplot(223)
+    # plt.scatter(pred[::every,2],s[::every,2],s=1, alpha=0.3)
+    thispred,thistrue=pred[::every,2],s[::every,2]
+    values = np.vstack([thispred,thistrue])
+    kernel = stats.gaussian_kde(values)(values)
+    sns.kdeplot(
+        x=thispred,
+        y=thistrue,
+        levels=5,
+        fill=True,
+        alpha=0.6,
+        cut=2,
+        ax=ax,) 
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('state v')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)    
+    ax=f.add_subplot(224)
+    # plt.scatter(pred[::every,3],s[::every,3],s=1, alpha=0.3)
+    thispred,thistrue=pred[::every,3],s[::every,3]
+    values = np.vstack([thispred,thistrue])
+    kernel = stats.gaussian_kde(values)(values)
+    sns.kdeplot(
+        x=thispred,
+        y=thistrue,
+        levels=5,
+        fill=True,
+        alpha=0.6,
+        cut=2,
+        ax=ax,) 
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('state w')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)
+    plt.tight_layout()
+
+with initiate_plot(5, 5, 200) as f:
+    pred  = beliefmodel.predict(y)
+    ax=f.add_subplot(221)
+    # plt.scatter(pred[::every,1],b[::every,1],s=1, alpha=0.3)
+    thispred,thistrue=pred[::every,1],b[::every,1]
+    values = np.vstack([thispred,thistrue])
+    kernel = stats.gaussian_kde(values)(values)
+    sns.kdeplot(
+        x=thispred,
+        y=thistrue,
+        levels=5,
+        fill=True,
+        alpha=0.6,
+        cut=2,
+        ax=ax,)    
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('belief pos x')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)
+
+    ax=f.add_subplot(222)
+    # plt.scatter(pred[::every,0],b[::every,0],s=1, alpha=0.3)
+    thispred,thistrue=pred[::every,0],b[::every,0]
+    values = np.vstack([thispred,thistrue])
+    kernel = stats.gaussian_kde(values)(values)
+    sns.kdeplot(
+        x=thispred,
+        y=thistrue,
+        levels=5,
+        fill=True,
+        alpha=0.6,
+        cut=2,
+        ax=ax,)    
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('belief pos y')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)
+
+    pred  = statemodel.predict(y)
+    ax=f.add_subplot(223)
+    # plt.scatter(pred[::every,0],s[::every,0],s=1, alpha=0.3)
+    thispred,thistrue=pred[::every,0],s[::every,0]
+    values = np.vstack([thispred,thistrue])
+    kernel = stats.gaussian_kde(values)(values)
+    sns.kdeplot(
+        x=thispred,
+        y=thistrue,
+        levels=5,
+        fill=True,
+        alpha=0.6,
+        cut=2,
+        ax=ax,)    
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('state pos x')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)    
+    ax=f.add_subplot(224)
+    # plt.scatter(pred[::every,1],s[::every,1],s=1, alpha=0.3)
+    thispred,thistrue=pred[::every,1],s[::every,1]
+    values = np.vstack([thispred,thistrue])
+    kernel = stats.gaussian_kde(values)(values)
+    sns.kdeplot(
+        x=thispred,
+        y=thistrue,
+        levels=5,
+        fill=True,
+        alpha=0.6,
+        cut=2,
+        ax=ax,
+    )
+    plt.xlabel('pred')
+    plt.ylabel('true')
+    plt.title('state pos y')
+    ax.axis('equal')
+    ax.plot(ax.get_ylim(),ax.get_ylim(),'k')
+    quickspine(ax)
+    plt.tight_layout()
 
 
-# numbers
-trainx, testx, mask = splitdata(y)
+# add heading direction to state and fit
+# change it to relative direction and fit
+# treat eye position as relative position to target, fit
 
-trainy, testy, _ = splitdata(b[:,[0,1]], mask=mask)
-reg = linear_model.LinearRegression()
-reg.fit(trainx, trainy, covs[mask][:,0,0]**0.5)
-y_pred = reg.predict(testx)
-print("Mean squared error: %.2f" % mean_squared_error(testy, y_pred),sum((abs(testy-y_pred))/abs(testy+1e-3)))
-# The coefficient of determination: 1 is perfect prediction
-print("Coefficient of determination: %.2f" % r2_score(testy, y_pred))
-
-
-trainy, testy, _ = splitdata(s[:,[2,3]], mask=mask)
-reg = linear_model.LinearRegression()
-reg.fit(trainx, trainy)
-y_pred = reg.predict(testx)
-print("Mean squared error: %.2f" % mean_squared_error(testy, y_pred),sum((abs(testy-y_pred))/abs(testy+1e-3)))
-# The coefficient of determination: 1 is perfect prediction
-print("Coefficient of determination: %.2f" % r2_score(testy, y_pred))

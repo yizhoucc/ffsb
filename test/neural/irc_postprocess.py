@@ -79,7 +79,7 @@ post_trial_dur = 0.5
 #                         lfp_beta=lfp_beta['lfp_beta'],lfp_alpha=lfp_alpha['lfp_alpha'],extract_lfp_phase=True)
 exp_data = data_handler(dat, behav_dat_key, spike_key, lfp_key, behav_stat_key, pre_trial_dur=pre_trial_dur, extract_fly_and_monkey_xy=True,
                         post_trial_dur=post_trial_dur,
-                        lfp_beta=None, lfp_alpha=None, extract_lfp_phase=True)
+                        lfp_beta=None, lfp_alpha=None, extract_lfp_phase=True, dt=0.1)
 
 exp_data.set_filters('all', True)
 
@@ -99,6 +99,12 @@ var_names = 'rad_vel', 'ang_vel', 'x_monk', 'y_monk'  # ,'t_move'
 y, X, trial_idx = exp_data.concatenate_inputs(
     *var_names, t_start=t_start, t_stop=t_stop, time_stamps=ts)
 
+len(ts)
+len(t_start)
+len(t_stop)
+len(ts)
+y.shape
+len(np.unique(trial_idx))
 
 
 

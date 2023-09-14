@@ -1,7 +1,7 @@
 import pickle
 from PIL.Image import ROTATE_90
 import torch
-import pandas
+import pandas as pd
 import numpy as np
 from numpy import pi
 import warnings
@@ -10,6 +10,7 @@ from scipy.signal import resample
 import neo
 from scipy.signal import medfilt
 from scipy.stats import norm
+
 
 # testing imports
 
@@ -512,10 +513,14 @@ class MonkeyDataExtractor():
             channel_signal = np.ones((analog_length, seg_reader.size['analogsignals'] + 1))
             
             channel_names = []
-            for ch_idx, ch_data in enumerate(seg_reader.analogsignals):
-                channel_signal[:, ch_idx] = ch_data.as_array()[:analog_length].T
-                channel_names.append(ch_data.annotations['channel_names'][0])
-            
+            try:
+                for ch_idx, ch_data in enumerate(seg_reader.analogsignals):
+                    channel_signal[:, ch_idx] = ch_data.as_array()[:analog_length].T
+                    channel_names.append(ch_data.annotations['channel_names'][0])
+            except:
+                print('no channel names')
+                continue
+
             # Add a time channel
             channel_signal[:, -1] = seg_reader.analogsignals[0].times[:analog_length]
             channel_names.append('Time') 
@@ -817,11 +822,12 @@ class MonkeyDataExtractor():
             channel_signal = np.ones((analog_length, seg_reader.size['analogsignals']))
             
             channel_names = []
+
             # Do not read the last channel as it has a unique shape.
             for ch_idx, ch_data in enumerate(seg_reader.analogsignals[:-1]):
                 channel_signal[:, ch_idx] = ch_data.as_array()[:analog_length].T
                 channel_names.append(ch_data.annotations['channel_names'][0])
-            
+
             # Add a time channel
             channel_signal[:, -1] = seg_reader.analogsignals[0].times[:analog_length]
             channel_names.append('Time') 

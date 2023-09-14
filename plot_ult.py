@@ -56,6 +56,8 @@ from sklearn import random_projection
 import sys
 from firefly_task import *
 from env_config import Config
+import scipy.interpolate as interpolate
+
 arg = Config()
 warnings.filterwarnings('ignore')
 seed = 0
@@ -3896,7 +3898,7 @@ def similar_trials2thispert(tasks, thistask, thispertmeta, ntrial=10, pertmeta=N
 
 
 def normalizematrix(data):
-    return (data - np.min(data)) / (np.max(data) - np.min(data))
+    return (data - np.nanmin(data)) / (np.nanmax(data) - np.nanmin(data))
 
 
 def get_relative_r_ang(px, py, heading_angle, target_x, target_y):
@@ -6550,3 +6552,263 @@ def f_importances(coef, names):
 def relu(arr):
     arr[arr < 0] = 0
     return arr
+
+
+import seaborn as sns
+from scipy import stats
+
+def predvstrue1(thispred,thistrue,ax):
+    sns.kdeplot(
+        x=thispred,
+        y=thistrue,
+        levels=5,
+        fill=True,
+        alpha=0.6,
+        cut=2,
+        ax=ax,)    
+    quickspine(ax)
+
+
+def predvstrue2(thispred,thistrue,ax):
+    values = np.vstack([thispred,thistrue])
+    kernel = stats.gaussian_kde(values)(values)
+    sns.scatterplot(
+        x=thispred,
+        y=thistrue,
+        c=kernel,
+        cmap="jet",
+        ax=ax,)
+    quickspine(ax)
+
+
+def limplot(ax):
+    vmin=min(min(ax.get_xlim()), min(ax.get_ylim()))
+    vmax=max(max(ax.get_xlim()), max(ax.get_ylim()))
+    ax.set_xlim([vmin, vmax])
+    ax.set_ylim([vmin, vmax])
+    return vmin, vmax
+
+
+def splineDesign(knots, x, ord=4, der=0, outer_ok=False):
+    """Reproduces behavior of R function splineDesign() for use by ns(). See R documentation for more information.
+
+    Python code uses scipy.interpolate.splev to get B-spline basis functions, while R code calls C.
+    Note that der is the same across x."""
+    knots = np.array(knots, dtype=np.float64)
+    x = np.array(x, dtype=np.float64)
+    xorig = x.copy()
+    not_nan = ~np.isnan(xorig)
+    nx = x.shape[0]
+    knots.sort()
+    nk = knots.shape[0]
+    need_outer = any(x[not_nan] < knots[ord - 1]) or any(x[not_nan] > knots[nk - ord])
+    in_x = (x >= knots[0]) & (x <= knots[-1]) & not_nan
+
+    if need_outer:
+        if outer_ok:
+            # print('knots do not contain the data range')
+
+            out_x = ~all(in_x)
+            if out_x:
+                x = x[in_x]
+                nnx = x.shape[0]
+            dkn = np.diff(knots)[::-1]
+            reps_start = ord - 1
+            if any(dkn > 0):
+                reps_end = max(0, ord - np.where(dkn > 0)[0][0] - 1)
+            else:
+                reps_end = np.nan  # this should give an error, since all knots are the same
+            idx = [0] * (ord - 1) + list(range(nk)) + [nk - 1] * reps_end
+            knots = knots[idx]
+        else:
+            raise ValueError("the 'x' data must be in the range %f to %f unless you set outer_ok==True'" % (
+            knots[ord - 1], knots[nk - ord]))
+    else:
+        reps_start = 0
+        reps_end = 0
+    if (not need_outer) and any(~not_nan):
+        x = x[in_x]
+    idx0 = reps_start
+    idx1 = len(knots) - ord - reps_end
+    cycleOver = np.arange(idx0, idx1)
+    m = len(knots) - ord
+    v = np.zeros((cycleOver.shape[0], len(x)), dtype=np.float64)
+    # v = np.zeros((m, len(x)))
+
+    d = np.eye(m, len(knots))
+    for i in range(cycleOver.shape[0]):
+        v[i] = interpolate.splev(x, (knots, d[cycleOver[i]], ord - 1), der=der)
+        # v[i] = interpolate.splev(x, (knots, d[i], ord - 1), der=der)
+
+    # before = np.sum(xorig[not_nan] < knots[0])
+    # after = np.sum(xorig[not_nan] > knots[-1])
+    design = np.zeros((v.shape[0], xorig.shape[0]), dtype=np.float64)
+    for i in range(v.shape[0]):
+    #     design[i, before:xorig.shape[0] - after] = v[i]
+        design[i,in_x] = v[i]
+
+
+    return design.transpose()
+
+
+def convolve_neuron(spk, trial_idx, bX):
+    kernel_len  = bX.shape[1]
+    agument_spk_size = spk.shape[0] + 2 * kernel_len * np.unique(trial_idx).shape[0]
+    agument_spk = np.zeros(agument_spk_size)
+    reverse = np.zeros(agument_spk.shape[0],dtype=bool)
+    cc = 0
+    for tr in np.unique(trial_idx):
+        sel = trial_idx == tr
+        agument_spk[cc:cc+sel.sum()] = spk[sel]
+        reverse[cc:cc+sel.sum()] = True
+        cc += sel.sum() + 2 * kernel_len
+    modelX = np.zeros((spk.shape[0],bX.shape[1]))
+    for k in range(bX.shape[1]):
+        xsm = np.convolve(agument_spk, bX[:,k],'same')
+        modelX[:,k] = xsm[reverse]
+    return modelX
+
+
+def convolve_loop(spks, trial_idx, bX):
+    modelX = np.zeros((spks.shape[1], spks.shape[0]*bX.shape[1]))
+    cc = 0
+    for neu in range(spks.shape[0]):
+        print(neu)
+        modelX[:,cc:cc+bX.shape[1]] = convolve_neuron(spks[neu], trial_idx, bX)
+        cc += bX.shape[1]
+    return modelX
+
+
+def splitdata(s, mask=None):
+    n = len(s)
+    if mask is not None:
+        pass
+    else:
+        mask = np.array(random.sample(range(0, n), n//10*9))
+
+    negmask = np.zeros(len(s), dtype=bool)
+    negmask[mask] = True
+    train = s[mask]
+    test = s[negmask]
+    return train, test, mask
+
+
+def splitdataxy(x,y, mask=None):
+    n = len(x)
+    if mask is not None:
+        pass
+    else:
+        mask = np.array(random.sample(range(0, n), n//10*9))
+
+    negmask = np.zeros(len(x), dtype=bool)
+    negmask[mask] = True
+    trainx,trainy = x[mask], y[mask]
+    testx, testy = x[negmask], y[negmask]
+    return trainx, trainy, testx,testy, mask
+
+
+def get_gaze_location(eye_ver,eye_hor, head_dir, pos_x, pos_y,monkey_height=10):
+    gaze_xs = []; gaze_ys = []
+
+    ver_theta = np.deg2rad(-eye_ver).clip(0.01, None)
+    hor_theta = np.deg2rad(-eye_hor)
+    body_theta = np.deg2rad(head_dir)
+    body_x, body_y = pos_x, pos_y
+
+    gaze_r = monkey_height / np.tan(ver_theta)
+    gaze_x = body_x + gaze_r * np.cos(body_theta + hor_theta)
+    gaze_y = body_y + gaze_r * np.sin(body_theta + hor_theta)
+    gaze_xs.append(gaze_x);  gaze_ys.append(gaze_y)
+
+    return gaze_r,gaze_x,gaze_y
+
+# def get_gaze_location(eye_ver,eye_hor, head_dir, pos_x, pos_y,monkey_height=10):
+
+#     ver_theta = np.deg2rad(-eye_ver).clip(0.01, None)
+#     hor_theta = np.deg2rad(-eye_hor)
+
+#     gaze_r = monkey_height / np.tan(ver_theta) # deepth into screen
+#     gaze_x =  gaze_r * np.cos(hor_theta)
+#     gaze_y =  gaze_r * np.sin(hor_theta)
+
+#     return gaze_r,gaze_x,gaze_y
+
+
+def dict_to_vec(dictionary):
+    return np.hstack(list(dictionary.values()))
+
+def time_stamps_rebin(time_stamps, binwidth_ms=20):
+    rebin = {}
+    for tr in time_stamps.keys():
+        ts = time_stamps[tr]
+        tp_num = np.floor((ts[-1] - ts[0]) * 1000 / (binwidth_ms))
+        rebin[tr] = ts[0] + np.arange(tp_num) * binwidth_ms / 1000.
+    return rebin
+
+def eyepos2flypos_(beta_l,beta_r,alpha_l,alpha_r,z):
+    '''
+    beta_l: left eye elevation
+    beta_r: right eye elevation
+    alpha_l: left eye version
+    alpha_r: right eye version
+    '''
+    beta = 0.5*(beta_l + beta_r)
+    alpha = 0.5*(alpha_l + alpha_r)
+    x_squared = z^2*[(np.tan(alpha)**2)/(np.tan(beta)**2)]*[(1 + np.tan(beta)**2)/(1 + np.tan(alpha)**2)]
+    y_squared = (z^2)/(np.tan(beta)**2) - x_squared
+   
+    r = (x_squared + y_squared)**0.5
+    theta = alpha
+   
+    return r, theta
+
+def eyepos2flypos(hor_theta,ver_theta,agent_height=10):
+
+    gaze_r = agent_height / np.tan(ver_theta)
+    gaze_x =  gaze_r * np.cos( hor_theta)
+    gaze_y =  gaze_r * np.sin( hor_theta)
+
+    return gaze_x,gaze_y
+
+def world2screen(x_rel,y_rel,height=10,screen_dist=32.5 ):
+    screen_z = height - screen_dist * height / y_rel
+    screen_x = screen_dist * x_rel / y_rel
+
+    screen_z[y_rel <= 0] = np.nan
+    screen_x[y_rel <= 0] = np.nan
+
+    return screen_x,screen_z
+
+def screen2world(screen_x,screen_z, height=10,screen_dist=32.5):
+    y_rel=(screen_dist*height)/(height-screen_z)
+    x_rel=screen_x*y_rel/screen_dist
+    y_rel[height-screen_z <= 0] = np.nan
+    return x_rel, y_rel
+
+def world2mk(monkeyx,monkeyy, w,x_fly, y_fly,dt=0.1):
+    x_fly_rel =x_fly - monkeyx
+    y_fly_rel = y_fly - monkeyy
+    phi = dt * np.cumsum(w)
+    R = lambda theta : np.array([[np.cos(theta/180*np.pi),-np.sin(theta/180*np.pi)],[np.sin(theta/180*np.pi),np.cos(theta/180*np.pi)]])
+    XY = np.zeros((2,x_fly_rel.shape[0]))
+    XY[0,:] = x_fly_rel
+    XY[1,:] = y_fly_rel
+    rot = R(phi)
+    XY = np.einsum('ijk,jk->ik', rot, XY)
+    xfp_rel= XY[0, :]
+    yfp_rel = XY[1, :]
+    return xfp_rel,yfp_rel
+
+
+def plot_pred(pred,testy, title='title', unit='unit',every=1):
+    with initiate_plot(3, 3, 200) as f:
+        ax=f.add_subplot(111)
+        thispred,thistrue=pred[::every],testy[::every]
+        predvstrue1(thispred,thistrue,ax)
+        plt.xlabel('pred [{}]'.format(unit))
+        plt.ylabel('true [{}]'.format(unit))
+        plt.title(title)
+        vmin,vmax=limplot(ax)
+        ax.plot([vmin,vmax],[vmin,vmax],'k')
+        quickspine(ax)
+        return ax

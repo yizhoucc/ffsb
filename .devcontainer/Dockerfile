@@ -1,6 +1,6 @@
 
 
-FROM yzsimple/irc:fullv0.2.1
+FROM yzsimple/irc:fullv0.2.2
 
 # ENV DATAPATH="D://mkdata"
 # ensure local python is preferred over distribution python

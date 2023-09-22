@@ -4,4 +4,7 @@ token = mWBcxqxVNZRUzECXxiLxs5
 
 
 [Datafolder]
-data = /data
+data = C:/Users/24455/Desktop/repo/mkdata
+
+[Codefolder]
+workspace = C:/Users/24455/Desktop/repo/ffsb

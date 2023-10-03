@@ -6569,7 +6569,7 @@ def predvstrue1(thispred,thistrue,ax):
     quickspine(ax)
 
 
-def predvstrue2(thispred,thistrue,ax):
+def predvstrue_scatter(thispred,thistrue,ax):
     values = np.vstack([thispred,thistrue])
     kernel = stats.gaussian_kde(values)(values)
     sns.scatterplot(
@@ -6577,8 +6577,15 @@ def predvstrue2(thispred,thistrue,ax):
         y=thistrue,
         c=kernel,
         cmap="jet",
+        s=1,
+        linewidth=0,
         ax=ax,)
     quickspine(ax)
+    # adding color bar
+    norm = plt.Normalize(np.min(values), np.max(values))
+    sm = plt.cm.ScalarMappable(cmap="jet", norm=norm)
+    sm.set_array([])
+    ax.figure.colorbar(sm, label='density')
 
 
 def limplot(ax):
@@ -6805,6 +6812,20 @@ def plot_pred(pred,testy, title='title', unit='unit',every=1):
         ax=f.add_subplot(111)
         thispred,thistrue=pred[::every],testy[::every]
         predvstrue1(thispred,thistrue,ax)
+        plt.xlabel('pred [{}]'.format(unit))
+        plt.ylabel('true [{}]'.format(unit))
+        plt.title(title)
+        vmin,vmax=limplot(ax)
+        ax.plot([vmin,vmax],[vmin,vmax],'k')
+        quickspine(ax)
+        return ax
+    
+
+def plot_pred_scatter(pred,testy, title='title', unit='unit',every=1):
+    with initiate_plot(3, 3, 200) as f:
+        ax=f.add_subplot(111)
+        thispred,thistrue=pred[::every],testy[::every]
+        predvstrue_scatter(thispred,thistrue,ax)
         plt.xlabel('pred [{}]'.format(unit))
         plt.ylabel('true [{}]'.format(unit))
         plt.title(title)

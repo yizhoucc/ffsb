@@ -108,9 +108,9 @@ len(np.unique(trial_idx))
 
 
 
-datapath=resdir/"neuraltest/1208pack"
-with open(datapath,'rb') as f:
-    states, actions, tasks = pickle.load(f)
+# datapath=resdir/"neuraltest/1208pack"
+# with open(datapath,'rb') as f:
+#     states, actions, tasks = pickle.load(f)
     
 
 
@@ -138,7 +138,7 @@ phi = torch.tensor([[0.4],
                     [0.001],
                     [0.001],
                     ])
-agent_ = TD3.load('trained_agent/paper.zip')
+agent_ = TD3.load(resdir/'trained_agent/paper')
 agent = agent_.actor.mu.cpu()
 
 
@@ -179,10 +179,11 @@ resdir = Path(resdir)/'neuraltest/res'
 b[[0,1,3]]=b[[0,1,3]]*500
 b[[2,4]]=b[[2,4]]*180/pi
 res['belief']=b.T
+res['mask']=mask
 
 
 
-with open(resdir/'0220collapsemodelbelief', 'wb+') as f:
+with open(resdir/'0928collapsemodelbelief', 'wb+') as f:
     pickle.dump(res, f)
 
 

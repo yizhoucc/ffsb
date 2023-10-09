@@ -1,0 +1,43 @@
+notes of ruiyi script
+
+helpers
+    convert location to angle.
+
+
+
+load data.
+    the data is packed in evalm.
+    loop the data and add the neurl activities into bins.
+    log the errors
+    log the eye 
+    downsample
+
+    X: activities
+    Y: [rel_dist, 
+        rel_ang, 
+        abs_dist, 
+        abs_ang,
+        hor_theta, 4
+        ver_theta, 5
+        hor_theta_, 6
+         ver_theta_, 7
+        fx, fy, mx, my]
+
+train a decoder
+    neural--> y
+    train one decoder for 1 area, 1 session, 1 y variable.
+    calculate error for 1 area, 1 session,
+    using ridge
+
+    neural-->eye hori, eye vert, eye both.
+
+    track_error=[
+            trial idx,
+            t, 1
+            hor theta, 2
+            hor theta _, 3
+            diff, 4
+            ver_theta
+            ver_theta_,
+            diff.
+    ]

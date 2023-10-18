@@ -6833,3 +6833,36 @@ def plot_pred_scatter(pred,testy, title='title', unit='unit',every=1):
         ax.plot([vmin,vmax],[vmin,vmax],'k')
         quickspine(ax)
         return ax
+    
+
+def overheadbase(figsize=(1.8, 1.8), fontsize=9, dpi=300, notations=False):
+    ''' plot a base overhead view
+    return fig and ax to add new stuff'''
+    fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
+    ax.set_aspect('equal')
+    ax.set_facecolor('none')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    ax.set_xlim([-235, 235])
+    ax.set_ylim([-2, 430])
+    x_temp = np.linspace(-235, 235)
+    ax.plot(x_temp, np.sqrt(420**2 - x_temp**2), c='k', ls=':')
+    if notations:
+        ax.text(-10, 425, s=r'$70\degree$', fontsize=fontsize)
+        ax.text(130, 150, s=r'$400cm$', fontsize=fontsize)
+        ax.text(-130, 0, s=r'$100cm$', fontsize=fontsize)
+        ax.plot(np.linspace(-230, -130), np.linspace(0, 0), c='k')
+        ax.plot(np.linspace(0, 230 + 7),
+                np.tan(np.deg2rad(55)) * np.linspace(0, 230 + 7) - 10, c='k', ls=':')
+    ax.text(-230, 100, s=r'$100cm$', fontsize=fontsize)
+    ax.plot(np.linspace(-230, -230), np.linspace(0, 100), c='k')
+    fig.tight_layout(pad=0)
+
+    return fig, ax
+
+
+

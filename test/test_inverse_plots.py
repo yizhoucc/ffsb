@@ -1447,7 +1447,7 @@ H=compute_H(env, agent, theta_estimation, true_theta, phi, H_dim=7, trajectory_d
 H=compute_H(env, agent, theta_estimation, true_theta, phi, H_dim=11, trajectory_data=None, num_episodes=20,is1d=True)
 cov=theta_cov(H)
 stderr(cov)
-ev, evector=torch.eig(H,eigenvectors=True)
+ev, evector=torch.linalg.eig(H,eigenvectors=True)
 p=torch.round(torch.log(torch.sign(H)*H))*torch.sign(H)
 img=plt.imshow(p)
 img=plt.imshow(H)
@@ -1504,7 +1504,7 @@ hessian(loss, theta_estimation)
 # H=compute_H(env, agent, theta_estimation, true_theta, phi, trajectory_data=None, num_episodes=100)
 # cov=theta_cov(H)
 # stderr(cov)
-# torch.eig(torch.Tensor(cov))
+# torch.linalg.eig(torch.Tensor(cov))
 
 
 

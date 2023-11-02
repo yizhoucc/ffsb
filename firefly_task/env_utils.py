@@ -40,15 +40,16 @@ def is_pos_def(x):
     """
     if x.is_cuda:
         x = x.clone().detach().cpu()
-        yes=torch.all(torch.eig(x)[0] >= torch.tensor([0.]))
+        yes=torch.all(torch.linalg.eig(x)[0] >= torch.tensor([0.]))
         if not yes:
-            print(torch.eig(x))
+            print(torch.linalg.eig(x))
     else:
         # x = x.detach().numpy()
         # yes=np.all(np.linalg.eigvalsh(x) >= 0)
-        yes=torch.all(torch.eig(x)[0] >= torch.tensor([0.]))
+
+        yes=torch.all(torch.real(torch.linalg.eig(x)[0]) >= torch.tensor([0.]))
         if not yes:
-            print(torch.eig(x))
+            print(torch.linalg.eig(x))
 
     return yes
 

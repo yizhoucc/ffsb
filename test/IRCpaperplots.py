@@ -125,7 +125,7 @@ arg = Config()
     stderr(torch.inverse(H))          
     inverse_data['Hessian']=H
     save_inverse_data(inverse_data)
-    ev, evector=torch.eig(H,eigenvectors=True)
+    ev, evector=torch.linalg.eig(H,eigenvectors=True)
     env=ffacc_real.FireFlyPaper(arg)
 
     # background in eigen axis
@@ -281,7 +281,7 @@ arg = Config()
 
 
     # eigen vector
-    ev, evector=torch.eig(H,eigenvectors=True)
+    ev, evector=torch.linalg.eig(H,eigenvectors=True)
     ev=ev[:,0]
     ev,esortinds=ev.sort(descending=False)
     evector=evector[esortinds]

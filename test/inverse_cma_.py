@@ -254,7 +254,7 @@ finalcov=r[-1][1]
 import torch
 import numpy as np
 torch.diag(finalcov)**0.5
-torch.eig(finalcov)
+torch.linalg.eig(finalcov)
 
 import matplotlib.pyplot as plt
 
@@ -364,7 +364,7 @@ with initiate_plot(5,5,300) as fig:
 
 
 # eigen vector
-ev, evector=torch.eig(torch.inverse(finalcov),eigenvectors=True)
+ev, evector=torch.linalg.eig(torch.inverse(finalcov),eigenvectors=True)
 ev=ev[:,0]
 ev,esortinds=ev.sort(descending=True)
 evector=evector[esortinds]

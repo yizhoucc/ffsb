@@ -106,7 +106,7 @@ for i in range(nrow):
 # eig cov heatmap -----------------------------------------------------
 theta,cov,err=process_inv("Z:/bruno_pert/cmafull_packed_bruno_pert")
 # theta,cov,err=process_inv("Z:/bruno_normal/preallpacked")
-ev, evector=torch.eig(torch.tensor(cov),eigenvectors=True)
+ev, evector=torch.linalg.eig(torch.tensor(cov),eigenvectors=True)
 ev=ev[:,0]
 ev,esortinds=ev.sort(descending=False)
 evector=evector[:,esortinds]

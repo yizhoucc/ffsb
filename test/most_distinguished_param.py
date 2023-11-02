@@ -672,7 +672,7 @@ states, actions, tasks=monkey_data_downsampled(df[:100],factor=0.0025)
 
 # from cov, find the eig axis we are most sure about
 theta,cov,err=process_inv("Z:/bruno_pert/cmafull_packed_bruno_pert", removegr=False)
-ev, evector=torch.eig(torch.tensor(cov),eigenvectors=True)
+ev, evector=torch.linalg.eig(torch.tensor(cov),eigenvectors=True)
 ev=ev[:,0]
 ev,esortinds=ev.sort(descending=False)
 evector=evector[:,esortinds]

@@ -585,7 +585,7 @@ finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
 bt=torch.cat([finaltheta[:6],finaltheta[-4:]])
 finalcov = finalcov[torch.arange(finalcov.size(0))!=6] 
 bc = finalcov[:,torch.arange(finalcov.size(1))!=6] 
-ev, evector=torch.eig(torch.tensor(bc),eigenvectors=True)
+ev, evector=torch.linalg.eig(torch.tensor(bc),eigenvectors=True)
 ev=ev[:,0]
 ev,esortinds=ev.sort(descending=False)
 evector=evector[:,esortinds]
@@ -627,7 +627,7 @@ finaltheta=torch.tensor(log[-1][0]._mean).view(-1,1)
 bt=torch.cat([finaltheta[:6],finaltheta[-4:]])
 finalcov = finalcov[torch.arange(finalcov.size(0))!=6] 
 bc = finalcov[:,torch.arange(finalcov.size(1))!=6] 
-ev, evector=torch.eig(torch.tensor(bc),eigenvectors=True)
+ev, evector=torch.linalg.eig(torch.tensor(bc),eigenvectors=True)
 ev=ev[:,0]
 ev,esortinds=ev.sort(descending=False)
 evector=evector[:,esortinds]

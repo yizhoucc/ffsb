@@ -9,3 +9,6 @@ def notify(msg='plots ready', group='lab',title='plot'):
     requests.get(notification)
 
 
+if __name__=='main':
+    notify()
+

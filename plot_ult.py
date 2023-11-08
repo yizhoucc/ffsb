@@ -5391,13 +5391,52 @@ def get_stops(states, tasks, thistask, env, theta, agent, pert=None):
 
     return mkstops, ircstops
 
+def run_trial_fix(env=None, given_action=None, pert=None):
+    '''
+    generate states from given action. use for validation.
+    '''
+    def _collect():
+        epstates.append(env.s)
+    # saves
+    epstates = []
+    env.presist_phi=True
+    env.debug=True
+    env.reset(phi = torch.tensor([[0.5],
+                    [pi/2],
+                    [0.001],
+                    [0.001],
+                    [0.001],
+                    [0.001],
+                    [0.13],
+                    [0.001],
+                    [0.001],
+                    [0.001],
+                    [0.001],
+                    ]))
+
+    t = 0
+    while t < len(given_action):
+        _collect()
+        _action=given_action[t]
+
+        if pert is not None and int(env.trial_timer) < len(pert):
+            _action = (given_action[t]).reshape(
+                1, -1)+pert[int(env.trial_timer)]
+        env.step(_action)
+        t += 1
+
+    return epstates
+
+
 
 def run_trial(agent=None, env=None, given_action=None, given_state=None, action_noise=0.1, pert=None, stimdur=None):
-    # return epactions,epbliefs,epbcov,epstates
-    # 10 a 10 s.
-    # when both
-    # use a1 and s2
-    # at t1, use a1. results in s2
+    '''    
+        # return epactions,epbliefs,epbcov,epstates
+        # 10 a 10 s.
+        # when both
+        # use a1 and s2
+        # at t1, use a1. results in s2
+    '''
 
     def _collect():
         epactions.append(action)
@@ -5407,7 +5446,7 @@ def run_trial(agent=None, env=None, given_action=None, given_state=None, action_
     # saves
     epactions, epbliefs, epbcov, epstates = [], [], [], []
     if given_action is not None:
-        epactions.append(given_action[0])
+        epactions.append(torch.tensor(given_action[0]))
     else:
         epactions.append(env.s[3:].view(-1))
     # print(env.s,epactions)
@@ -5420,7 +5459,7 @@ def run_trial(agent=None, env=None, given_action=None, given_state=None, action_
                 _collect()
                 # print(given_state)
                 env.step(torch.tensor(given_action[t]).reshape(
-                    1, -1), next_state=given_state[t].view(-1, 1))
+                    1, -1), next_state=torch.tensor(given_state[t]).reshape(-1, 1))
                 t += 1
                 # print(env.s)
         elif given_state is not None:  # have states but no actions
@@ -5466,7 +5505,13 @@ def run_trial(agent=None, env=None, given_action=None, given_state=None, action_
 
 
 def run_trials(agent, env, phi, theta, task, ntrials=10, stimdur=None, given_obs=None, action_noise=0.1, pert=None, return_belief=False, given_action=None, given_state=None):
+    '''
     # sample ntrials for same task and return states and actions
+
+    initialize the env, by (theta, phi, task)
+    then call run single trial function
+    till we have enough data to return
+    '''
     states = []
     actions = []
     beliefs = []
@@ -5474,21 +5519,25 @@ def run_trials(agent, env, phi, theta, task, ntrials=10, stimdur=None, given_obs
     with suppress():
         while len(states) < ntrials:
             if given_action is not None:
+                env.debug=True
                 env.reset(phi=phi, theta=theta, goal_position=task, pro_traj=None,
-                          vctrl=given_action[0, 0], wctrl=given_action[0, 1], obs_traj=given_obs)
+                            vctrl=given_action[0, 0], wctrl=given_action[0, 1], obs_traj=given_obs)
             else:
                 print('given action', given_action)
                 env.reset(phi=phi, theta=theta, goal_position=task,
-                          pro_traj=None, vctrl=0., wctrl=0., obs_traj=given_obs)
+                            pro_traj=None, vctrl=0., wctrl=0., obs_traj=given_obs)
                 print('init s', env.s)
+
             epactions, epbliefs, epbcov, epstates = run_trial(
                 agent, env, given_action=given_action, given_state=given_state, pert=pert, action_noise=action_noise, stimdur=stimdur,)
-            if len(epstates) > 5:
-                # print([s.shape for s in epstates])
-                states.append(torch.stack(epstates)[:, :, 0])
-                actions.append(torch.stack(epactions))
-                beliefs.append(torch.stack(epbliefs))
-                covs.append((torch.stack(epbcov)))
+        
+            states.append(torch.stack(epstates)[:, :, 0])
+            actions.append(torch.stack(epactions))
+            beliefs.append(torch.stack(epbliefs))
+            covs.append((torch.stack(epbcov)))
+
+   
+
     if return_belief:
         return states, actions, beliefs, covs
     else:
@@ -6837,7 +6886,17 @@ def plot_pred_scatter(pred,testy, title='title', unit='unit',every=1):
 
 def overheadbase(figsize=(1.8, 1.8), fontsize=9, dpi=300, notations=False):
     ''' plot a base overhead view
-    return fig and ax to add new stuff'''
+    return fig and ax to add new stuff
+    
+    
+    # template for overheadbase bwr
+    fig, ax = overheadbase(figsize=(3,3))
+    vm=np.max(np.abs(scatterv))
+    cax=ax.scatter(scatterx*worldscale, scattery*worldscale,s=5, c=scatterv,cmap='bwr', vmin=-vm, vmax=vm)
+    cbar = fig.colorbar(cax,shrink=0.6, label='colorbar title')
+
+
+    '''
     fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
     ax.set_aspect('equal')
     ax.set_facecolor('none')
@@ -6865,4 +6924,70 @@ def overheadbase(figsize=(1.8, 1.8), fontsize=9, dpi=300, notations=False):
     return fig, ax
 
 
+def state_step2(px, py, heading, v, w,a, pro_gainv=1, pro_gainw=1,dt=0.006, userad=False): 
+    if not userad:
+        w=w/180*pi
 
+    # overall, x'=Ax+Bu+noise. here, noise=0
+
+    # use current v and w to update x y and heading 
+    # (x'=Ax) part
+
+    if v<=0:
+        pass
+    elif w==0:
+        px = px + v*dt * np.cos(heading)
+        py = py + v*dt * np.sin(heading)
+    else:
+        px = px-np.sin(heading)*(v/w-(v*np.cos(w*dt)/w))+np.cos(heading)*((v*np.sin(w*dt)/w))
+        py = py+np.cos(heading)*(v/w-(v*np.cos(w*dt)/w))+np.sin(heading)*((v*np.sin(w*dt)/w))
+    heading = heading + w*dt
+    heading=np.clip(heading,-pi,pi)
+
+
+    # apply the new control to state
+    # (Bu) part
+    v = pro_gainv *a[0]
+    w = pro_gainw *a[1] 
+    return px, py, heading, v, w
+
+
+
+def convert_rel_location_to_angle(x, y, monkey_height=0.1):
+    '''
+        convert the world relative locatio to eye coord. 
+
+        x, lateral
+        y, forward,
+
+    '''
+    hor_theta = -np.rad2deg(np.arctan2(x,(monkey_height**2+x**2+y**2)**0.5)).reshape(-1, 1) 
+    ver_theta = -np.rad2deg(np.arctan2(monkey_height, (x**2+y**2)**0.5)).reshape(-1, 1)
+
+    return hor_theta, ver_theta
+
+def convert_location_to_relative(
+        mx,
+        my,
+        body_theta,
+        x_fly,
+        y_fly,
+):
+    '''
+        calculate relative beliefs and states
+        body_theta is in degree
+    '''
+
+    x_fly_rel = x_fly - mx
+    y_fly_rel = y_fly - my
+    phi = body_theta.reshape(-1)
+    R = lambda theta : np.array([[np.cos(theta/180*np.pi),-np.sin(theta/180*np.pi)],[np.sin(theta/180*np.pi),np.cos(theta/180*np.pi)]])
+    XY = np.zeros((2,x_fly_rel.shape[0]))
+    XY[0,:] = x_fly_rel.reshape(-1)
+    XY[1,:] = y_fly_rel.reshape(-1)
+    rot = R(phi)
+    XY = np.einsum('ijk,jk->ik', rot, XY)
+    xfp_rel= XY[0, :]
+    yfp_rel = XY[1, :]
+    
+    return xfp_rel,yfp_rel

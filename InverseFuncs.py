@@ -460,6 +460,8 @@ def monkeyloss_(agent=None,
                         nextstate=states[ep][1:][t]
                     elif type(states[ep])==torch.Tensor:
                         nextstate=states[ep][1:][t].view(-1,1)
+                    else: # np array
+                        nextstate=torch.tensor(states[ep])[1:][t].view(-1,1)
                     obs=env.observations(nextstate)
                     # agent's belief
                     env.b, env.P=env.belief_step(env.b,env.P, obs, torch.tensor(mk_action).view(1,-1))

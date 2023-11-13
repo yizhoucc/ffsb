@@ -113,7 +113,6 @@ len(np.unique(trial_idx))
 #     states, actions, tasks = pickle.load(f)
     
 
-
 # reconstruct belief ----------------------------------------
 warnings.filterwarnings('ignore')
 torch.manual_seed(42)

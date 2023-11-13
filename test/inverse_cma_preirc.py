@@ -41,23 +41,12 @@ arg = Config()
 
 
 print('loading data')
-datapath = Path(resdir/'m51_mat_ruiyi/preirc')
-
+datapath = Path(resdir/'m51_mat_ruiyi\preirc_den_3')
+idensity=datapath.name[-1]
 with open(datapath, 'rb') as f:
-    df = pickle.load(f)
-df = datawash(df)
-df = df[df.category == 'normal']
-df = df[df.target_r > 200]
-df = df[2*len(df)//3:]
-df = df[df.relative_radius_end < 65]
+    (states, actions, tasks) = pickle.load(f)
 
-densities = sorted(pd.unique(df.floor_density))
-
-# if len(densities)!=1:
-#     raise ValueError('more than 1 density, need to pick one')
-
-ithden = 1
-df = df[df.floor_density == densities[ithden]]
+ithden = idensity
 savename = datapath.parent/(f'm51_{ithden}'+datapath.name)
 
 fix_theta={}
@@ -71,10 +60,7 @@ fix_theta={
     10:0.35,
 }
 
-print('process data')
-states, actions, tasks = monkey_data_downsampled(df, factor=0.0025)
 print('done process data')
-
 
 # decide if to continue
 optimizer = None
@@ -136,9 +122,9 @@ if not optimizer:
     cur_mu = init_theta.view(-1)
     cur_cov = init_cov
     optimizer = CMA(mean=np.array(cur_mu), sigma=0.5, population_size=14)
-    optimizer.set_bounds(np.array([
-        [0.1, 0.1, 0.01, 0.01, 0.01, 0.01, 0.129, 0.01, 0.01, 0.01, 0.01],
-        [1., 2, 1.5, 1.5, 1.5, 1.5, 0.131, 1, 1, 1, 1]], dtype='float32').transpose())
+optimizer.set_bounds(np.array([
+    [0.1, 0.1, 0.01, 0.01, 0.01, 0.01, 0.129, 0.01, 0.01, 0.01, 0.01],
+    [1.5, 2, 1.5, 1.5, 1.5, 1.5, 0.131, 1, 1, 1, 1]], dtype='float32').transpose())
 
 
 for generation in range(len(log), len(log)+99):

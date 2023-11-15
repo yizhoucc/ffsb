@@ -381,8 +381,8 @@ def plot_cov_ellipse(cov, pos=[0, 0], nstd=2, color=None, ax=None, alpha=1, edge
     if ax is None:
         figure = plt.figure(figsize=(10, 10))
         ax = plt.gca()
-        ax.set_ylim(-1.5, 1.5)
-        ax.set_xlim(-1.5, 1.5)
+        # ax.set_ylim(-1.5, 1.5)
+        # ax.set_xlim(-1.5, 1.5)
 
     vals, vecs = eigsorted(cov)
     theta = np.degrees(np.arctan2(*vecs[:, 0][::-1]))

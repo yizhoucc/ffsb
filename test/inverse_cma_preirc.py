@@ -47,7 +47,7 @@ with open(datapath, 'rb') as f:
     (states, actions, tasks) = pickle.load(f)
 
 ithden = idensity
-savename = datapath.parent/(f'm51_{ithden}'+datapath.name)
+savename = datapath.parent/(f'm51_100_{ithden}'+datapath.name)
 
 fix_theta={}
 fix_theta={

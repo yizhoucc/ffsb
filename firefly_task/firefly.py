@@ -574,10 +574,17 @@ class FireFlyReady(gym.Env, torch.nn.Module):
             relative_distance = torch.sqrt((px)**2+(py)**2).view(-1)
         return position, relative_distance
 
+
+    def in_target(self):
+        '''
+        
+        '''
+        return self.get_distance(state=self.b)[1] <= self.goal_r
+
     def rewarded(self):  
         '''
         agent stops,
-        agent belief is in goal
+        agent belief is in goal,
         '''
         return self.if_agent_stop() and (self.get_distance(state=self.b)[1] <= self.goal_r)
 

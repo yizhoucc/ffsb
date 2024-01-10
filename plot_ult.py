@@ -6618,7 +6618,7 @@ def predvstrue1(thispred,thistrue,ax):
     quickspine(ax)
 
 
-def predvstrue_scatter(thispred,thistrue,ax):
+def predvstrue_scatter(thispred,thistrue,ax,size=1):
     values = np.vstack([thispred,thistrue])
     kernel = stats.gaussian_kde(values)(values)
     sns.scatterplot(
@@ -6626,7 +6626,7 @@ def predvstrue_scatter(thispred,thistrue,ax):
         y=thistrue,
         c=kernel,
         cmap="jet",
-        s=1,
+        s=size,
         linewidth=0,
         ax=ax,)
     quickspine(ax)

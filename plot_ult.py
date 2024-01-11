@@ -58,6 +58,12 @@ from firefly_task import *
 from env_config import Config
 import scipy.interpolate as interpolate
 
+from sklearn.datasets import make_regression
+from sklearn.model_selection import KFold
+from sklearn.linear_model import LassoCV, Lasso
+from sklearn.metrics import mean_squared_error
+
+
 arg = Config()
 warnings.filterwarnings('ignore')
 seed = 0
@@ -3897,8 +3903,21 @@ def similar_trials2thispert(tasks, thistask, thispertmeta, ntrial=10, pertmeta=N
     return result
 
 
-def normalizematrix(data):
+def normalizematrix_(data):
+    '''normalize the data vector or matrix to 0-1 range'''
     return (data - np.nanmin(data)) / (np.nanmax(data) - np.nanmin(data))
+
+
+def normalizematrix(data,low=5,high=95):
+    '''normalize the data vector or matrix to 0-1 range
+    use percentile to avoid outliers.'''
+    themin=np.percentile(data[~np.isnan(data)],low)
+    themax=np.percentile(data[~np.isnan(data)],high)
+    res= (data - themin) / (themax- themin)
+    res[np.isnan(data)]=np.nan
+    # res[data>themax]=np.nan
+    # res[data<themin]=np.nan
+    return res
 
 
 def get_relative_r_ang(px, py, heading_angle, target_x, target_y):
@@ -6793,6 +6812,7 @@ def get_gaze_location(eye_ver,eye_hor, head_dir, pos_x, pos_y,monkey_height=10):
 def dict_to_vec(dictionary):
     return np.hstack(list(dictionary.values()))
 
+
 def time_stamps_rebin(time_stamps, binwidth_ms=20):
     rebin = {}
     for tr in time_stamps.keys():
@@ -6800,6 +6820,7 @@ def time_stamps_rebin(time_stamps, binwidth_ms=20):
         tp_num = np.floor((ts[-1] - ts[0]) * 1000 / (binwidth_ms))
         rebin[tr] = ts[0] + np.arange(tp_num) * binwidth_ms / 1000.
     return rebin
+
 
 def eyepos2flypos_(beta_l,beta_r,alpha_l,alpha_r,z):
     '''
@@ -6818,6 +6839,7 @@ def eyepos2flypos_(beta_l,beta_r,alpha_l,alpha_r,z):
    
     return r, theta
 
+
 def eyepos2flypos(hor_theta,ver_theta,agent_height=10):
 
     gaze_r = agent_height / np.tan(ver_theta)
@@ -6825,6 +6847,7 @@ def eyepos2flypos(hor_theta,ver_theta,agent_height=10):
     gaze_y =  gaze_r * np.sin( hor_theta)
 
     return gaze_x,gaze_y
+
 
 def world2screen(x_rel,y_rel,height=10,screen_dist=32.5 ):
     screen_z = height - screen_dist * height / y_rel
@@ -6835,11 +6858,13 @@ def world2screen(x_rel,y_rel,height=10,screen_dist=32.5 ):
 
     return screen_x,screen_z
 
+
 def screen2world(screen_x,screen_z, height=10,screen_dist=32.5):
     y_rel=(screen_dist*height)/(height-screen_z)
     x_rel=screen_x*y_rel/screen_dist
     y_rel[height-screen_z <= 0] = np.nan
     return x_rel, y_rel
+
 
 def world2mk(monkeyx,monkeyy, w,x_fly, y_fly,dt=0.1):
     x_fly_rel =x_fly - monkeyx
@@ -6952,7 +6977,6 @@ def state_step2(px, py, heading, v, w,a, pro_gainv=1, pro_gainw=1,dt=0.006, user
     return px, py, heading, v, w
 
 
-
 def convert_rel_location_to_angle(x, y, monkey_height=0.1):
     '''
         convert the world relative locatio to eye coord. 
@@ -6965,6 +6989,86 @@ def convert_rel_location_to_angle(x, y, monkey_height=0.1):
     ver_theta = -np.rad2deg(np.arctan2(monkey_height, (x**2+y**2)**0.5)).reshape(-1, 1)
 
     return hor_theta, ver_theta
+
+
+def lasso_wrap(X, y, num_folds=5,title='title'):
+    # Initialize k-fold cross-validation
+    kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
+
+    # Initialize LassoCV model
+    lasso_cv = LassoCV(cv=kf, random_state=42)
+
+    # Lists to store scores and best alphas from each fold
+    scores = []
+    best_alphas = []
+
+    # Perform k-fold cross-validation
+    for train_index, test_index in kf.split(X):
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+
+        lasso_cv.fit(X_train, y_train)
+
+        best_alpha = lasso_cv.alpha_
+        best_alphas.append(best_alpha)
+
+        predictions = lasso_cv.predict(X_test)
+        mse = mean_squared_error(y_test, predictions)
+        scores.append(mse)
+
+    # Calculate the average score and best alpha across folds
+    avg_score = np.mean(scores)
+    avg_alpha = np.mean(best_alphas)
+
+    fig,ax=plt.subplots(1,1)
+    lasso=Lasso(alpha=avg_alpha)
+    lasso.fit(X, y)
+    predictions=lasso.predict(X)
+    predvstrue_scatter(predictions, y, ax,size=5)
+    ax.set_title(f'{title}, {num_folds} folds cv mse = {avg_score:.2f}')
+    ax.plot(ax.get_xlim(),ax.get_xlim(),'k')
+    ax.set_xlabel('angle degree')
+    ax.set_ylabel('angle degree')
+
+    print(f"Average Mean Squared Error across {num_folds} folds: {avg_score}")
+    print(f"Average Best alpha across {num_folds} folds: {avg_alpha}")
+
+
+def lasso_wrap_weights(X, y, num_folds=5,title='title'):
+    # Initialize k-fold cross-validation
+    kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
+
+    # Initialize LassoCV model
+    lasso_cv = LassoCV(cv=kf, random_state=42)
+
+    # Lists to store scores and best alphas from each fold
+    scores = []
+    best_alphas = []
+
+    # Perform k-fold cross-validation
+    for train_index, test_index in kf.split(X):
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+
+        lasso_cv.fit(X_train, y_train)
+
+        best_alpha = lasso_cv.alpha_
+        best_alphas.append(best_alpha)
+
+        predictions = lasso_cv.predict(X_test)
+        mse = mean_squared_error(y_test, predictions)
+        scores.append(mse)
+
+    # Calculate the average score and best alpha across folds
+    avg_score = np.mean(scores)
+    avg_alpha = np.mean(best_alphas)
+
+    lasso=Lasso(alpha=avg_alpha)
+    lasso.fit(X, y)
+    sortind=np.argsort(np.abs(lasso.coef_))[::-1]
+
+    return lasso.coef_, sortind
+
 
 def convert_location_to_relative(
         mx,

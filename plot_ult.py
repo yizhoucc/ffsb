@@ -62,7 +62,7 @@ from sklearn.datasets import make_regression
 from sklearn.model_selection import KFold
 from sklearn.linear_model import LassoCV, Lasso
 from sklearn.metrics import mean_squared_error
-
+from sklearn.linear_model import MultiTaskLassoCV
 
 arg = Config()
 warnings.filterwarnings('ignore')
@@ -81,6 +81,7 @@ torch.backends.cudnn.benchmark = False
 plt.rcParams['font.family'] = 'CMU Serif'
 plt.rcParams['font.size'] = '14'
 plt.rcParams['axes.unicode_minus'] = False
+plt.rcParams['svg.fonttype'] = 'none'
 
 cmaps = OrderedDict()
 cmaps['Qualitative'] = ['Pastel1', 'Pastel2', 'Paired', 'Accent',
@@ -6991,7 +6992,7 @@ def convert_rel_location_to_angle(x, y, monkey_height=0.1):
     return hor_theta, ver_theta
 
 
-def lasso_wrap(X, y, num_folds=5,title='title'):
+def lasso_wrap(X, y, num_folds=5,title='title', return_fig=False):
     # Initialize k-fold cross-validation
     kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
 
@@ -7032,6 +7033,9 @@ def lasso_wrap(X, y, num_folds=5,title='title'):
 
     print(f"Average Mean Squared Error across {num_folds} folds: {avg_score}")
     print(f"Average Best alpha across {num_folds} folds: {avg_alpha}")
+    if return_fig:
+        return fig
+    return lasso
 
 
 def lasso_wrap_weights(X, y, num_folds=5,title='title'):
@@ -7095,3 +7099,50 @@ def convert_location_to_relative(
     yfp_rel = XY[1, :]
     
     return xfp_rel,yfp_rel
+
+from sklearn.linear_model import MultiTaskLassoCV
+
+def lasso_wrap_multi(X, y, num_folds=5,title='title'):
+    
+    # Initialize k-fold cross-validation
+    kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
+
+    # Initialize LassoCV model
+    lasso_cv = MultiTaskLassoCV(cv=kf, random_state=42)
+
+    # Lists to store scores and best alphas from each fold
+    scores = []
+    best_alphas = []
+
+    # Perform k-fold cross-validation
+    for train_index, test_index in kf.split(X):
+        # print(X.shape, y.shape, max(train_index), max(test_index))
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+
+        lasso_cv.fit(X_train, y_train)
+
+        best_alpha = lasso_cv.alpha_
+        best_alphas.append(best_alpha)
+
+        predictions = lasso_cv.predict(X_test)
+        mse = mean_squared_error(y_test, predictions)
+        scores.append(mse)
+
+    # Calculate the average score and best alpha across folds
+    avg_score = np.mean(scores)
+    avg_alpha = np.mean(best_alphas)
+
+    print(f"Average Mean Squared Error across {num_folds} folds: {avg_score}")
+    print(f"Average Best alpha across {num_folds} folds: {avg_alpha}")
+    return lasso_cv
+
+
+
+
+
+
+
+
+
+

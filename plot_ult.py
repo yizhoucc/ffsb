@@ -75,7 +75,8 @@ torch.backends.cudnn.benchmark = False
 # font_files = font_manager.findSystemFonts(fontpaths=font_dirs)
 # for font_file in font_files:
     # font_manager.fontManager.addfont(font_file)
-plt.rcParams['font.family'] = 'CMU Serif'
+
+# plt.rcParams['font.family'] = 'CMU Serif'
 plt.rcParams['font.size'] = '14'
 plt.rcParams['axes.unicode_minus'] = False
 plt.rcParams['svg.fonttype'] = 'none'
@@ -7135,9 +7136,14 @@ def lasso_wrap_multi(X, y, num_folds=5,title='title'):
     return lasso_cv
 
 
+def mypack(list_of_variable_names):
+    return dict((name, eval(name)) for name in list_of_variable_names)
 
-
-
+def myhist(data, bins=99,alpha=0.4):
+    for k,v in data.items():
+        plt.hist(v, bins=bins,alpha=alpha, label=k)
+    plt.legend()
+    plt.show()
 
 
 

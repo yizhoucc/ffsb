@@ -333,5 +333,23 @@ def mytime():
     return  formatted_date
 
 
+def normalize_01(data,low=5,high=95):
+    '''normalize the data vector or matrix to 0-1 range
+    use percentile to avoid outliers.'''
+    themin=np.percentile(data[~np.isnan(data)],low)
+    themax=np.percentile(data[~np.isnan(data)],high)
+    res= (data - themin) / (themax- themin)
+    res[np.isnan(data)]=np.nan
+    res=np.clip(res, 0,1)
+    return res
 
+def normalize_z(data):
+    '''normalize the data vector or matrix to have mean of 0 std of 1'''
+    nanmask=~np.isnan(data)
+    validdata=data[nanmask]
+    mean = sum(data[nanmask]) / len(data[nanmask])
+    variance = sum((x - mean) ** 2 for x in data[nanmask]) / len(data[nanmask])
+    std_deviation = variance ** 0.5
+    normalized_data = [(x - mean) / std_deviation  if x else np.nan for x in data]
+    return normalized_data
 

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.colors as mcolors
 from IPython.display import clear_output
-
+import matplotlib.colors as mcolors
 
 # cebra embedding plots -------------------------------
 
@@ -331,3 +331,7 @@ def mytime():
     formatted_date = current_date.strftime("%m%d")
 
     return  formatted_date
+
+
+
+

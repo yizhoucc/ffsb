@@ -74,6 +74,7 @@ from operator import itemgetter
 
 
 def datawash(df):
+    '''skip the too short trials and fully on trials. only take the normal and skip from 'lazy', 'crazy', 'normal', 'wrong_target', skip '''
     from pandas import concat
     trialtypes={}
     df=df[df.trial_dur<4]
